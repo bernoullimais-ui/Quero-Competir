@@ -48,12 +48,13 @@ export function validateEnv(): void {
 
   // ─── Output ─────────────────────────────────────────────────────────────
   if (errors.length > 0) {
-    console.error("\n🚨  VARIÁVEIS DE AMBIENTE AUSENTES OU INVÁLIDAS:\n");
-    console.error(errors.join("\n\n"));
-    console.error(
-      "\n📖  Consulte o arquivo .env.example para instruções de configuração.\n"
-    );
-    process.exit(1);
+    const message = [
+      "\n🚨  VARIÁVEIS DE AMBIENTE AUSENTES OU INVÁLIDAS:\n",
+      errors.join("\n\n"),
+      "\n📖  Consulte o arquivo .env.example para instruções de configuração.\n",
+    ].join("\n");
+    console.error(message);
+    throw new Error(`Missing or invalid environment variables:\n${errors.join("\n")}`);
   }
 
   if (warnings.length > 0) {
