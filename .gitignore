@@ -6,10 +6,6 @@ build/
 dist/
 coverage/
 
-# Artefatos de compilação do backend (gerados por esbuild durante o build)
-api/index.js
-api/index.js.map
-
 # Sistema
 .DS_Store
 *.log
