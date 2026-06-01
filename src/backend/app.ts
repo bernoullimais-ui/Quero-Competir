@@ -50,18 +50,22 @@ app.use(
 );
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
+// In production on Vercel, CORS headers are handled at CDN level via vercel.json.
+// Here we allow all origins so the Express layer never blocks requests.
+// For self-hosted deployments, set APP_URL to restrict origins.
 const allowedOrigins = process.env.APP_URL
   ? [process.env.APP_URL, "http://localhost:3000", "http://localhost:5173"]
-  : ["http://localhost:3000", "http://localhost:5173"];
+  : null; // null = allow all origins
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g., curl, Postman, server-to-server)
+      // Always allow requests with no origin (curl, Postman, server-to-server)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin) || !isProduction) {
-        return callback(null, true);
-      }
+      // If no specific origins configured, allow all (Vercel CDN handles security)
+      if (!allowedOrigins) return callback(null, true);
+      // Otherwise enforce the allowlist
+      if (allowedOrigins.includes(origin)) return callback(null, true);
       return callback(new Error(`CORS: origin '${origin}' not allowed`));
     },
     credentials: true,
