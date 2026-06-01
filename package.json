@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build",
+    "build": "vite build && npm run build:api",
+    "build:api": "esbuild api/_entry.ts --bundle --platform=node --target=node20 --format=esm --packages=external --sourcemap --outfile=api/index.js",
     "build:server": "esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "NODE_ENV=production node dist/server.cjs",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist api/index.js api/index.js.map",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
