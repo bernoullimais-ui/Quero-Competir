@@ -9,7 +9,6 @@ import memberRoutes from "./routes/memberRoutes.ts";
 import authRoutes from "./routes/authRoutes.ts";
 import membershipRoutes from "./routes/membershipRoutes.ts";
 import { optionalAuth } from "./middleware/auth.ts";
-import { validateEnv } from "./lib/validateEnv.ts";
 
 // ─── Load env vars first (ESM-safe: called in module body, not hoisted) ────────
 // This ensures env vars are available even when app.ts is imported before
@@ -21,8 +20,6 @@ const app = express();
 
 const isProduction = process.env.NODE_ENV === "production";
 
-// Validate environment variables early — throws if required vars are missing
-validateEnv();
 
 // ─── Security ─────────────────────────────────────────────────────────────────
 app.use(
@@ -82,6 +79,27 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", version: "1.0.0", env: process.env.NODE_ENV || "development" });
+});
+
+// ─── Env Diagnostic (shows which vars are SET vs MISSING, never exposes values)
+app.get("/api/health/env", (_req, res) => {
+  const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "JWT_SECRET"];
+  const optional = ["APP_URL", "PAGARME_PUBLIC_KEY", "PAGARME_SECRET_KEY", "NODE_ENV"];
+  const report: Record<string, string> = {};
+
+  for (const key of required) {
+    const val = process.env[key];
+    if (!val) report[key] = "❌ MISSING";
+    else if (key === "JWT_SECRET") report[key] = val.length >= 32 ? `✅ SET (${val.length} chars)` : `⚠️ TOO SHORT (${val.length} chars, need ≥32)`;
+    else if (key === "SUPABASE_URL") report[key] = val.startsWith("https://") ? `✅ SET` : `⚠️ INVALID (must start with https://)`;
+    else report[key] = "✅ SET";
+  }
+
+  for (const key of optional) {
+    report[key] = process.env[key] ? "✅ SET" : "⚪ not set (optional)";
+  }
+
+  res.json({ status: "ok", variables: report });
 });
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
