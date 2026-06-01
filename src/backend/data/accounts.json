@@ -1,0 +1,154 @@
+[
+  {
+    "id": "inst-acc-48efa856-f0c8-447f-a08d-91c7501cc905",
+    "email": "aka@querocompetir.com.br",
+    "passwordHash": "$2b$10$ZT/MBudxPMEIvSmmgTWPOu9EAn9G6HknXEWSRw.EKYUSxttTCYQx2",
+    "role": "institution",
+    "name": "AKA",
+    "referenceId": "48efa856-f0c8-447f-a08d-91c7501cc905",
+    "createdAt": "2026-05-30T10:47:57.257+00:00"
+  },
+  {
+    "id": "inst-acc-266cd154-0730-47d7-b96b-7577f98e4937",
+    "email": "bunny@querocompetir.com.br",
+    "passwordHash": "$2b$10$ZNMRmCipWYHOEZRdzHf7r.COrMELZSLZ2yUXBY9Clg23u4kuW3Uca",
+    "role": "institution",
+    "name": "Bunny",
+    "referenceId": "266cd154-0730-47d7-b96b-7577f98e4937",
+    "createdAt": "2026-05-30T10:47:57.105+00:00"
+  },
+  {
+    "id": "org-1",
+    "email": "organizador@querocompetir.com.br",
+    "passwordHash": "$2b$10$uZhVFUQJIumN7j1swy6wmuaM.2gpagRB7JZPGT3C6.7YUx0xaMyEK",
+    "role": "organizer",
+    "name": "Organizador Principal",
+    "referenceId": "470275a0-cc3c-49f1-b61e-0f19850a6a4e",
+    "createdAt": "2026-05-30T10:47:56.612+00:00"
+  },
+  {
+    "id": "venue-acc-271d402e-5069-4982-8ceb-7687d6f9f939",
+    "email": "dombosco@querocompetir.com.br",
+    "passwordHash": "$2b$10$9yK.OeVMXM96E/LH7l1LJ.v/1xyearD9Gd.fZI4Zjy3yGw4zaLD6m",
+    "role": "venue",
+    "name": "Dom Bosco",
+    "referenceId": "271d402e-5069-4982-8ceb-7687d6f9f939",
+    "createdAt": "2026-05-30T11:51:12.391+00:00"
+  },
+  {
+    "id": "acc_jdcwegthm",
+    "email": "testetorcida@gmail.com",
+    "passwordHash": "$2b$10$VhKrnDytZV7pXj0wyuRCf.WlZ/SAu/G9Wgi9nZ08E5tFTbLD43s3K",
+    "role": "guardian",
+    "name": "Pai Torcedor",
+    "referenceId": "e65d8a9f-aa9e-4a48-b475-e4f84aeb1804",
+    "createdAt": "2026-05-30T12:30:47.438+00:00"
+  },
+  {
+    "id": "venue-acc-9f74aa68-e0d6-4a83-960f-933a7b1fe71b",
+    "email": "cav@querocompetir.com.br",
+    "passwordHash": "$2b$10$2qA0EzQugpsJtOim952Sxu.CTVV2xMPNplOAYv23qHY5UDwKyvR46",
+    "role": "venue",
+    "name": "CAV",
+    "referenceId": "9f74aa68-e0d6-4a83-960f-933a7b1fe71b",
+    "createdAt": "2026-05-30T11:51:12.442+00:00"
+  },
+  {
+    "id": "inst-acc-52965e85-4fc0-48b7-8ef9-60c0bcbe50dc",
+    "email": "pequenoliceu@querocompetir.com.br",
+    "passwordHash": "$2b$10$bFKe0X8gTAw2Orq10qfHmO.Z0t3aNm.oYy0k9EgNM3fq5hHpBJyXO",
+    "role": "institution",
+    "name": "Pequeno Liceu",
+    "referenceId": "52965e85-4fc0-48b7-8ef9-60c0bcbe50dc",
+    "createdAt": "2026-05-30T10:47:57.054+00:00"
+  },
+  {
+    "id": "inst-acc-2c6c6da3-451c-4126-954d-f1d06562e054",
+    "email": "timeteste@querocompetir.com.br",
+    "passwordHash": "$2b$10$CEqw237nmYZpTW1mTOZ8ReJBbaA8XrKqDqz6LHb8suF7h73gE5.Le",
+    "role": "institution",
+    "name": "TIME TESTE",
+    "referenceId": "2c6c6da3-451c-4126-954d-f1d06562e054",
+    "createdAt": "2026-05-30T10:47:57.307+00:00"
+  },
+  {
+    "id": "sa-1",
+    "email": "admin@querocompetir.com.br",
+    "passwordHash": "$2b$10$9PaDAkKkX9EJiMSdLNIWX.vDn50ozGp5tZXQjQnJICk9H5KminIX6",
+    "role": "super_admin",
+    "name": "Super Admin (SaaS Manager)",
+    "createdAt": "2026-05-30T10:47:56.56+00:00"
+  },
+  {
+    "id": "inst-acc-6aba1472-2823-487e-b737-a16a5ba8a387",
+    "email": "aabb@querocompetir.com.br",
+    "passwordHash": "$2b$10$JWoeh82G6Fvqn0EShHFq9.W9truuppWY7VcGXvl8/g9V7WK2Qtegy",
+    "role": "institution",
+    "name": "AABB",
+    "referenceId": "6aba1472-2823-487e-b737-a16a5ba8a387",
+    "createdAt": "2026-05-30T10:47:57.357+00:00"
+  },
+  {
+    "id": "venue-acc-static",
+    "email": "sede@querocompetir.com.br",
+    "passwordHash": "$2b$10$IXpQ3OYlrLVjVre5CKjez.NyduPeuUV98byk9hwZtD8xZKHd8ZLC2",
+    "role": "venue",
+    "name": "Sede Central (Arena Olímpica)",
+    "referenceId": "00000000-0000-0000-0000-000000000001",
+    "createdAt": "2026-05-30T11:51:12.492+00:00"
+  },
+  {
+    "id": "inst-acc-35a45ad5-602d-4332-8a86-21268ed399ba",
+    "email": "sportforkids@querocompetir.com.br",
+    "passwordHash": "$2b$10$gbdS/X04bNA6vgVHFTJ4j.RSmrxvGf1Wjt/YuT7jibkEZldA6h6au",
+    "role": "institution",
+    "name": "Sport for Kids",
+    "referenceId": "35a45ad5-602d-4332-8a86-21268ed399ba",
+    "createdAt": "2026-05-30T10:47:56.848+00:00"
+  },
+  {
+    "id": "inst-acc-81f171a9-1894-41d2-a71a-1bb00e86f72a",
+    "email": "dompedrinho@querocompetir.com.br",
+    "passwordHash": "$2b$10$fe/hyWAyxBOYRazfbTgTtO4D/hC8U0Lbm4fuvQ2K7GRWT.MHwnAsW",
+    "role": "institution",
+    "name": "Dom Pedrinho",
+    "referenceId": "81f171a9-1894-41d2-a71a-1bb00e86f72a",
+    "createdAt": "2026-05-30T10:47:56.952+00:00"
+  },
+  {
+    "id": "inst-acc-69fd6aae-a179-4277-ac4c-516db38086c1",
+    "email": "fluir@querocompetir.com.br",
+    "passwordHash": "$2b$10$ab0AHIUmzc29I7uZAkAyHeonyMcqSNHQkZKQJbkHjmV2KhOtWpolC",
+    "role": "institution",
+    "name": "FLUIR",
+    "referenceId": "69fd6aae-a179-4277-ac4c-516db38086c1",
+    "createdAt": "2026-05-30T10:47:57.004+00:00"
+  },
+  {
+    "id": "inst-acc-905c7902-56f0-44e1-ab79-54029c7b0611",
+    "email": "bernoulli+@querocompetir.com.br",
+    "passwordHash": "$2b$10$crNZptyVZltqetMwmjTMoeIu/6qLotqCmLZgodf6o2xyRtYrfaYIG",
+    "role": "institution",
+    "name": "Bernoulli+",
+    "referenceId": "905c7902-56f0-44e1-ab79-54029c7b0611",
+    "createdAt": "2026-05-30T10:47:56.901+00:00"
+  },
+  {
+    "id": "inst-acc-8a90c3bb-0ccc-48ed-8d95-4ce719d9f5b1",
+    "email": "escolapanameric@querocompetir.com.br",
+    "passwordHash": "$2b$10$UfHWyQ1yIHe1w6Lxlj6fmOKb1HBsEyHDBB23Eh2rgVnmrVKSM.i6q",
+    "role": "institution",
+    "name": "Escola Pan Americana",
+    "referenceId": "8a90c3bb-0ccc-48ed-8d95-4ce719d9f5b1",
+    "createdAt": "2026-05-30T10:47:57.206+00:00"
+  },
+  {
+    "id": "inst-acc-d7e59a23-96c3-4963-9d7f-0376897fea31",
+    "email": "segundagaveta@querocompetir.com.br",
+    "passwordHash": "$2b$10$McUJs/1Xj1slu7FvBwvSeOmqa4s3eMkRDg6Y5j9syfpg9yPvndRLW",
+    "role": "institution",
+    "name": "Segunda Gaveta",
+    "referenceId": "d7e59a23-96c3-4963-9d7f-0376897fea31",
+    "createdAt": "2026-05-30T10:47:57.155+00:00"
+  }
+]

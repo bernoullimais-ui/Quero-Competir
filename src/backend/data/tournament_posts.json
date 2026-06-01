@@ -1,0 +1,38 @@
+[
+  {
+    "id": "post_5aytqyuok",
+    "tournamentId": "44d0e06e-9691-4e02-931e-2f3b806a2f8e",
+    "authorType": "organizer",
+    "authorName": "JCCPAR",
+    "authorAvatar": "https://www.centraldasinscricoes.com.br/painel/upload/img/inscricao/thumb/img-47-801ed7b5b0763b900ea1e9c75322ccec.png",
+    "content": "",
+    "mediaUrl": "https://www.olimpiadatododia.com.br/wp-content/uploads/2022/08/Brasil-x-Hungria-IHF.png",
+    "mediaType": "image",
+    "createdAt": "2026-05-29T00:45:56.344Z",
+    "reactions": {
+      "like": 0,
+      "love": 0,
+      "applause": 0,
+      "is_pending": false
+    },
+    "comments": []
+  },
+  {
+    "id": "post_fp87pskke",
+    "tournamentId": "44d0e06e-9691-4e02-931e-2f3b806a2f8e",
+    "authorType": "organizer",
+    "authorName": "JCCPAR",
+    "authorAvatar": "https://www.centraldasinscricoes.com.br/painel/upload/img/inscricao/thumb/img-47-801ed7b5b0763b900ea1e9c75322ccec.png",
+    "content": "",
+    "mediaUrl": "https://placarsoft-jaraguadosul.s3.sa-east-1.amazonaws.com/01/post/da/d4/2162/f.basquete-ok-492290430390690932.jpg",
+    "mediaType": "image",
+    "createdAt": "2026-05-29T00:46:48.860Z",
+    "reactions": {
+      "like": 0,
+      "love": 0,
+      "applause": 0,
+      "is_pending": false
+    },
+    "comments": []
+  }
+]

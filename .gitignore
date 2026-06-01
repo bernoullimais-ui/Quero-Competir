@@ -1,0 +1,42 @@
+# Dependências
+node_modules/
+
+# Builds
+build/
+dist/
+coverage/
+
+# Sistema
+.DS_Store
+*.log
+*.log.*
+
+# Variáveis de ambiente — NUNCA fazer commit destes arquivos
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+# Manter apenas o template de exemplo
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+
+# Arquivos temporários e de scratch (gerados pelo agente de IA)
+api_response.json
+print_api_fields.ts
+scratch_*.ts
+test_*.ts
+test_*.cjs
+check_*.ts
+check_*.cjs
+test_hash.cjs
+test_save.cjs
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# Vercel
+.vercel

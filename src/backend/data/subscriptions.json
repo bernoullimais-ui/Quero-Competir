@@ -1,0 +1,170 @@
+{
+  "settings": {
+    "44d0e06e-9691-4e02-931e-2f3b806a2f8e": {
+      "deadline": "2026-06-10",
+      "feeType": "free",
+      "teamFee": 1000,
+      "athleteFee": 240,
+      "status": "open",
+      "requireMembership": false,
+      "registrationConfig": {
+        "fields": [
+          {
+            "id": "parentName",
+            "label": "Nome do Responsável",
+            "enabled": true,
+            "required": true,
+            "custom": false
+          },
+          {
+            "id": "parentPhone",
+            "label": "Telefone do Responsável",
+            "enabled": true,
+            "required": true,
+            "custom": false
+          },
+          {
+            "id": "bloodType",
+            "label": "Tipo Sanguíneo",
+            "enabled": true,
+            "required": true,
+            "custom": false
+          },
+          {
+            "id": "allergies",
+            "label": "Alergias / Restrições",
+            "enabled": true,
+            "required": false,
+            "custom": false
+          },
+          {
+            "id": "emergencyContact",
+            "label": "Contato de Emergência",
+            "enabled": true,
+            "required": true,
+            "custom": false
+          }
+        ],
+        "uploads": [
+          {
+            "id": "document",
+            "label": "Documento de Identidade (RG/CPF)",
+            "enabled": true,
+            "required": true,
+            "custom": false
+          },
+          {
+            "id": "photo",
+            "label": "Foto de Rosto (3x4)",
+            "enabled": true,
+            "required": true,
+            "custom": false
+          }
+        ],
+        "terms": [
+          {
+            "id": "imageUse",
+            "title": "1. Concessão de Direito de Uso de Imagem",
+            "content": "Autorizo expressamente o organizador do torneio a capturar e utilizar imagens, vídeos e transmissões de áudio nas quais o atleta participante figure, com finalidade puramente de divulgação esportiva, cobertura oficial das partidas, publicações em mídias impressas, redes sociais e portal oficial da competição, sem que isso gere qualquer direito a retribuição financeira.",
+            "enabled": true,
+            "required": true
+          },
+          {
+            "id": "liability",
+            "title": "2. Termo de Aptidão Física e Responsabilidade",
+            "content": "Declaro estar inteiramente ciente das regras oficiais do torneio. Sob as penas da lei, declaro que o atleta encontra-se plenamente apto e saudável para a participação em esportes competitivos, gozando de perfeita saúde física e mental. Isento de qualquer responsabilidade civil ou criminal os realizadores, a instituição escolar representativa e os patrocinadores por acidentes, imprevistos ou perdas decorrentes do andamento regular dos jogos.",
+            "enabled": true,
+            "required": true
+          }
+        ]
+      }
+    },
+    "mock-tournament-123": {
+      "deadline": "2026-12-31",
+      "feeType": "by_team_and_athlete_parent",
+      "teamFee": 50,
+      "athleteFee": 15,
+      "status": "open",
+      "requireMembership": false,
+      "registrationConfig": {
+        "fields": [
+          {
+            "id": "parentName",
+            "label": "Nome do Responsável",
+            "enabled": true,
+            "required": true,
+            "custom": false
+          },
+          {
+            "id": "parentPhone",
+            "label": "Telefone do Responsável",
+            "enabled": true,
+            "required": true,
+            "custom": false
+          },
+          {
+            "id": "bloodType",
+            "label": "Tipo Sanguíneo",
+            "enabled": false,
+            "required": false,
+            "custom": false
+          },
+          {
+            "id": "allergies",
+            "label": "Alergias / Restrições",
+            "enabled": true,
+            "required": true,
+            "custom": false
+          },
+          {
+            "id": "emergencyContact",
+            "label": "Contato de Emergência",
+            "enabled": true,
+            "required": true,
+            "custom": false
+          },
+          {
+            "id": "custom_mother",
+            "label": "Nome da Mãe",
+            "enabled": true,
+            "required": true,
+            "custom": true
+          }
+        ],
+        "uploads": [
+          {
+            "id": "document",
+            "label": "Documento de Identidade (RG/CPF)",
+            "enabled": true,
+            "required": true,
+            "custom": false
+          },
+          {
+            "id": "photo",
+            "label": "Foto de Rosto (3x4)",
+            "enabled": true,
+            "required": true,
+            "custom": false
+          }
+        ],
+        "terms": [
+          {
+            "id": "imageUse",
+            "title": "1. Concessão de Direito de Uso de Imagem",
+            "content": "Autorizo...",
+            "enabled": true,
+            "required": true
+          },
+          {
+            "id": "liability",
+            "title": "2. Termo de Aptidão Física",
+            "content": "Declaro...",
+            "enabled": true,
+            "required": true
+          }
+        ]
+      }
+    }
+  },
+  "athleteSubscriptions": []
+}
