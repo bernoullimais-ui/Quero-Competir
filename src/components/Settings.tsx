@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, Palette, Link as LinkIcon, Globe, Image as ImageIcon, Save, Phone, Mail, FileText } from 'lucide-react';
 import { useToast } from './ui/Toast.tsx';
+import { applyBrandColors } from '../utils/theme';
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<'geral' | 'visual' | 'redes' | 'avancado'>('geral');
@@ -87,6 +88,7 @@ export default function Settings() {
       });
       if (res.ok) {
         success('Configurações salvas com sucesso!');
+        applyBrandColors(formData);
       } else {
         const err = await res.json();
         toastError('Erro ao salvar: ' + err.error);

@@ -64,6 +64,7 @@ export default function PublicTournamentView() {
       fetch(`/api/tournaments/${id}/categories`).then(r => r.json())
     ]).then(([tData, cData]) => {
       setTournament(tData);
+      if (tData.organization) applyBrandColors(tData.organization);
       const catsList = Array.isArray(cData) ? cData : [];
       setCategories(catsList);
       if (catsList.length > 0) {

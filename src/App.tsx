@@ -9,6 +9,7 @@ import { LayoutDashboard, Trophy, Building2, Users, Settings, Activity, Shield, 
 import { motion, AnimatePresence } from "motion/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ErrorBoundary } from "react-error-boundary";
+import { applyBrandColors } from "./utils/theme";
 
 // Auth Components
 import Login from "./components/Login.tsx";
@@ -74,7 +75,10 @@ const Layout = ({ children, onLogout }: { children: React.ReactNode; onLogout: (
     fetch("/api/tournaments/organization", { headers })
       .then(res => res.json())
       .then(data => {
-        if (data && !data.error) setOrg(data);
+        if (data && !data.error) {
+          setOrg(data);
+          applyBrandColors(data);
+        }
       })
       .catch(console.error);
   }, []);
