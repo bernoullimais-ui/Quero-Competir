@@ -2611,6 +2611,16 @@ export default function TournamentDashboard() {
                                           setShowMatchModal(true);
                                         }}
                                       >
+                                        <div className="flex flex-col mb-3 pb-2 border-b border-slate-50">
+                                          <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                             <MapPin size={10} className="shrink-0" />
+                                             <span className="truncate">{match.venue?.name || "Local a definir"}{match.court ? ` - ${match.court}` : ''}</span>
+                                          </div>
+                                          <div className="text-[9px] font-bold text-slate-400 flex items-center gap-1 mt-0.5">
+                                             <Calendar size={10} className="shrink-0" />
+                                             <span>{match.scheduled_time ? parseLocalTime(match.scheduled_time)?.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : "Data a definir"}</span>
+                                          </div>
+                                        </div>
                                         <div className="space-y-3">
                                           <div className={`flex justify-between items-center p-2 rounded-lg ${match.winner_id === match.team1_id && match.team1_id ? "bg-emerald-50 text-emerald-900" : ""}`}>
                                             <div className="flex items-center gap-2 overflow-hidden flex-1">
@@ -2668,6 +2678,16 @@ export default function TournamentDashboard() {
                                           setShowMatchModal(true);
                                         }}
                                       >
+                                        <div className="flex flex-col mb-3 pb-2 border-b border-slate-50">
+                                          <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                             <MapPin size={10} className="shrink-0" />
+                                             <span className="truncate">{match.venue?.name || "Local a definir"}{match.court ? ` - ${match.court}` : ''}</span>
+                                          </div>
+                                          <div className="text-[9px] font-bold text-slate-400 flex items-center gap-1 mt-0.5">
+                                             <Calendar size={10} className="shrink-0" />
+                                             <span>{match.scheduled_time ? parseLocalTime(match.scheduled_time)?.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : "Data a definir"}</span>
+                                          </div>
+                                        </div>
                                         <div className="space-y-3">
                                           <div className={`flex justify-between items-center p-2 rounded-lg ${match.winner_id === match.team1_id && match.team1_id ? "bg-emerald-50 text-emerald-900" : ""}`}>
                                             <div className="flex items-center gap-2 overflow-hidden flex-1">
