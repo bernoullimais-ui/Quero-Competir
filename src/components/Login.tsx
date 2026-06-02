@@ -157,21 +157,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         {/* Auth Box */}
         <div className="bg-slate-900/85 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden" id="login-card">
           
-          {/* Header Action to Seed Accounts for Demonstrations */}
-          <div className="mb-6 flex justify-between items-center bg-slate-800/40 px-4 py-3 rounded-2xl border border-slate-800">
-            <div className="flex items-center gap-1.5 text-xs text-indigo-400 font-bold">
-              <Sparkles size={14} className="animate-pulse" />
-              <span>Ambiente Demonstrativo</span>
-            </div>
-            <button
-              type="button"
-              onClick={handleSeedAccounts}
-              disabled={loading}
-              className="text-[10px] uppercase font-extrabold tracking-wider bg-indigo-600 hover:bg-indigo-500 text-white py-1 px-2.5 rounded-lg transition duration-150 disabled:opacity-50"
-            >
-              Autogerar Contas
-            </button>
-          </div>
 
           {!isSignUp && (
             /* Multi-role Navigation Tabs */
@@ -366,17 +351,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             </div>
           )}
 
-          {/* Mini helper showing pre-seeded logins if needed */}
-          {seededUsers && (
-            <div className="mt-6 p-4 rounded-2xl bg-indigo-950/20 border border-indigo-900/30 text-[10px] text-slate-400 space-y-1.5 select-all">
-              <span className="font-bold text-indigo-300 uppercase tracking-wider block mb-1">Dica de logins disponíveis:</span>
-              <p>📍 Admin: <strong>admin@querocompetir.com.br</strong> (senha: <strong>admin123</strong>)</p>
-              <p>📍 Organizador: <strong>organizador@querocompetir.com.br</strong> (senha: <strong>org123</strong>)</p>
-              {institutions.length > 0 && (
-                <p>📍 Clube Demo: <strong>{institutions[0].name.toLowerCase().replace(/\s+/g, "").substring(0, 15)}@querocompetir.com.br</strong> (senha: <strong>clube123</strong>)</p>
-              )}
-            </div>
-          )}
+          
+
         </div>
       </div>
     </div>
