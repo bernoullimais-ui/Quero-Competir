@@ -72,43 +72,12 @@ export default function MatchModal({
   };
 
   const handleSaveResult = async () => {
-    const s1 = parseInt((document.getElementById("score1_input") as HTMLInputElement).value) || 0;
-    const s2 = parseInt((document.getElementById("score2_input") as HTMLInputElement).value) || 0;
-
-    let wId = manualWinner;
-    const isGroupMatch = !!selectedMatch.group_label;
-
-    if (manualWinner === null && !isGroupMatch) {
-      toastWarning("Jogos eliminatórios não podem terminar em empate. Selecione um vencedor.");
-      return;
-    }
-
-    if (manualWinner === undefined || manualWinner === null) {
-      if (s1 > s2) wId = selectedMatch.team1_id;
-      else if (s2 > s1) wId = selectedMatch.team2_id;
-      else if (isGroupMatch) wId = null; // Draw is allowed
-    }
-
-    if (wId === undefined && !isGroupMatch) {
-      toastWarning("Por favor, selecione o vencedor manualmente em caso de empate.");
-      return;
-    }
-
-    if (s1 === s2 && !isGroupMatch && !manualWinner) {
-      toastWarning("Por favor, informe quem venceu nos pênaltis/critério de desempate.");
-      return;
-    }
-
     setLoading(true);
     try {
       const res = await fetch(`/api/tournaments/matches/${selectedMatch.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          score1: s1,
-          score2: s2,
-          winner_id: wId,
-          status: "finished",
           roster1,
           roster2
         })
@@ -160,12 +129,6 @@ export default function MatchModal({
               <p className="text-[10px] font-bold truncate px-2 text-slate-500 uppercase tracking-widest">
                 {selectedMatch.roster1?.athlete_name ? `${selectedMatch.roster1.athlete_name} (${selectedMatch.roster1.institution_name})` : (selectedMatch.team1?.institution?.name || "A definir")}
               </p>
-              <input
-                type="number"
-                className="w-20 text-center text-3xl font-black p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 mx-auto"
-                defaultValue={selectedMatch.score1 ?? ""}
-                id="score1_input"
-              />
             </div>
 
             <div className="text-slate-350 font-black text-2xl italic">VS</div>
@@ -190,12 +153,6 @@ export default function MatchModal({
               <p className="text-[10px] font-bold truncate px-2 text-slate-500 uppercase tracking-widest">
                 {selectedMatch.roster2?.athlete_name ? `${selectedMatch.roster2.athlete_name} (${selectedMatch.roster2.institution_name})` : (selectedMatch.team2?.institution?.name || "A definir")}
               </p>
-              <input
-                type="number"
-                className="w-20 text-center text-3xl font-black p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 mx-auto"
-                defaultValue={selectedMatch.score2 ?? ""}
-                id="score2_input"
-              />
             </div>
           </div>
 
@@ -282,50 +239,11 @@ export default function MatchModal({
           <div className="space-y-4 pt-4">
             <button
               onClick={handleStartLive}
-              className="w-full p-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-indigo-200 hover:bg-slate-900 transition-all mb-4 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full p-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-indigo-200 hover:bg-slate-900 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Timer size={18} />
               Iniciar Partida (Painel do Mesário)
             </button>
-
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest text-center">
-              Resultado / Vencedor
-            </label>
-            <div className={`grid ${selectedMatch.group_label ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
-              <button
-                type="button"
-                onClick={() => setManualWinner(selectedMatch.team1_id)}
-                className={`p-3 rounded-xl text-[10px] font-bold border transition-all uppercase tracking-widest ${
-                  manualWinner === selectedMatch.team1_id
-                    ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-white text-slate-600 border-slate-200"
-                }`}
-              >
-                Time A
-              </button>
-              {selectedMatch.group_label && (
-                <button
-                  type="button"
-                  onClick={() => setManualWinner(null)}
-                  className={`p-3 rounded-xl text-[10px] font-bold border transition-all uppercase tracking-widest ${
-                    manualWinner === null ? "bg-slate-600 text-white border-slate-600" : "bg-white text-slate-600 border-slate-200"
-                  }`}
-                >
-                  Empate
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setManualWinner(selectedMatch.team2_id)}
-                className={`p-3 rounded-xl text-[10px] font-bold border transition-all uppercase tracking-widest ${
-                  manualWinner === selectedMatch.team2_id
-                    ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-white text-slate-600 border-slate-200"
-                }`}
-              >
-                Time B
-              </button>
-            </div>
           </div>
 
           <div className="flex gap-4 pt-6">
