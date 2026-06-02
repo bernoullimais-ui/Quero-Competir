@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Activity, Shield, Users, Building2, Trophy, Key, Trash2, ShieldAlert, CheckCircle, TrendingUp, DollarSign, Plus, Eye, Check } from "lucide-react";
+import { Activity, Shield, Users, Building2, Trophy, Key, Trash2, ShieldAlert, CheckCircle, TrendingUp, DollarSign, Plus, Eye, Check, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useToast } from "./ui/Toast.tsx";
 import { useConfirm } from "./ui/ConfirmDialog.tsx";
@@ -15,6 +15,7 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
   const [users, setUsers] = useState<any[]>([]);
   const [institutions, setInstitutions] = useState<any[]>([]);
   const [tournaments, setTournaments] = useState<any[]>([]);
+  const [athletes, setAthletes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -29,6 +30,9 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
   const [saasFeePercent, setSaasFeePercent] = useState(10);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [saasConfigSaved, setSaasConfigSaved] = useState(false);
+
+  // Details Modal State
+  const [activeModal, setActiveModal] = useState<"athletes" | "institutions" | "tournaments" | null>(null);
 
   const getHeaders = (extraHeaders: any = {}) => {
     const headersObj: any = { ...extraHeaders };
@@ -47,21 +51,24 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [uRes, iRes, tRes] = await Promise.all([
+      const [uRes, iRes, tRes, aRes] = await Promise.all([
         fetch("/api/auth/users", { headers: getHeaders() }),
         fetch("/api/institutions", { headers: getHeaders() }),
-        fetch("/api/tournaments", { headers: getHeaders() })
+        fetch("/api/tournaments", { headers: getHeaders() }),
+        fetch("/api/members", { headers: getHeaders() })
       ]);
 
-      const [uData, iData, tData] = await Promise.all([
+      const [uData, iData, tData, aData] = await Promise.all([
         uRes.json(),
         iRes.json(),
-        tRes.json()
+        tRes.json(),
+        aRes.json()
       ]);
 
       if (Array.isArray(uData)) setUsers(uData);
       if (Array.isArray(iData)) setInstitutions(iData);
       if (Array.isArray(tData)) setTournaments(tData);
+      if (Array.isArray(aData)) setAthletes(aData);
     } catch (err: any) {
       setError("Erro ao carregar dados do painel: " + err.message);
     } finally {
@@ -164,17 +171,21 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
       </header>
 
       {/* Main SaaS Contents Grid */}
-      <main className="flex-1 p-8 max-w-7xl w-full mx-auto space-y-8">
+      <main className="flex-1 p-8 max-w-7xl w-full mx-auto space-y-8 relative">
         
         {/* Statistics Widgets Row */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[
-            { label: "Atletas Registrados (SaaS)", value: "324", change: "+14% hoje", icon: Users, color: "text-indigo-600 bg-indigo-50 border-indigo-100" },
-            { label: "Instituições Ativas", value: institutions.length.toString(), change: "Em todo o Brasil", icon: Building2, color: "text-emerald-500 bg-emerald-50 border-emerald-100" },
-            { label: "Torneios Hospedados", value: tournaments.length.toString(), change: "Ativos & Planejamento", icon: Trophy, color: "text-amber-500 bg-amber-50 border-amber-100" },
-            { label: "Taxa de Comissão SaaS", value: `${saasFeePercent}%`, change: "Configurada sobre transações", icon: DollarSign, color: "text-rose-500 bg-rose-50 border-rose-100" }
+            { id: "athletes", label: "Atletas Registrados (SaaS)", value: athletes.length.toString(), change: "Na plataforma", icon: Users, color: "text-indigo-600 bg-indigo-50 border-indigo-100" },
+            { id: "institutions", label: "Instituições Ativas", value: institutions.length.toString(), change: "Em todo o Brasil", icon: Building2, color: "text-emerald-500 bg-emerald-50 border-emerald-100" },
+            { id: "tournaments", label: "Torneios Hospedados", value: tournaments.length.toString(), change: "Ativos & Planejamento", icon: Trophy, color: "text-amber-500 bg-amber-50 border-amber-100" },
+            { id: "fees", label: "Taxa de Comissão SaaS", value: `${saasFeePercent}%`, change: "Configurada sobre transações", icon: DollarSign, color: "text-rose-500 bg-rose-50 border-rose-100" }
           ].map((stat, i) => (
-            <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition duration-200 flex items-center justify-between">
+            <div 
+              key={i} 
+              onClick={() => stat.id !== "fees" && setActiveModal(stat.id as any)}
+              className={`bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition duration-200 flex items-center justify-between ${stat.id !== "fees" ? "cursor-pointer hover:shadow-md hover:ring-2 hover:ring-indigo-500/50 hover:border-indigo-500/50" : ""}`}
+            >
               <div className="space-y-1.5">
                 <span className="text-[11px] font-bold text-slate-450 uppercase tracking-wider block">{stat.label}</span>
                 <h3 className="text-3xl font-extrabold text-slate-800">{stat.value}</h3>
@@ -208,14 +219,14 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
               {loading ? (
                 <div className="py-12 text-center text-slate-400 font-medium text-sm">Carregando contas seguras...</div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-150 text-slate-450 font-bold uppercase tracking-wider">
-                        <th className="py-3 px-4 rounded-l-xl">E-mail / Usuário</th>
+                <div className="overflow-x-auto max-h-96">
+                  <table className="w-full text-left text-xs border-collapse relative">
+                    <thead className="sticky top-0 bg-slate-50 z-10">
+                      <tr className="border-b border-slate-150 text-slate-450 font-bold uppercase tracking-wider">
+                        <th className="py-3 px-4 rounded-tl-xl">E-mail / Usuário</th>
                         <th className="py-3 px-4">Nome Completo</th>
                         <th className="py-3 px-4">Role / Perfil</th>
-                        <th className="py-3 px-4 text-center">Ações</th>
+                        <th className="py-3 px-4 text-center rounded-tr-xl">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="font-semibold text-slate-700 divide-y divide-slate-100">
@@ -410,7 +421,143 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
 
         </div>
 
+        {/* Modal for Details Lists */}
+        <AnimatePresence>
+          {activeModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setActiveModal(null)}
+                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden relative z-10 flex flex-col max-h-[85vh]"
+              >
+                <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                      {activeModal === "athletes" && <Users size={20} />}
+                      {activeModal === "institutions" && <Building2 size={20} />}
+                      {activeModal === "tournaments" && <Trophy size={20} />}
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-extrabold text-slate-800">
+                        {activeModal === "athletes" && "Listagem de Atletas"}
+                        {activeModal === "institutions" && "Listagem de Instituições"}
+                        {activeModal === "tournaments" && "Listagem de Torneios"}
+                      </h2>
+                      <p className="text-xs font-semibold text-slate-500">Visualização global de dados do sistema</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setActiveModal(null)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 hover:text-slate-800 transition"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6">
+                  {activeModal === "athletes" && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-150 text-slate-450 font-bold uppercase tracking-wider">
+                            <th className="py-3 px-4 rounded-tl-xl">Nome Completo</th>
+                            <th className="py-3 px-4">Documento</th>
+                            <th className="py-3 px-4">Clube / Instituição</th>
+                            <th className="py-3 px-4 text-right rounded-tr-xl">Data de Nasc.</th>
+                          </tr>
+                        </thead>
+                        <tbody className="font-semibold text-slate-700 divide-y divide-slate-100">
+                          {athletes.length === 0 ? (
+                            <tr><td colSpan={4} className="py-8 text-center text-slate-400">Nenhum atleta registrado</td></tr>
+                          ) : athletes.map(a => (
+                            <tr key={a.id} className="hover:bg-slate-50/80">
+                              <td className="py-3 px-4">{a.full_name || a.name}</td>
+                              <td className="py-3 px-4 text-slate-500 font-mono">{a.document_number || "-"}</td>
+                              <td className="py-3 px-4">{a.institutions?.name || a.institution_id || "Não vinculada"}</td>
+                              <td className="py-3 px-4 text-right">
+                                {a.birth_date ? new Date(a.birth_date).toLocaleDateString('pt-BR') : "-"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {activeModal === "institutions" && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-150 text-slate-450 font-bold uppercase tracking-wider">
+                            <th className="py-3 px-4 rounded-tl-xl">Nome do Clube</th>
+                            <th className="py-3 px-4">Responsável</th>
+                            <th className="py-3 px-4">E-mail</th>
+                            <th className="py-3 px-4 text-right rounded-tr-xl">Documento</th>
+                          </tr>
+                        </thead>
+                        <tbody className="font-semibold text-slate-700 divide-y divide-slate-100">
+                          {institutions.length === 0 ? (
+                            <tr><td colSpan={4} className="py-8 text-center text-slate-400">Nenhuma instituição registrada</td></tr>
+                          ) : institutions.map(i => (
+                            <tr key={i.id} className="hover:bg-slate-50/80">
+                              <td className="py-3 px-4 font-bold text-slate-800">{i.name}</td>
+                              <td className="py-3 px-4">{i.responsible_name || "-"}</td>
+                              <td className="py-3 px-4 font-mono text-slate-500">{i.email || "-"}</td>
+                              <td className="py-3 px-4 text-right font-mono text-slate-500">{i.document_number || i.tax_id || i.cnpj || "-"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {activeModal === "tournaments" && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-150 text-slate-450 font-bold uppercase tracking-wider">
+                            <th className="py-3 px-4 rounded-tl-xl">Nome do Torneio</th>
+                            <th className="py-3 px-4">Modalidade</th>
+                            <th className="py-3 px-4">Status</th>
+                            <th className="py-3 px-4 text-right rounded-tr-xl">Nº Categorias</th>
+                          </tr>
+                        </thead>
+                        <tbody className="font-semibold text-slate-700 divide-y divide-slate-100">
+                          {tournaments.length === 0 ? (
+                            <tr><td colSpan={4} className="py-8 text-center text-slate-400">Nenhum torneio registrado</td></tr>
+                          ) : tournaments.map(t => (
+                            <tr key={t.id} className="hover:bg-slate-50/80">
+                              <td className="py-3 px-4 font-bold text-slate-800">{t.name}</td>
+                              <td className="py-3 px-4 uppercase text-[10px] tracking-wider">{t.sport_type || "Geral"}</td>
+                              <td className="py-3 px-4">
+                                <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${t.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                  {t.status === 'active' ? 'Ativo' : t.status || 'Rascunho'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right text-slate-500">
+                                {t.categories ? t.categories.length : 0}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );
 }
+
