@@ -27,4 +27,18 @@ export const applyBrandColors = (org: any) => {
     root.style.setProperty('--color-amber-800', `color-mix(in srgb, ${org.secondary_color} 50%, black)`);
     root.style.setProperty('--color-amber-900', `color-mix(in srgb, ${org.secondary_color} 30%, black)`);
   }
+  
+  if (org.font_family) {
+    let fontFamily = '"Inter", sans-serif'; // default
+    if (org.font_family === 'roboto') {
+      fontFamily = '"Roboto", sans-serif';
+    } else if (org.font_family === 'space') {
+      fontFamily = '"Space Grotesk", sans-serif';
+    }
+    
+    // Tailwind v4 relies heavily on --font-sans for the default font
+    root.style.setProperty('--font-sans', fontFamily);
+    // Also apply it directly to body to ensure it propagates everywhere correctly
+    document.body.style.fontFamily = fontFamily;
+  }
 };
