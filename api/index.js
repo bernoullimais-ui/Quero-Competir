@@ -1697,7 +1697,15 @@ router2.get("/:id", async (req, res) => {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase.from("tournaments").select("*").eq("id", req.params.id).single();
     if (error) throw error;
-    res.json(data);
+    let organization = null;
+    if (data && data.owner_id) {
+      const orgId = await getOrganizerReferenceIdAndSync(data.owner_id);
+      if (orgId) {
+        const { data: orgData } = await supabase.from("organizations").select("*").eq("id", orgId).maybeSingle();
+        organization = orgData;
+      }
+    }
+    res.json({ ...data, organization });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

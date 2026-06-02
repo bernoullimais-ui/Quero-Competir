@@ -650,7 +650,22 @@ router.get("/:id", async (req, res) => {
       .single();
 
     if (error) throw error;
-    res.json(data);
+    
+    // Buscar organização associada usando o owner_id
+    let organization = null;
+    if (data && data.owner_id) {
+      const orgId = await getOrganizerReferenceIdAndSync(data.owner_id);
+      if (orgId) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('id', orgId)
+          .maybeSingle();
+        organization = orgData;
+      }
+    }
+    
+    res.json({ ...data, organization });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
