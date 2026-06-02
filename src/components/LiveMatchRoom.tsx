@@ -2097,15 +2097,21 @@ const LiveMatchRoom: React.FC<LiveMatchRoomProps> = ({ matchId, onBack, onUpdate
               </button>
           )}
           
-          {match.status === 'finished' && nextMatchId && onNextMatch && (
+          {match.status === 'finished' && onNextMatch && (
             <div className="w-full mt-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-              <button 
-                onClick={() => onNextMatch(nextMatchId)}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-600/20 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                Ir para o Próximo Jogo
-                <Play size={16} fill="currentColor" />
-              </button>
+              {nextMatchId ? (
+                <button 
+                  onClick={() => onNextMatch(nextMatchId)}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-600/20 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  Ir para o Próximo Jogo
+                  <Play size={16} fill="currentColor" />
+                </button>
+              ) : (
+                <div className="w-full py-3 bg-slate-800 text-slate-400 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 border border-slate-700">
+                  <span className="truncate">Nenhum próximo jogo nesta sede</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -2910,6 +2916,24 @@ const LiveMatchRoom: React.FC<LiveMatchRoomProps> = ({ matchId, onBack, onUpdate
               >
                 Finalizar Jogo
               </button>
+            </div>
+          )}
+
+          {match.status === 'finished' && onNextMatch && (
+            <div className="flex gap-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              {nextMatchId ? (
+                <button 
+                  onClick={() => onNextMatch(nextMatchId)}
+                  className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 rounded-2xl font-black uppercase tracking-widest text-xs transition-all cursor-pointer"
+                >
+                  Ir para o Próximo Jogo
+                  <Play size={16} fill="currentColor" />
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 px-6 py-3 bg-slate-800 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px] border border-slate-700">
+                  <span className="truncate">Nenhum próximo jogo nesta sede</span>
+                </div>
+              )}
             </div>
           )}
         </div>
