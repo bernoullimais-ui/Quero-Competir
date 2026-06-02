@@ -333,6 +333,7 @@ router.get("/:tournamentId/venues/:venueId/live", async (req, res) => {
       .maybeSingle();
 
     // 2. Se não houver jogo em progresso, tenta achar o que deve ocorrer hoje na ordem ou que já acabou
+    // 2. Se não houver jogo em progresso, tenta achar o próximo que deve ocorrer hoje ('scheduled')
     if (!liveMatch) {
       const { data: nextMatch } = await supabase
         .from('matches')
@@ -346,7 +347,7 @@ router.get("/:tournamentId/venues/:venueId/live", async (req, res) => {
         `)
         .eq('tournament_id', req.params.tournamentId)
         .eq('venue_id', req.params.venueId)
-        .in('status', ['scheduled', 'finished'])
+        .eq('status', 'scheduled')
         .gte('scheduled_time', startOfDay.toISOString())
         .lte('scheduled_time', endOfDay.toISOString())
         .order('scheduled_time', { ascending: true })
@@ -354,6 +355,30 @@ router.get("/:tournamentId/venues/:venueId/live", async (req, res) => {
         .maybeSingle();
         
       liveMatch = nextMatch;
+    }
+
+    // 3. Se não houver nem 'in_progress' nem 'scheduled', mostra o último que terminou ('finished')
+    if (!liveMatch) {
+      const { data: lastFinished } = await supabase
+        .from('matches')
+        .select(`
+          *,
+          tournament:tournament_id(name, logo_url),
+          category:tournament_category_id(name, gender, age_group),
+          team1:team1_id(id, institution:institutions(id, name, logo_url)),
+          team2:team2_id(id, institution:institutions(id, name, logo_url)),
+          venue:venue_id(name)
+        `)
+        .eq('tournament_id', req.params.tournamentId)
+        .eq('venue_id', req.params.venueId)
+        .eq('status', 'finished')
+        .gte('scheduled_time', startOfDay.toISOString())
+        .lte('scheduled_time', endOfDay.toISOString())
+        .order('scheduled_time', { ascending: false }) // O último do dia que foi jogado
+        .limit(1)
+        .maybeSingle();
+        
+      liveMatch = lastFinished;
     }
 
     res.json(liveMatch || null);

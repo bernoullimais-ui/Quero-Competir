@@ -1476,8 +1476,19 @@ router2.get("/:tournamentId/venues/:venueId/live", async (req, res) => {
           team1:team1_id(id, institution:institutions(id, name, logo_url)),
           team2:team2_id(id, institution:institutions(id, name, logo_url)),
           venue:venue_id(name)
-        `).eq("tournament_id", req.params.tournamentId).eq("venue_id", req.params.venueId).in("status", ["scheduled", "finished"]).gte("scheduled_time", startOfDay.toISOString()).lte("scheduled_time", endOfDay.toISOString()).order("scheduled_time", { ascending: true }).limit(1).maybeSingle();
+        `).eq("tournament_id", req.params.tournamentId).eq("venue_id", req.params.venueId).eq("status", "scheduled").gte("scheduled_time", startOfDay.toISOString()).lte("scheduled_time", endOfDay.toISOString()).order("scheduled_time", { ascending: true }).limit(1).maybeSingle();
       liveMatch = nextMatch;
+    }
+    if (!liveMatch) {
+      const { data: lastFinished } = await supabase.from("matches").select(`
+          *,
+          tournament:tournament_id(name, logo_url),
+          category:tournament_category_id(name, gender, age_group),
+          team1:team1_id(id, institution:institutions(id, name, logo_url)),
+          team2:team2_id(id, institution:institutions(id, name, logo_url)),
+          venue:venue_id(name)
+        `).eq("tournament_id", req.params.tournamentId).eq("venue_id", req.params.venueId).eq("status", "finished").gte("scheduled_time", startOfDay.toISOString()).lte("scheduled_time", endOfDay.toISOString()).order("scheduled_time", { ascending: false }).limit(1).maybeSingle();
+      liveMatch = lastFinished;
     }
     res.json(liveMatch || null);
   } catch (error) {

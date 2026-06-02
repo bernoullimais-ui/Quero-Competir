@@ -1045,7 +1045,14 @@ export default function TournamentDashboard() {
         fetchMatches();
       }}
       onNextMatch={(nextId) => {
-        setLiveMatchId(nextId);
+        const nextMatchObj = bracketMatches.find((m: any) => m.id === nextId);
+        setLiveMatchId(null);
+        if (nextMatchObj) {
+          setSelectedMatch(nextMatchObj);
+          setShowMatchModal(true);
+        } else {
+          setLiveMatchId(nextId);
+        }
       }}
     />
   );
