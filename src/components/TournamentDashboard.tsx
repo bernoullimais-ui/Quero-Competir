@@ -160,6 +160,19 @@ const formatCurrency = (val: number) => {
 
 type Tab = "geral" | "modalidades" | "inscricoes" | "financeiro" | "configuracoes" | "tabela" | "escala" | "arbitragem" | "estatisticas" | "classificacao" | "comunidade";
 
+const parseLocalTime = (scheduledTime: string) => {
+  const regexMatch = scheduledTime.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!regexMatch) return null;
+  const [_, year, month, day, hour, minute] = regexMatch;
+  return new Date(
+    parseInt(year, 10),
+    parseInt(month, 10) - 1,
+    parseInt(day, 10),
+    parseInt(hour, 10),
+    parseInt(minute, 10)
+  );
+};
+
 export default function TournamentDashboard() {
   const { id } = useParams();
   const navigate = useNavigate();
