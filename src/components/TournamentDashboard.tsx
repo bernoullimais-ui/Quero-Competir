@@ -1044,6 +1044,9 @@ export default function TournamentDashboard() {
       onUpdatePlacar={() => {
         fetchMatches();
       }}
+      onNextMatch={(nextId) => {
+        setLiveMatchId(nextId);
+      }}
     />
   );
 

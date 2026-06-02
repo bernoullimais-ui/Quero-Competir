@@ -25,6 +25,7 @@ import TournamentList from "./components/TournamentList.tsx";
 import TournamentDashboard from "./components/TournamentDashboard.tsx";
 import AthleteFilter from "./components/AthleteFilter.tsx";
 import PublicScoreboard from "./components/PublicScoreboard.tsx";
+import LiveVenueScoreboard from "./components/LiveVenueScoreboard.tsx";
 import StaffManagement from "./components/StaffManagement.tsx";
 import VenueManagement from "./components/VenueManagement.tsx";
 import PublicTournamentView from "./components/PublicTournamentView.tsx";
@@ -447,6 +448,11 @@ export default function App() {
               <Route path="/public/match/:matchId" element={
                 <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar o placar.</div>}>
                   <PublicScoreboard />
+                </ErrorBoundary>
+              } />
+              <Route path="/public/tournament/:tournamentId/venue/:venueId/live" element={
+                <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar o placar de sede.</div>}>
+                  <LiveVenueScoreboard />
                 </ErrorBoundary>
               } />
               

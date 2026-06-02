@@ -17,15 +17,17 @@ interface LiveMatchRoomProps {
   matchId: string;
   onBack: () => void;
   onUpdatePlacar: () => void;
+  onNextMatch?: (matchId: string) => void;
 }
 
-const LiveMatchRoom: React.FC<LiveMatchRoomProps> = ({ matchId, onBack, onUpdatePlacar }) => {
+const LiveMatchRoom: React.FC<LiveMatchRoomProps> = ({ matchId, onBack, onUpdatePlacar, onNextMatch }) => {
   const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
   const { confirm } = useConfirm();
   const [match, setMatch] = useState<any>(null);
   const [team1Athletes, setTeam1Athletes] = useState<any[]>([]);
   const [team2Athletes, setTeam2Athletes] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [nextMatchId, setNextMatchId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
   // New: Offline state management & Pocket Referee Mode (PWA helper)
@@ -279,6 +281,17 @@ const LiveMatchRoom: React.FC<LiveMatchRoomProps> = ({ matchId, onBack, onUpdate
       console.warn("Dispositivo conectado em modo offline ou rede lenta. Usando dados armazenados em cache local.", err);
       setIsOnline(false);
     } finally {
+      // 3. Busca próximo jogo (não bloqueia UI)
+      if (navigator.onLine) {
+        try {
+          const nRes = await fetch(`/api/tournaments/matches/${matchId}/next`);
+          if (nRes.ok) {
+            const nData = await nRes.json();
+            if (nData && nData.id) setNextMatchId(nData.id);
+            else setNextMatchId(null);
+          }
+        } catch (e) {}
+      }
       setLoading(false);
     }
   };
@@ -2082,6 +2095,17 @@ const LiveMatchRoom: React.FC<LiveMatchRoomProps> = ({ matchId, onBack, onUpdate
                 <Trophy size={12} />
                 Finalizar Jogo
               </button>
+          )}
+          
+          {match.status === 'finished' && nextMatchId && onNextMatch && (
+            <div className="w-full mt-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <button 
+                onClick={() => onNextMatch(nextMatchId)}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-600/20 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                Ir para o Próximo Jogo
+                <Play size={16} fill="currentColor" />
+              </button>
             </div>
           )}
         </div>
@@ -2552,9 +2576,15 @@ const LiveMatchRoom: React.FC<LiveMatchRoomProps> = ({ matchId, onBack, onUpdate
           </button>
 
           <button 
-            onClick={() => window.open(`/public/match/${matchId}`, '_blank')}
+            onClick={() => {
+              if (match?.tournament_id && match?.venue_id) {
+                window.open(`/public/tournament/${match.tournament_id}/venue/${match.venue_id}/live`, '_blank');
+              } else {
+                window.open(`/public/match/${matchId}`, '_blank');
+              }
+            }}
             className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-colors"
-            title="Abrir Placar Público"
+            title="Abrir Placar Público da Sede"
           >
             <ExternalLink size={14} />
             <span className="hidden sm:inline">Placar Público</span>
