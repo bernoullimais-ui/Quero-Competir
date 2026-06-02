@@ -18,6 +18,7 @@ export default function Settings() {
     primary_color: '#4F46E5',
     secondary_color: '#0F172A',
     font_family: 'inter',
+    theme_mode: 'light',
     website: '',
     instagram: '',
     youtube: '',
@@ -233,6 +234,15 @@ export default function Settings() {
                       <input type="text" name="secondary_color" value={formData.secondary_color || '#0F172A'} onChange={handleChange} className="w-28 px-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono" />
                     </div>
                   </div>
+                </div>
+
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">Modo Visual (Tema)</label>
+                  <select name="theme_mode" value={formData.theme_mode || 'light'} onChange={handleChange} className="w-full md:w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="light">Modo Claro (Padrão)</option>
+                    <option value="dark">Modo Escuro (Dark Mode)</option>
+                  </select>
                 </div>
 
                 <div>

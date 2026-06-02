@@ -178,31 +178,67 @@ export interface Database {
         Row: {
           id: string
           name: string
+          cnpj: string | null
+          description: string | null
+          email: string | null
+          phone: string | null
           logo_url: string | null
           primary_color: string | null
           secondary_color: string | null
           font_family: string | null
+          theme_mode: string | null
+          website: string | null
+          instagram: string | null
+          youtube: string | null
           subdomain: string | null
+          auto_approve_registrations: boolean | null
+          show_incomplete_brackets: boolean | null
+          requires_membership_fee: boolean | null
+          membership_fee_amount: number | null
           created_at: string
         }
         Insert: {
           id?: string
           name: string
+          cnpj?: string | null
+          description?: string | null
+          email?: string | null
+          phone?: string | null
           logo_url?: string | null
           primary_color?: string | null
           secondary_color?: string | null
           font_family?: string | null
+          theme_mode?: string | null
+          website?: string | null
+          instagram?: string | null
+          youtube?: string | null
           subdomain?: string | null
+          auto_approve_registrations?: boolean | null
+          show_incomplete_brackets?: boolean | null
+          requires_membership_fee?: boolean | null
+          membership_fee_amount?: number | null
           created_at?: string
         }
         Update: {
           id?: string
           name?: string
+          cnpj?: string | null
+          description?: string | null
+          email?: string | null
+          phone?: string | null
           logo_url?: string | null
           primary_color?: string | null
           secondary_color?: string | null
           font_family?: string | null
+          theme_mode?: string | null
+          website?: string | null
+          instagram?: string | null
+          youtube?: string | null
           subdomain?: string | null
+          auto_approve_registrations?: boolean | null
+          show_incomplete_brackets?: boolean | null
+          requires_membership_fee?: boolean | null
+          membership_fee_amount?: number | null
           created_at?: string
         }
       }
