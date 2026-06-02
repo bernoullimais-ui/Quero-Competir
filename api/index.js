@@ -1432,6 +1432,58 @@ router2.get("/match/:matchId", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+router2.get("/matches/:matchId/next", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: currentMatch, error: currError } = await supabase.from("matches").select("tournament_id, venue_id, scheduled_time").eq("id", req.params.matchId).single();
+    if (currError) throw currError;
+    if (!currentMatch.venue_id || !currentMatch.scheduled_time) {
+      return res.json(null);
+    }
+    const currentDate = new Date(currentMatch.scheduled_time);
+    const startOfDay = new Date(currentDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(currentDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    const { data: nextMatch, error: nextError } = await supabase.from("matches").select("id, scheduled_time, status").eq("tournament_id", currentMatch.tournament_id).eq("venue_id", currentMatch.venue_id).gte("scheduled_time", currentMatch.scheduled_time).neq("id", req.params.matchId).order("scheduled_time", { ascending: true }).limit(1).maybeSingle();
+    if (nextError) throw nextError;
+    res.json(nextMatch || null);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+router2.get("/:tournamentId/venues/:venueId/live", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const today = /* @__PURE__ */ new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
+    let { data: liveMatch, error } = await supabase.from("matches").select(`
+        *,
+        tournament:tournament_id(name, logo_url),
+        category:tournament_category_id(name, gender, age_group),
+        team1:team1_id(id, institution:institutions(id, name, logo_url)),
+        team2:team2_id(id, institution:institutions(id, name, logo_url)),
+        venue:venue_id(name)
+      `).eq("tournament_id", req.params.tournamentId).eq("venue_id", req.params.venueId).eq("status", "in_progress").gte("scheduled_time", startOfDay.toISOString()).lte("scheduled_time", endOfDay.toISOString()).order("scheduled_time", { ascending: true }).limit(1).maybeSingle();
+    if (!liveMatch) {
+      const { data: nextMatch } = await supabase.from("matches").select(`
+          *,
+          tournament:tournament_id(name, logo_url),
+          category:tournament_category_id(name, gender, age_group),
+          team1:team1_id(id, institution:institutions(id, name, logo_url)),
+          team2:team2_id(id, institution:institutions(id, name, logo_url)),
+          venue:venue_id(name)
+        `).eq("tournament_id", req.params.tournamentId).eq("venue_id", req.params.venueId).in("status", ["scheduled", "finished"]).gte("scheduled_time", startOfDay.toISOString()).lte("scheduled_time", endOfDay.toISOString()).order("scheduled_time", { ascending: true }).limit(1).maybeSingle();
+      liveMatch = nextMatch;
+    }
+    res.json(liveMatch || null);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 router2.post("/", requireAuth, async (req, res) => {
   const { name, owner_id, description, start_date, end_date, logo_url } = req.body;
   const organizerId = req.user.id;

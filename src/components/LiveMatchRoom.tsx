@@ -2095,6 +2095,7 @@ const LiveMatchRoom: React.FC<LiveMatchRoomProps> = ({ matchId, onBack, onUpdate
                 <Trophy size={12} />
                 Finalizar Jogo
               </button>
+            </div>
           )}
           
           {match.status === 'finished' && onNextMatch && (
