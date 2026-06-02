@@ -30,13 +30,27 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [saasConfigSaved, setSaasConfigSaved] = useState(false);
 
+  const getHeaders = (extraHeaders: any = {}) => {
+    const headersObj: any = { ...extraHeaders };
+    const savedUser = localStorage.getItem("currentUser");
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser);
+        if (user && user.token) {
+          headersObj["Authorization"] = `Bearer ${user.token}`;
+        }
+      } catch (e) {}
+    }
+    return headersObj;
+  };
+
   const fetchAllData = async () => {
     setLoading(true);
     try {
       const [uRes, iRes, tRes] = await Promise.all([
-        fetch("/api/auth/users"),
-        fetch("/api/institutions"),
-        fetch("/api/tournaments")
+        fetch("/api/auth/users", { headers: getHeaders() }),
+        fetch("/api/institutions", { headers: getHeaders() }),
+        fetch("/api/tournaments", { headers: getHeaders() })
       ]);
 
       const [uData, iData, tData] = await Promise.all([
@@ -69,7 +83,10 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
     });
     if (!isConfirmed) return;
     try {
-      const res = await fetch(`/api/auth/users/${userId}`, { method: "DELETE" });
+      const res = await fetch(`/api/auth/users/${userId}`, { 
+        method: "DELETE",
+        headers: getHeaders()
+      });
       if (res.ok) {
         setUsers(users.filter(u => u.id !== userId));
         toastSuccess("Credencial excluída com sucesso.");
