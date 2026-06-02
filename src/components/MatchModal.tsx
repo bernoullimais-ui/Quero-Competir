@@ -108,7 +108,7 @@ export default function MatchModal({
         </div>
 
         <div className="space-y-8">
-          <div className="grid grid-cols-2 gap-8 items-center text-center">
+          <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center text-center">
             <div className="space-y-4">
               <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl mx-auto flex items-center justify-center font-bold text-xl border border-indigo-100 overflow-hidden">
                 {selectedMatch.team1?.institution?.logo_url ? (
