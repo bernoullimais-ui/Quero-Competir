@@ -92,13 +92,13 @@ const Layout = ({ children, onLogout }: { children: React.ReactNode; onLogout: (
         
         <nav className="space-y-2">
           <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/" active={location.pathname === "/"} />
-          <SidebarItem icon={Building2} label="Instituições" href="/institutions" active={location.pathname.startsWith("/institutions")} />
-          <SidebarItem icon={Trophy} label="Torneios" href="/tournaments" active={location.pathname.startsWith("/tournaments")} />
-          <SidebarItem icon={Users} label="Atletas" href="/athletes" active={location.pathname === "/athletes"} />
+          <SidebarItem icon={Building2} label="Instituições" href="/instituicoes" active={location.pathname.startsWith("/instituicoes")} />
+          <SidebarItem icon={Trophy} label="Torneios" href="/torneios" active={location.pathname.startsWith("/torneios")} />
+          <SidebarItem icon={Users} label="Atletas" href="/atletas" active={location.pathname === "/atletas"} />
           <SidebarItem icon={Shield} label="Arbitragem" href="/staff" active={location.pathname === "/staff"} />
-          <SidebarItem icon={MapPin} label="Sedes" href="/venues" active={location.pathname === "/venues"} />
+          <SidebarItem icon={MapPin} label="Sedes" href="/sedes" active={location.pathname === "/sedes"} />
           <div className="pt-10 border-t border-slate-100 mt-6 space-y-2">
-            <SidebarItem icon={Settings} label="Configurações" href="/settings" active={location.pathname === "/settings"} />
+            <SidebarItem icon={Settings} label="Configurações" href="/configuracoes" active={location.pathname === "/configuracoes"} />
           </div>
         </nav>
       </aside>
@@ -142,13 +142,13 @@ const Layout = ({ children, onLogout }: { children: React.ReactNode; onLogout: (
 
               <nav className="space-y-2 flex-1">
                 <SidebarItem icon={LayoutDashboard} label="Dashboard" href="/" active={location.pathname === "/"} />
-                <SidebarItem icon={Building2} label="Instituições" href="/institutions" active={location.pathname.startsWith("/institutions")} />
-                <SidebarItem icon={Trophy} label="Torneios" href="/tournaments" active={location.pathname.startsWith("/tournaments")} />
-                <SidebarItem icon={Users} label="Atletas" href="/athletes" active={location.pathname === "/athletes"} />
+                <SidebarItem icon={Building2} label="Instituições" href="/instituicoes" active={location.pathname.startsWith("/instituicoes")} />
+                <SidebarItem icon={Trophy} label="Torneios" href="/torneios" active={location.pathname.startsWith("/torneios")} />
+                <SidebarItem icon={Users} label="Atletas" href="/atletas" active={location.pathname === "/atletas"} />
                 <SidebarItem icon={Shield} label="Arbitragem" href="/staff" active={location.pathname === "/staff"} />
-                <SidebarItem icon={MapPin} label="Sedes" href="/venues" active={location.pathname === "/venues"} />
+                <SidebarItem icon={MapPin} label="Sedes" href="/sedes" active={location.pathname === "/sedes"} />
                 <div className="pt-8 border-t border-slate-100 mt-6 space-y-2">
-                  <SidebarItem icon={Settings} label="Configurações" href="/settings" active={location.pathname === "/settings"} />
+                  <SidebarItem icon={Settings} label="Configurações" href="/configuracoes" active={location.pathname === "/configuracoes"} />
                 </div>
               </nav>
 
@@ -285,11 +285,11 @@ const Home = () => {
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8">
         <h2 className="text-lg font-bold mb-4 text-slate-800">Ações Rápidas</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-center mb-8">
-          <Link to="/tournaments/new" className="p-6 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all group">
+          <Link to="/torneios/new" className="p-6 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all group">
             <Trophy className="mx-auto mb-2 text-slate-400 group-hover:text-indigo-600" />
             <span className="text-sm font-semibold text-slate-600 group-hover:text-indigo-600">Criar Torneio</span>
           </Link>
-          <Link to="/institutions/new" className="p-6 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all group">
+          <Link to="/instituicoes/new" className="p-6 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all group">
             <Building2 className="mx-auto mb-2 text-slate-400 group-hover:text-indigo-600" />
             <span className="text-sm font-semibold text-slate-600 group-hover:text-indigo-600">Novo Clube/Escola</span>
           </Link>
@@ -300,7 +300,7 @@ const Home = () => {
             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Acesso Rápido - Torneios Ativos</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
               {tournaments.map(t => (
-                <Link key={t.id} to={`/tournaments/${t.id}`} className="p-6 rounded-2xl border-2 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 transition-all group relative overflow-hidden">
+                <Link key={t.id} to={`/torneios/${t.id}`} className="p-6 rounded-2xl border-2 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 transition-all group relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-2 h-full bg-emerald-400"></div>
                   <Trophy className="mx-auto mb-2 text-emerald-500 group-hover:text-emerald-600" size={24} />
                   <span className="block text-sm font-bold text-slate-800">{t.name}</span>
@@ -510,16 +510,16 @@ export default function App() {
                     <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 bg-white rounded-2xl shadow-sm border border-red-100">Erro inesperado no painel. Tente recarregar a página.</div>}>
                       <Routes>
                         <Route path="/" element={<Home />} />
-                        <Route path="/institutions" element={<InstitutionList />} />
-                        <Route path="/institutions/new" element={<NewInstitution />} />
-                        <Route path="/institutions/:id/edit" element={<NewInstitution />} />
-                        <Route path="/tournaments" element={<TournamentList />} />
-                        <Route path="/tournaments/new" element={<NewTournament />} />
-                        <Route path="/tournaments/:id" element={<TournamentDashboard />} />
-                        <Route path="/athletes" element={<AthleteFilter />} />
+                        <Route path="/instituicoes" element={<InstitutionList />} />
+                        <Route path="/instituicoes/new" element={<NewInstitution />} />
+                        <Route path="/instituicoes/:id/edit" element={<NewInstitution />} />
+                        <Route path="/torneios" element={<TournamentList />} />
+                        <Route path="/torneios/new" element={<NewTournament />} />
+                        <Route path="/torneios/:id" element={<TournamentDashboard />} />
+                        <Route path="/atletas" element={<AthleteFilter />} />
                         <Route path="/staff" element={<StaffManagement />} />
-                        <Route path="/venues" element={<VenueManagement />} />
-                        <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/sedes" element={<VenueManagement />} />
+                        <Route path="/configuracoes" element={<SettingsPage />} />
                         <Route path="/portal/institution/:id" element={<InstitutionPortal />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                       </Routes>

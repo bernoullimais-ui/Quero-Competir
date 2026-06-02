@@ -1176,7 +1176,7 @@ export default function TournamentDashboard() {
   if (!tournament) return (
     <div className="text-center py-20">
       <h2 className="text-2xl font-bold text-slate-800">Torneio não encontrado</h2>
-      <button onClick={() => navigate("/tournaments")} className="mt-4 text-indigo-600 font-semibold">
+      <button onClick={() => navigate("/torneios")} className="mt-4 text-indigo-600 font-semibold">
         Voltar para a lista
       </button>
     </div>
@@ -1188,7 +1188,7 @@ export default function TournamentDashboard() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-slate-200">
         <div className="space-y-4">
           <button 
-            onClick={() => navigate("/tournaments")}
+            onClick={() => navigate("/torneios")}
             className="flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors text-sm font-medium"
           >
             <ChevronLeft size={16} />

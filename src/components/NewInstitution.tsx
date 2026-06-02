@@ -74,7 +74,7 @@ export default function NewInstitution() {
       if (!res.ok) throw new Error(data.error || "Erro ao salvar");
       
       setSuccess(true);
-      setTimeout(() => navigate("/institutions"), 2000);
+      setTimeout(() => navigate("/instituicoes"), 2000);
     } catch (err: any) {
       toastError(`Erro ao cadastrar instituição: ${err.message}`);
     } finally {

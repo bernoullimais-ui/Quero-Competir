@@ -41,7 +41,7 @@ export default function NewTournament() {
       if (!res.ok) throw new Error(data.error || "Erro ao criar torneio");
       
       toastSuccess("Torneio criado com sucesso!");
-      navigate("/tournaments");
+      navigate("/torneios");
     } catch (err: any) {
       toastError(`Erro: ${err.message}`);
     } finally {

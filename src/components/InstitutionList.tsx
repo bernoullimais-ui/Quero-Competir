@@ -174,7 +174,7 @@ ${generatedInvite.organizerName}`;
           <p className="text-slate-500 text-sm">Gerencie clubes, escolas e parcerias credenciadas no sistema</p>
         </div>
         <Link 
-          to="/institutions/new" 
+          to="/instituicoes/new" 
           className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg shadow-indigo-100 hover:bg-indigo-700 flex items-center gap-2 whitespace-nowrap"
         >
           <Plus size={20} />
@@ -257,7 +257,7 @@ ${generatedInvite.organizerName}`;
                     <Link to={`/portal/institution/${inst.id}`} target="_blank" className="text-slate-500 hover:text-indigo-600 text-sm font-bold flex items-center gap-1">
                       Ver Portal
                     </Link>
-                    <Link to={`/institutions/${inst.id}/edit`} className="text-indigo-600 text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                    <Link to={`/instituicoes/${inst.id}/edit`} className="text-indigo-600 text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                       Editar
                     </Link>
                   </div>
@@ -287,7 +287,7 @@ ${generatedInvite.organizerName}`;
             {tournaments.length === 0 && !loadingTournaments && (
               <div className="mb-6 p-4 bg-amber-50 text-amber-800 rounded-2xl border border-amber-200 text-sm font-medium flex items-center justify-between">
                 <span>Você precisa de pelo menos um torneio com status ativo para gerar convites de adesão para eventos específicos.</span>
-                <Link to="/tournaments/new" className="bg-amber-600 text-white px-4 py-2 rounded-xl hover:bg-amber-700 transition-all font-semibold text-xs whitespace-nowrap ml-4">
+                <Link to="/torneios/new" className="bg-amber-600 text-white px-4 py-2 rounded-xl hover:bg-amber-700 transition-all font-semibold text-xs whitespace-nowrap ml-4">
                   Criar Primeiro Torneio
                 </Link>
               </div>

@@ -38,7 +38,7 @@ export default function TournamentList() {
           <p className="text-slate-500 text-sm">Acompanhe e gerencie todas as competições</p>
         </div>
         <Link 
-          to="/tournaments/new" 
+          to="/torneios/new" 
           className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg shadow-indigo-100 hover:bg-indigo-700 flex items-center gap-2 whitespace-nowrap"
         >
           <Plus size={20} />
@@ -91,7 +91,7 @@ export default function TournamentList() {
                     {tournament.status === 'active' ? 'Em Andamento' : 'Configuração'}
                   </span>
                 </div>
-                <Link to={`/tournaments/${tournament.id}`} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors">
+                <Link to={`/torneios/${tournament.id}`} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors">
                   Gerenciar
                 </Link>
               </div>
@@ -102,7 +102,7 @@ export default function TournamentList() {
             <Trophy className="mx-auto mb-4 text-slate-300" size={48} />
             <h3 className="text-lg font-bold text-slate-600">Nenhum torneio agendado</h3>
             <p className="text-slate-500 text-sm mb-6 max-w-sm mx-auto">Você ainda não criou nenhuma competição. Comece agora mesmo!</p>
-            <Link to="/tournaments/new" className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold inline-block">Criar meu primeiro torneio</Link>
+            <Link to="/torneios/new" className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold inline-block">Criar meu primeiro torneio</Link>
           </div>
         )}
       </div>
