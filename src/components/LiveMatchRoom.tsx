@@ -2098,7 +2098,7 @@ const LiveMatchRoom: React.FC<LiveMatchRoomProps> = ({ matchId, onBack, onUpdate
           )}
           
           {match.status === 'finished' && onNextMatch && (
-            <div className="w-full mt-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="w-full mt-4">
               {nextMatchId ? (
                 <button 
                   onClick={() => onNextMatch(nextMatchId)}
@@ -2920,7 +2920,7 @@ const LiveMatchRoom: React.FC<LiveMatchRoomProps> = ({ matchId, onBack, onUpdate
           )}
 
           {match.status === 'finished' && onNextMatch && (
-            <div className="flex gap-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="flex gap-2 mt-4">
               {nextMatchId ? (
                 <button 
                   onClick={() => onNextMatch(nextMatchId)}
