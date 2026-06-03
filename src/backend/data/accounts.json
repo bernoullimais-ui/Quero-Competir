@@ -1,41 +1,5 @@
 [
   {
-    "id": "inst-acc-48efa856-f0c8-447f-a08d-91c7501cc905",
-    "email": "aka@querocompetir.com.br",
-    "passwordHash": "$2b$10$ZT/MBudxPMEIvSmmgTWPOu9EAn9G6HknXEWSRw.EKYUSxttTCYQx2",
-    "role": "institution",
-    "name": "AKA",
-    "referenceId": "48efa856-f0c8-447f-a08d-91c7501cc905",
-    "createdAt": "2026-05-30T10:47:57.257+00:00"
-  },
-  {
-    "id": "inst-acc-266cd154-0730-47d7-b96b-7577f98e4937",
-    "email": "bunny@querocompetir.com.br",
-    "passwordHash": "$2b$10$ZNMRmCipWYHOEZRdzHf7r.COrMELZSLZ2yUXBY9Clg23u4kuW3Uca",
-    "role": "institution",
-    "name": "Bunny",
-    "referenceId": "266cd154-0730-47d7-b96b-7577f98e4937",
-    "createdAt": "2026-05-30T10:47:57.105+00:00"
-  },
-  {
-    "id": "org-1",
-    "email": "organizador@querocompetir.com.br",
-    "passwordHash": "$2b$10$uZhVFUQJIumN7j1swy6wmuaM.2gpagRB7JZPGT3C6.7YUx0xaMyEK",
-    "role": "organizer",
-    "name": "Organizador Principal",
-    "referenceId": "470275a0-cc3c-49f1-b61e-0f19850a6a4e",
-    "createdAt": "2026-05-30T10:47:56.612+00:00"
-  },
-  {
-    "id": "venue-acc-271d402e-5069-4982-8ceb-7687d6f9f939",
-    "email": "dombosco@querocompetir.com.br",
-    "passwordHash": "$2b$10$9yK.OeVMXM96E/LH7l1LJ.v/1xyearD9Gd.fZI4Zjy3yGw4zaLD6m",
-    "role": "venue",
-    "name": "Dom Bosco",
-    "referenceId": "271d402e-5069-4982-8ceb-7687d6f9f939",
-    "createdAt": "2026-05-30T11:51:12.391+00:00"
-  },
-  {
     "id": "acc_jdcwegthm",
     "email": "testetorcida@gmail.com",
     "passwordHash": "$2b$10$VhKrnDytZV7pXj0wyuRCf.WlZ/SAu/G9Wgi9nZ08E5tFTbLD43s3K",
@@ -74,7 +38,7 @@
   {
     "id": "sa-1",
     "email": "admin@querocompetir.com.br",
-    "passwordHash": "$2b$10$9PaDAkKkX9EJiMSdLNIWX.vDn50ozGp5tZXQjQnJICk9H5KminIX6",
+    "passwordHash": "$2b$10$dUK1duvv7ZUR7crkauv2aOZnwnt.wjSnaDwAwNg70wjRUcF6Obws.",
     "role": "super_admin",
     "name": "Super Admin (SaaS Manager)",
     "createdAt": "2026-05-30T10:47:56.56+00:00"
@@ -150,5 +114,41 @@
     "name": "Segunda Gaveta",
     "referenceId": "d7e59a23-96c3-4963-9d7f-0376897fea31",
     "createdAt": "2026-05-30T10:47:57.155+00:00"
+  },
+  {
+    "id": "inst-acc-48efa856-f0c8-447f-a08d-91c7501cc905",
+    "email": "aka@querocompetir.com.br",
+    "passwordHash": "$2b$10$ZT/MBudxPMEIvSmmgTWPOu9EAn9G6HknXEWSRw.EKYUSxttTCYQx2",
+    "role": "institution",
+    "name": "AKA",
+    "referenceId": "48efa856-f0c8-447f-a08d-91c7501cc905",
+    "createdAt": "2026-05-30T10:47:57.257+00:00"
+  },
+  {
+    "id": "inst-acc-266cd154-0730-47d7-b96b-7577f98e4937",
+    "email": "bunny@querocompetir.com.br",
+    "passwordHash": "$2b$10$ZNMRmCipWYHOEZRdzHf7r.COrMELZSLZ2yUXBY9Clg23u4kuW3Uca",
+    "role": "institution",
+    "name": "Bunny",
+    "referenceId": "266cd154-0730-47d7-b96b-7577f98e4937",
+    "createdAt": "2026-05-30T10:47:57.105+00:00"
+  },
+  {
+    "id": "org-1",
+    "email": "organizador@querocompetir.com.br",
+    "passwordHash": "$2b$10$dYgTl.nhxr3FWNp9BWSj1.ulrGr6UmqsOMW9jdeRMUIAVTiInbMyu",
+    "role": "organizer",
+    "name": "Organizador Principal",
+    "referenceId": "470275a0-cc3c-49f1-b61e-0f19850a6a4e",
+    "createdAt": "2026-05-30T10:47:56.612+00:00"
+  },
+  {
+    "id": "venue-acc-271d402e-5069-4982-8ceb-7687d6f9f939",
+    "email": "dombosco@querocompetir.com.br",
+    "passwordHash": "$2b$10$9yK.OeVMXM96E/LH7l1LJ.v/1xyearD9Gd.fZI4Zjy3yGw4zaLD6m",
+    "role": "venue",
+    "name": "Dom Bosco",
+    "referenceId": "271d402e-5069-4982-8ceb-7687d6f9f939",
+    "createdAt": "2026-05-30T11:51:12.391+00:00"
   }
 ]

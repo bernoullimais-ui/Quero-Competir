@@ -8,6 +8,7 @@ import TournamentClassification from "./TournamentClassification.tsx";
 import TournamentCommunity from "./TournamentCommunity.tsx";
 import EventInfoTab from "./EventInfoTab.tsx";
 import { ErrorBoundary } from "react-error-boundary";
+import { applyBrandColors } from "../utils/theme";
 
 const getSubdivisions = (cat: any) => {
   if (!cat || cat.rules_config?.sport_type !== "combat") return [];
