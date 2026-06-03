@@ -4102,19 +4102,95 @@ router2.post("/:id/auto-schedule", async (req, res) => {
     (teams || []).forEach((t) => {
       teamInstitutionMap[t.id] = t.institution_id;
     });
-    let matchesToSchedule = (matches || []).filter((m) => {
-      const hasTeams = m.team1_id && m.team2_id;
-      if (!hasTeams) return false;
-      if (onlyUnscheduled) {
-        return !m.scheduled_time || !m.venue_id;
+    const parseHelper = (timeStr) => {
+      const m = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (!m) return null;
+      return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+    };
+    const getDayName = (date) => ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"][date.getDay()];
+    const isOverlap = (a, b, dur) => {
+      const da = parseHelper(a), db = parseHelper(b);
+      if (!da || !db) return false;
+      return Math.abs(da.getTime() - db.getTime()) < dur * 6e4;
+    };
+    const slotFitsInAvail = (avails, slotStr, dur) => {
+      const d = parseHelper(slotStr);
+      if (!d) return true;
+      const dateOnly = slotStr.split("T")[0];
+      const dayName = getDayName(d);
+      const startMin = d.getHours() * 60 + d.getMinutes();
+      const endMin = startMin + dur;
+      if (avails.some((av) => av.type === "unavailable" && av.date === dateOnly)) return false;
+      const regular = avails.filter((a) => a.type !== "unavailable" && a.day && a.start && a.end);
+      if (regular.length === 0) return true;
+      return regular.some((av) => {
+        if (av.day !== dayName) return false;
+        const [sh, sm] = av.start.split(":").map(Number);
+        const [eh, em] = av.end.split(":").map(Number);
+        const openMin = sh * 60 + sm;
+        const closeMin = eh * 60 + em;
+        return startMin >= openMin && endMin <= closeMin;
+      });
+    };
+    const venueAvailableAt = (venueId, slotStr) => {
+      const venue = (venues || []).find((v) => v.id === venueId);
+      if (!venue) return false;
+      const avails = Array.isArray(venue.availability) ? venue.availability : [];
+      if (avails.length === 0) return true;
+      return slotFitsInAvail(avails, slotStr, matchDuration);
+    };
+    const teamAvailableAt = (teamId, slotStr) => {
+      const team = (teams || []).find((t) => t.id === teamId);
+      if (!team || !Array.isArray(team.availability) || team.availability.length === 0) return true;
+      return slotFitsInAvail(team.availability, slotStr, matchDuration);
+    };
+    const generateSlots = () => {
+      const slots = [];
+      const [sh, sm] = dailyStartTime.split(":").map(Number);
+      const [eh, em] = dailyEndTime.split(":").map(Number);
+      const dayEndMin = eh * 60 + em;
+      const limit = /* @__PURE__ */ new Date((endDate || startDate) + "T23:59:59");
+      let cur = /* @__PURE__ */ new Date(startDate + "T00:00:00");
+      while (cur <= limit) {
+        const dateStr = cur.toISOString().split("T")[0];
+        let h = sh, m = sm;
+        while (h * 60 + m + matchDuration <= dayEndMin) {
+          slots.push(`${dateStr}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+          m += matchDuration;
+          h += Math.floor(m / 60);
+          m = m % 60;
+        }
+        cur = new Date(cur.getTime() + 864e5);
       }
-      return true;
+      return slots;
+    };
+    const allSlots = generateSlots();
+    const allScheduled = (matches || []).filter(
+      (m) => m.scheduled_time && m.venue_id && m.team1_id && m.team2_id
+    );
+    const validAnchors = [];
+    const invalidPrev = [];
+    if (onlyUnscheduled) {
+      for (const m of allScheduled) {
+        if (venueAvailableAt(m.venue_id, m.scheduled_time)) {
+          validAnchors.push(m);
+        } else {
+          invalidPrev.push(m);
+        }
+      }
+    }
+    let matchesToSchedule = (matches || []).filter((m) => {
+      if (!m.team1_id || !m.team2_id) return false;
+      if (!onlyUnscheduled) return true;
+      if (!m.scheduled_time || !m.venue_id) return true;
+      if (invalidPrev.some((i) => i.id === m.id)) return true;
+      return false;
     });
     matchesToSchedule.sort((a, b) => {
       if (a.round !== b.round) return a.round - b.round;
       return a.match_index - b.match_index;
     });
-    const activeSchedule = (matches || []).filter((m) => m.scheduled_time && m.venue_id && m.team1_id && m.team2_id).map((m) => ({
+    const activeSchedule = validAnchors.map((m) => ({
       matchId: m.id,
       team1Id: m.team1_id,
       team2Id: m.team2_id,
@@ -4122,241 +4198,103 @@ router2.post("/:id/auto-schedule", async (req, res) => {
       venueId: m.venue_id,
       court: m.court || "Principal"
     }));
-    if (onlyUnscheduled === false) {
-      activeSchedule.length = 0;
-    }
-    const createTimeSlots = (startD, endD) => {
-      const slots2 = [];
-      let currentDate = /* @__PURE__ */ new Date(startD + "T00:00:00");
-      let limitDate = endD ? /* @__PURE__ */ new Date(endD + "T23:59:59") : new Date((/* @__PURE__ */ new Date(startD + "T00:00:00")).getTime() + 30 * 24 * 60 * 60 * 1e3);
-      const [startH, startM] = dailyStartTime.split(":").map(Number);
-      const [endH, endM] = dailyEndTime.split(":").map(Number);
-      let dayOffset = 0;
-      while (true) {
-        const loopDate = new Date(currentDate.getTime() + dayOffset * 24 * 60 * 60 * 1e3);
-        if (loopDate > limitDate) break;
-        const dateStr = loopDate.toISOString().split("T")[0];
-        let currentHour = startH;
-        let currentMinute = startM;
-        const endMinutes = endH * 60 + endM;
-        while (currentHour * 60 + currentMinute + matchDuration <= endMinutes) {
-          const hh = String(currentHour).padStart(2, "0");
-          const mm = String(currentMinute).padStart(2, "0");
-          slots2.push(`${dateStr}T${hh}:${mm}`);
-          currentMinute += matchDuration;
-          if (currentMinute >= 60) {
-            currentHour += Math.floor(currentMinute / 60);
-            currentMinute = currentMinute % 60;
-          }
-        }
-        dayOffset++;
-        if (dayOffset > 365) break;
-      }
-      return slots2;
-    };
-    const slots = createTimeSlots(startDate, endDate || startDate);
-    const parseHelper = (timeStr) => {
-      const regexMatch = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-      if (!regexMatch) return null;
-      const [_, year, month, day, hour, minute] = regexMatch;
-      return new Date(
-        parseInt(year, 10),
-        parseInt(month, 10) - 1,
-        parseInt(day, 10),
-        parseInt(hour, 10),
-        parseInt(minute, 10)
-      );
-    };
-    const isOverlap = (timeStr1, timeStr2, durationMin) => {
-      const t1 = parseHelper(timeStr1);
-      const t2 = parseHelper(timeStr2);
-      if (!t1 || !t2) return false;
-      const diff = Math.abs(t1.getTime() - t2.getTime());
-      return diff < durationMin * 60 * 1e3;
-    };
     let scheduledCount = 0;
     const updatesToSave = [];
-    if (!onlyUnscheduled) {
-      matchesToSchedule.forEach((m) => {
-        updatesToSave.push({ id: m.id, scheduled_time: null, venue_id: null, court: null });
-      });
+    if (onlyUnscheduled) {
+      invalidPrev.forEach((m) => updatesToSave.push({
+        id: m.id,
+        scheduled_time: null,
+        venue_id: null,
+        court: null
+      }));
+    } else {
+      matchesToSchedule.forEach((m) => updatesToSave.push({
+        id: m.id,
+        scheduled_time: null,
+        venue_id: null,
+        court: null
+      }));
     }
     for (const match of matchesToSchedule) {
       const team1Id = match.team1_id;
       const team2Id = match.team2_id;
-      const t1Athletes = teamAthleteMap[team1Id] || [];
-      const t2Athletes = teamAthleteMap[team2Id] || [];
-      const inst1 = teamInstitutionMap[team1Id];
-      const inst2 = teamInstitutionMap[team2Id];
-      const allMatchAthletes = /* @__PURE__ */ new Set([...t1Athletes, ...t2Athletes]);
+      const matchAthletes = /* @__PURE__ */ new Set([
+        ...teamAthleteMap[team1Id] || [],
+        ...teamAthleteMap[team2Id] || []
+      ]);
       let foundSlot = false;
-      for (const slot of slots) {
-        const slotDateStr = slot.split("T")[0];
-        const t1GamesToday = team1Id ? activeSchedule.filter((s) => s.scheduledTime.startsWith(slotDateStr) && (s.team1Id === team1Id || s.team2Id === team1Id)).length : 0;
-        const t2GamesToday = team2Id ? activeSchedule.filter((s) => s.scheduledTime.startsWith(slotDateStr) && (s.team1Id === team2Id || s.team2Id === team2Id)).length : 0;
-        if (t1GamesToday >= maxGamesPerDay || t2GamesToday >= maxGamesPerDay) {
-          continue;
-        }
+      slotLoop: for (const slot of allSlots) {
+        const slotDate = slot.split("T")[0];
+        const t1Today = activeSchedule.filter(
+          (s) => s.scheduledTime.startsWith(slotDate) && (s.team1Id === team1Id || s.team2Id === team1Id)
+        ).length;
+        const t2Today = activeSchedule.filter(
+          (s) => s.scheduledTime.startsWith(slotDate) && (s.team1Id === team2Id || s.team2Id === team2Id)
+        ).length;
+        if (t1Today >= maxGamesPerDay || t2Today >= maxGamesPerDay) continue slotLoop;
+        if (!teamAvailableAt(team1Id, slot)) continue slotLoop;
+        if (!teamAvailableAt(team2Id, slot)) continue slotLoop;
         for (const resource of resources) {
-          const getDayHelper2 = (date) => ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"][date.getDay()];
-          const slotDate2 = (() => {
-            const m = slot.match(/^(d{4})-(d{2})-(d{2})T(d{2}):(d{2})/);
-            return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null;
-          })();
-          const slotVenue = venues?.find((v) => v.id === resource.venueId);
-          if (slotVenue && slotDate2) {
-            const availArr = Array.isArray(slotVenue.availability) ? slotVenue.availability : [];
-            if (availArr.length > 0) {
-              const dateOnly2 = slot.split("T")[0];
-              const dayStr2 = getDayHelper2(slotDate2);
-              const tMin2 = slotDate2.getHours() * 60 + slotDate2.getMinutes();
-              if (availArr.some((av) => av.type === "unavailable" && av.date === dateOnly2)) continue;
-              const regAvail2 = availArr.filter((a) => a.type !== "unavailable" && a.day && a.start && a.end);
-              if (regAvail2.length > 0) {
-                const ok = regAvail2.some((av) => av.day === dayStr2 && (() => {
-                  const [sh, sm] = av.start.split(":").map(Number);
-                  const [eh, em] = av.end.split(":").map(Number);
-                  return tMin2 >= sh * 60 + sm && tMin2 + matchDuration <= eh * 60 + em + 1;
-                })());
-                if (!ok) continue;
-              }
-            }
-          }
+          if (!venueAvailableAt(resource.venueId, slot)) continue;
           let hasConflict = false;
-          for (const scheduled of activeSchedule) {
-            if (scheduled.venueId === resource.venueId && scheduled.court === resource.courtName) {
-              if (isOverlap(scheduled.scheduledTime, slot, matchDuration)) {
+          for (const sched of activeSchedule) {
+            if (sched.venueId === resource.venueId && sched.court === resource.courtName && isOverlap(sched.scheduledTime, slot, matchDuration)) {
+              hasConflict = true;
+              break;
+            }
+            const teamInvolved = sched.team1Id === team1Id || sched.team1Id === team2Id || sched.team2Id === team1Id || sched.team2Id === team2Id;
+            if (teamInvolved && isOverlap(sched.scheduledTime, slot, matchDuration)) {
+              hasConflict = true;
+              break;
+            }
+            if (isOverlap(sched.scheduledTime, slot, matchDuration)) {
+              const other = [
+                ...teamAthleteMap[sched.team1Id] || [],
+                ...teamAthleteMap[sched.team2Id] || []
+              ];
+              if (other.some((id) => matchAthletes.has(id))) {
                 hasConflict = true;
                 break;
               }
             }
-            if (scheduled.team1Id === team1Id || scheduled.team1Id === team2Id || scheduled.team2Id === team1Id || scheduled.team2Id === team2Id) {
-              const t1 = parseHelper(scheduled.scheduledTime);
-              const t2 = parseHelper(slot);
-              if (t1 && t2) {
-                const diffMin = Math.abs(t1.getTime() - t2.getTime()) / (60 * 1e3);
-                if (diffMin < matchDuration) {
-                  hasConflict = true;
-                  break;
-                } else if (diffMin <= matchDuration && maxGamesPerDay > 1) {
-                  hasConflict = true;
-                  break;
-                }
-              }
-            }
-            const scheduledAthletes1 = teamAthleteMap[scheduled.team1Id] || [];
-            const scheduledAthletes2 = teamAthleteMap[scheduled.team2Id] || [];
-            let athleteConflict = false;
-            for (const athleteId of scheduledAthletes1) {
-              if (allMatchAthletes.has(athleteId)) {
-                athleteConflict = true;
-                break;
-              }
-            }
-            if (!athleteConflict) {
-              for (const athleteId of scheduledAthletes2) {
-                if (allMatchAthletes.has(athleteId)) {
-                  athleteConflict = true;
-                  break;
-                }
-              }
-            }
-            if (athleteConflict && isOverlap(scheduled.scheduledTime, slot, matchDuration)) {
-              hasConflict = true;
-              break;
-            }
           }
-          if (!hasConflict) {
-            const getDayHelper = (date) => {
-              const days = ["Domingo", "Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado"];
-              return days[date.getDay()];
-            };
-            const checkTeamAvail = (teamId, slotTime) => {
-              const team = teams?.find((t) => t.id === teamId);
-              if (!team || !team.availability || team.availability.length === 0) return true;
-              const mDate = parseHelper(slotTime);
-              if (!mDate) return true;
-              const dayStr = getDayHelper(mDate);
-              const mHour = mDate.getHours();
-              const mMin = mDate.getMinutes();
-              const isUnavailableDate = team.availability.some((av) => av.type === "unavailable" && av.date === slotTime.split("T")[0]);
-              if (isUnavailableDate) return false;
-              const regularAvails = team.availability.filter((a) => a.type !== "unavailable");
-              if (regularAvails.length === 0) return true;
-              return regularAvails.some((av) => {
-                const isDayMatch = av.day === dayStr;
-                if (!isDayMatch) return false;
-                const [startH, startM] = av.start.split(":").map(Number);
-                const [endH, endM] = av.end.split(":").map(Number);
-                const timeVal = mHour * 60 + mMin;
-                return timeVal >= startH * 60 + startM && timeVal <= endH * 60 + endM;
-              });
-            };
-            const checkVenueAvail = (venueId, slotTime) => {
-              const venue = venues?.find((v) => v.id === venueId);
-              if (!venue || !venue.availability || venue.availability.length === 0) return true;
-              const mDate = parseHelper(slotTime);
-              if (!mDate) return true;
-              const dayStr = getDayHelper(mDate);
-              const mHour = mDate.getHours();
-              const mMin = mDate.getMinutes();
-              const isUnavailableDate = venue.availability.some((av) => av.type === "unavailable" && av.date === slotTime.split("T")[0]);
-              if (isUnavailableDate) return false;
-              const avail = Array.isArray(venue.availability) ? venue.availability : [];
-              if (avail.length === 0) return true;
-              const regularAvails = avail.filter((a) => a.type !== "unavailable" && a.day && a.start && a.end);
-              if (regularAvails.length === 0) return true;
-              return regularAvails.some((av) => {
-                if (av.day !== dayStr) return false;
-                const [startH, startM] = av.start.split(":").map(Number);
-                const [endH, endM] = av.end.split(":").map(Number);
-                const timeVal = mHour * 60 + mMin;
-                return timeVal >= startH * 60 + startM && timeVal + matchDuration <= endH * 60 + endM + 1;
-              });
-            };
-            const t1Ok = checkTeamAvail(team1Id, slot);
-            const t2Ok = checkTeamAvail(team2Id, slot);
-            const venueOk = checkVenueAvail(resource.venueId, slot);
-            if (t1Ok && t2Ok && venueOk) {
-              activeSchedule.push({
-                matchId: match.id,
-                team1Id,
-                team2Id,
-                scheduledTime: slot,
-                venueId: resource.venueId,
-                court: resource.courtName
-              });
-              const existingUpdate = updatesToSave.find((u) => u.id === match.id);
-              if (existingUpdate) {
-                existingUpdate.scheduled_time = slot;
-                existingUpdate.venue_id = resource.venueId;
-                existingUpdate.court = resource.courtName;
-              } else {
-                updatesToSave.push({
-                  id: match.id,
-                  scheduled_time: slot,
-                  venue_id: resource.venueId,
-                  court: resource.courtName
-                });
-              }
-              scheduledCount++;
-              foundSlot = true;
-              break;
-            }
+          if (hasConflict) continue;
+          activeSchedule.push({
+            matchId: match.id,
+            team1Id,
+            team2Id,
+            scheduledTime: slot,
+            venueId: resource.venueId,
+            court: resource.courtName
+          });
+          const existing = updatesToSave.find((u) => u.id === match.id);
+          if (existing) {
+            existing.scheduled_time = slot;
+            existing.venue_id = resource.venueId;
+            existing.court = resource.courtName;
+          } else {
+            updatesToSave.push({
+              id: match.id,
+              scheduled_time: slot,
+              venue_id: resource.venueId,
+              court: resource.courtName
+            });
           }
+          scheduledCount++;
+          foundSlot = true;
+          break;
         }
-        if (foundSlot) break;
+        if (foundSlot) break slotLoop;
+      }
+      if (!foundSlot) {
+        const existing = updatesToSave.find((u) => u.id === match.id);
+        if (!existing) {
+          updatesToSave.push({ id: match.id, scheduled_time: null, venue_id: null, court: null });
+        }
       }
     }
-    if (updatesToSave.length > 0) {
-      for (const update of updatesToSave) {
-        const { id, scheduled_time, venue_id, court } = update;
-        await supabase.from("matches").update({
-          scheduled_time,
-          venue_id,
-          court
-        }).eq("id", id);
-      }
+    for (const u of updatesToSave) {
+      await supabase.from("matches").update({ scheduled_time: u.scheduled_time, venue_id: u.venue_id, court: u.court }).eq("id", u.id);
     }
     res.json({
       success: true,

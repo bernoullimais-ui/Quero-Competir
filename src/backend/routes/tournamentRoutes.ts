@@ -4140,327 +4140,277 @@ router.post("/:id/auto-schedule", async (req, res) => {
       teamInstitutionMap[t.id] = t.institution_id;
     });
 
-    // Filtrar jogos para agendar
-    let matchesToSchedule = (matches || []).filter(m => {
-      const hasTeams = m.team1_id && m.team2_id;
-      if (!hasTeams) return false;
+    // ─────────────────────────────────────────────────────────────────────────
+    // HELPERS (definidos antes do loop principal)
+    // ─────────────────────────────────────────────────────────────────────────
 
-      if (onlyUnscheduled) {
-        return !m.scheduled_time || !m.venue_id;
-      }
-      return true;
-    });
+    const parseHelper = (timeStr: string): Date | null => {
+      const m = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (!m) return null;
+      return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5]);
+    };
 
-    // Ordenar rodadas inferiores primeiro (as primeiras acontecem antes!)
-    matchesToSchedule.sort((a,b) => {
-      if (a.round !== b.round) return a.round - b.round;
-      return a.match_index - b.match_index;
-    });
+    const getDayName = (date: Date) =>
+      ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][date.getDay()];
 
-    // Programar grade atual de jogos ativos
-    const activeSchedule: {
-      matchId: string;
-      team1Id: string;
-      team2Id: string;
-      scheduledTime: string;
-      venueId: string;
-      court: string;
-    }[] = (matches || [])
-      .filter(m => m.scheduled_time && m.venue_id && m.team1_id && m.team2_id)
-      .map(m => ({
-        matchId: m.id,
-        team1Id: m.team1_id!,
-        team2Id: m.team2_id!,
-        scheduledTime: m.scheduled_time!,
-        venueId: m.venue_id!,
-        court: m.court || "Principal"
-      }));
+    /** true se dois eventos [t, t+dur) se sobrepõem */
+    const isOverlap = (a: string, b: string, dur: number): boolean => {
+      const da = parseHelper(a), db = parseHelper(b);
+      if (!da || !db) return false;
+      return Math.abs(da.getTime() - db.getTime()) < dur * 60_000;
+    };
 
-    if (onlyUnscheduled === false) {
-      activeSchedule.length = 0;
-    }
+    /** true se o slot (início+duração) cabe dentro de um período de disponibilidade */
+    const slotFitsInAvail = (
+      avails: any[],         // array de {day,start,end} ou {type:'unavailable',date}
+      slotStr: string,
+      dur: number
+    ): boolean => {
+      const d = parseHelper(slotStr);
+      if (!d) return true;
+      const dateOnly = slotStr.split('T')[0];
+      const dayName  = getDayName(d);
+      const startMin = d.getHours() * 60 + d.getMinutes();
+      const endMin   = startMin + dur;          // fim da partida (exclusivo)
 
-    // Auxiliar de criação de datas e horários de jogo (gerar slots)
-    const createTimeSlots = (startD: string, endD: string) => {
+      // Bloqueio de data específica → fora
+      if (avails.some(av => av.type === 'unavailable' && av.date === dateOnly)) return false;
+
+      // Horários regulares (entradas com day+start+end válidos)
+      const regular = avails.filter(a => a.type !== 'unavailable' && a.day && a.start && a.end);
+      if (regular.length === 0) return true;    // sem restrição de horário → disponível
+
+      return regular.some(av => {
+        if (av.day !== dayName) return false;
+        const [sh, sm] = (av.start as string).split(':').map(Number);
+        const [eh, em] = (av.end   as string).split(':').map(Number);
+        const openMin  = sh * 60 + sm;
+        const closeMin = eh * 60 + em;
+        return startMin >= openMin && endMin <= closeMin;
+      });
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // VERIFICAR disponibilidade da SEDE para um slot
+    // ─────────────────────────────────────────────────────────────────────────
+    const venueAvailableAt = (venueId: string, slotStr: string): boolean => {
+      const venue = (venues || []).find(v => v.id === venueId);
+      if (!venue) return false;
+      const avails: any[] = Array.isArray(venue.availability) ? venue.availability : [];
+      if (avails.length === 0) return true;   // sem configuração → disponível
+      return slotFitsInAvail(avails, slotStr, matchDuration);
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // VERIFICAR disponibilidade da EQUIPE para um slot
+    // ─────────────────────────────────────────────────────────────────────────
+    const teamAvailableAt = (teamId: string, slotStr: string): boolean => {
+      const team = (teams || []).find(t => t.id === teamId);
+      if (!team || !Array.isArray(team.availability) || team.availability.length === 0) return true;
+      return slotFitsInAvail(team.availability, slotStr, matchDuration);
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GERAR SLOTS dentro do período configurado
+    // ─────────────────────────────────────────────────────────────────────────
+    const generateSlots = (): string[] => {
       const slots: string[] = [];
-      let currentDate = new Date(startD + "T00:00:00");
-      let limitDate = endD ? new Date(endD + "T23:59:59") : new Date(new Date(startD + "T00:00:00").getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days max if not provided
-      
-      const [startH, startM] = dailyStartTime.split(':').map(Number);
-      const [endH, endM] = dailyEndTime.split(':').map(Number);
-      
-      let dayOffset = 0;
-      while (true) {
-        const loopDate = new Date(currentDate.getTime() + dayOffset * 24 * 60 * 60 * 1000);
-        if (loopDate > limitDate) break;
-        
-        const dateStr = loopDate.toISOString().split('T')[0];
-        
-        let currentHour = startH;
-        let currentMinute = startM;
-        const endMinutes = endH * 60 + endM;
+      const [sh, sm] = dailyStartTime.split(':').map(Number);
+      const [eh, em] = dailyEndTime.split(':').map(Number);
+      const dayEndMin = eh * 60 + em;
 
-        while (currentHour * 60 + currentMinute + matchDuration <= endMinutes) {
-          const hh = String(currentHour).padStart(2, '0');
-          const mm = String(currentMinute).padStart(2, '0');
-          slots.push(`${dateStr}T${hh}:${mm}`);
-          
-          currentMinute += matchDuration;
-          if (currentMinute >= 60) {
-            currentHour += Math.floor(currentMinute / 60);
-            currentMinute = currentMinute % 60;
-          }
+      const limit = new Date((endDate || startDate) + 'T23:59:59');
+      let cur = new Date(startDate + 'T00:00:00');
+
+      while (cur <= limit) {
+        const dateStr = cur.toISOString().split('T')[0];
+        let h = sh, m = sm;
+        while (h * 60 + m + matchDuration <= dayEndMin) {
+          slots.push(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+          m += matchDuration;
+          h += Math.floor(m / 60);
+          m  = m % 60;
         }
-        dayOffset++;
-        if (dayOffset > 365) break; // failsafe
+        cur = new Date(cur.getTime() + 86_400_000);
       }
       return slots;
     };
 
-    const slots = createTimeSlots(startDate, endDate || startDate);
+    const allSlots = generateSlots();
 
-    const parseHelper = (timeStr: string) => {
-      const regexMatch = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-      if (!regexMatch) return null;
-      const [_, year, month, day, hour, minute] = regexMatch;
-      return new Date(
-        parseInt(year, 10),
-        parseInt(month, 10) - 1,
-        parseInt(day, 10),
-        parseInt(hour, 10),
-        parseInt(minute, 10)
-      );
-    };
+    // ─────────────────────────────────────────────────────────────────────────
+    // SEPARAR jogos já agendados VÁLIDOS (âncoras) dos que precisam ser
+    // reagendados.
+    //   • onlyUnscheduled = true  → só agendar os que ainda não têm horário;
+    //                               âncoras = todos os já agendados (mesmo inválidos)*
+    //                               *mas inválidos serão reagendados tb!
+    //   • onlyUnscheduled = false → reagendar tudo
+    // ─────────────────────────────────────────────────────────────────────────
 
-    const isOverlap = (timeStr1: string, timeStr2: string, durationMin: number) => {
-      const t1 = parseHelper(timeStr1);
-      const t2 = parseHelper(timeStr2);
-      if (!t1 || !t2) return false;
-      const diff = Math.abs(t1.getTime() - t2.getTime());
-      return diff < durationMin * 60 * 1000;
-    };
+    const allScheduled = (matches || []).filter(
+      m => m.scheduled_time && m.venue_id && m.team1_id && m.team2_id
+    );
 
+    // Em modo "Manter", separar os válidos (que ficam) dos inválidos (que voltam à fila)
+    const validAnchors: typeof allScheduled = [];
+    const invalidPrev:  typeof allScheduled = [];
+
+    if (onlyUnscheduled) {
+      for (const m of allScheduled) {
+        if (venueAvailableAt(m.venue_id!, m.scheduled_time!)) {
+          validAnchors.push(m);
+        } else {
+          invalidPrev.push(m);
+        }
+      }
+    }
+    // onlyUnscheduled=false → validAnchors e invalidPrev ficam vazios; tudo vai pra fila
+
+    // Jogos que serão (re)agendados
+    let matchesToSchedule = (matches || []).filter(m => {
+      if (!m.team1_id || !m.team2_id) return false;
+      if (!onlyUnscheduled) return true;           // modo apagar: todos
+      if (!m.scheduled_time || !m.venue_id) return true; // sem horário: entra na fila
+      if (invalidPrev.some(i => i.id === m.id)) return true; // horário inválido: re-agendar
+      return false;
+    });
+
+    matchesToSchedule.sort((a, b) => {
+      if (a.round !== b.round) return a.round - b.round;
+      return a.match_index - b.match_index;
+    });
+
+    // Grade de conflitos — começa com os jogos válidos já fixados
+    const activeSchedule: {
+      matchId: string; team1Id: string; team2Id: string;
+      scheduledTime: string; venueId: string; court: string;
+    }[] = validAnchors.map(m => ({
+      matchId: m.id,
+      team1Id: m.team1_id!,
+      team2Id: m.team2_id!,
+      scheduledTime: m.scheduled_time!,
+      venueId: m.venue_id!,
+      court: m.court || 'Principal'
+    }));
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ALGORITMO PRINCIPAL
+    // ─────────────────────────────────────────────────────────────────────────
     let scheduledCount = 0;
     const updatesToSave: any[] = [];
-    if (!onlyUnscheduled) {
-      matchesToSchedule.forEach(m => {
-        updatesToSave.push({ id: m.id, scheduled_time: null, venue_id: null, court: null });
-      });
+
+    // Preparar entradas nulas para jogos inválidos que serão reagendados
+    if (onlyUnscheduled) {
+      invalidPrev.forEach(m => updatesToSave.push({
+        id: m.id, scheduled_time: null, venue_id: null, court: null
+      }));
+    } else {
+      matchesToSchedule.forEach(m => updatesToSave.push({
+        id: m.id, scheduled_time: null, venue_id: null, court: null
+      }));
     }
 
-    // Algoritmo de Escolha de Horário / Slot Sem Conflitos
     for (const match of matchesToSchedule) {
       const team1Id = match.team1_id!;
       const team2Id = match.team2_id!;
-      
-      const t1Athletes = teamAthleteMap[team1Id] || [];
-      const t2Athletes = teamAthleteMap[team2Id] || [];
-      const inst1 = teamInstitutionMap[team1Id];
-      const inst2 = teamInstitutionMap[team2Id];
-
-      const allMatchAthletes = new Set([...t1Athletes, ...t2Athletes]);
+      const matchAthletes = new Set([
+        ...(teamAthleteMap[team1Id] || []),
+        ...(teamAthleteMap[team2Id] || [])
+      ]);
 
       let foundSlot = false;
 
-      for (const slot of slots) {
-        const slotDateStr = slot.split('T')[0];
-        const t1GamesToday = team1Id ? activeSchedule.filter(s => s.scheduledTime.startsWith(slotDateStr) && (s.team1Id === team1Id || s.team2Id === team1Id)).length : 0;
-        const t2GamesToday = team2Id ? activeSchedule.filter(s => s.scheduledTime.startsWith(slotDateStr) && (s.team1Id === team2Id || s.team2Id === team2Id)).length : 0;
-        if (t1GamesToday >= maxGamesPerDay || t2GamesToday >= maxGamesPerDay) {
-          continue; // Pula para o próximo slot porque um dos times já atingiu o limite no dia
-        }
+      slotLoop: for (const slot of allSlots) {
+        const slotDate = slot.split('T')[0];
 
+        // ① Limite de jogos por equipe no dia
+        const t1Today = activeSchedule.filter(s =>
+          s.scheduledTime.startsWith(slotDate) &&
+          (s.team1Id === team1Id || s.team2Id === team1Id)
+        ).length;
+        const t2Today = activeSchedule.filter(s =>
+          s.scheduledTime.startsWith(slotDate) &&
+          (s.team1Id === team2Id || s.team2Id === team2Id)
+        ).length;
+        if (t1Today >= maxGamesPerDay || t2Today >= maxGamesPerDay) continue slotLoop;
+
+        // ② Disponibilidade das equipes
+        if (!teamAvailableAt(team1Id, slot)) continue slotLoop;
+        if (!teamAvailableAt(team2Id, slot)) continue slotLoop;
+
+        // ③ Tentar cada quadra/recurso disponível
         for (const resource of resources) {
-          // Verificar disponibilidade da sede ANTES de qualquer outra checagem
-          const getDayHelper2 = (date: Date) => ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][date.getDay()];
-          const slotDate2 = (() => { const m = slot.match(/^(d{4})-(d{2})-(d{2})T(d{2}):(d{2})/); return m ? new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]) : null; })();
-          const slotVenue = venues?.find(v => v.id === resource.venueId);
-          if (slotVenue && slotDate2) {
-            const availArr: any[] = Array.isArray(slotVenue.availability) ? slotVenue.availability : [];
-            if (availArr.length > 0) {
-              const dateOnly2 = slot.split('T')[0];
-              const dayStr2 = getDayHelper2(slotDate2);
-              const tMin2 = slotDate2.getHours() * 60 + slotDate2.getMinutes();
-              if (availArr.some(av => av.type === 'unavailable' && av.date === dateOnly2)) continue; // data bloqueada
-              const regAvail2 = availArr.filter(a => a.type !== 'unavailable' && a.day && a.start && a.end);
-              if (regAvail2.length > 0) {
-                const ok = regAvail2.some(av => av.day === dayStr2 && (() => { const [sh,sm]=av.start.split(':').map(Number);const [eh,em]=av.end.split(':').map(Number); return tMin2>=(sh*60+sm)&&(tMin2+matchDuration)<=(eh*60+em+1); })());
-                if (!ok) continue; // fora do horário da sede
-              }
-            }
-          }
+
+          // ③a Disponibilidade da SEDE — primeira barreira, pula pro próximo recurso
+          if (!venueAvailableAt(resource.venueId, slot)) continue;
+
+          // ③b Verificar conflitos com jogos já agendados
           let hasConflict = false;
-
-          for (const scheduled of activeSchedule) {
-            // A. Conflito de quadra na mesma sede no mesmo horário
-            if (scheduled.venueId === resource.venueId && scheduled.court === resource.courtName) {
-              if (isOverlap(scheduled.scheduledTime, slot, matchDuration)) {
-                hasConflict = true;
-                break;
-              }
+          for (const sched of activeSchedule) {
+            // Conflito de quadra
+            if (sched.venueId === resource.venueId && sched.court === resource.courtName &&
+                isOverlap(sched.scheduledTime, slot, matchDuration)) {
+              hasConflict = true; break;
             }
-
-            // B. Conflito do mesmo time jogando simultaneamente
-            if (scheduled.team1Id === team1Id || scheduled.team1Id === team2Id || 
-                scheduled.team2Id === team1Id || scheduled.team2Id === team2Id) {
-              
-              // Verifica se já estão jogando exatamente no mesmo horário (overlap)
-              // OU se estão jogando no horário anterior/seguinte (back-to-back) caso maxGamesPerDay > 1
-              const t1 = parseHelper(scheduled.scheduledTime);
-              const t2 = parseHelper(slot);
-              if (t1 && t2) {
-                const diffMin = Math.abs(t1.getTime() - t2.getTime()) / (60 * 1000);
-                
-                if (diffMin < matchDuration) {
-                  // É overlap (estão jogando ao mesmo tempo)
-                  hasConflict = true;
-                  break;
-                } else if (diffMin <= matchDuration && maxGamesPerDay > 1) {
-                  // É back-to-back (jogo seguido). Vamos bloquear.
-                  hasConflict = true;
-                  break;
-                }
-              }
+            // Mesmo time jogando neste horário (sobreposição)
+            const teamInvolved = sched.team1Id === team1Id || sched.team1Id === team2Id ||
+                                  sched.team2Id === team1Id || sched.team2Id === team2Id;
+            if (teamInvolved && isOverlap(sched.scheduledTime, slot, matchDuration)) {
+              hasConflict = true; break;
             }
-
-            // C. Conflito de atleta jogando por múltiplos times ao mesmo tempo
-            const scheduledAthletes1 = teamAthleteMap[scheduled.team1Id] || [];
-            const scheduledAthletes2 = teamAthleteMap[scheduled.team2Id] || [];
-            
-            let athleteConflict = false;
-            for (const athleteId of scheduledAthletes1) {
-              if (allMatchAthletes.has(athleteId)) {
-                athleteConflict = true;
-                break;
-              }
-            }
-            if (!athleteConflict) {
-              for (const athleteId of scheduledAthletes2) {
-                if (allMatchAthletes.has(athleteId)) {
-                  athleteConflict = true;
-                  break;
-                }
-              }
-            }
-
-            if (athleteConflict && isOverlap(scheduled.scheduledTime, slot, matchDuration)) {
-              hasConflict = true;
-              break;
+            // Atleta em dois jogos simultâneos
+            if (isOverlap(sched.scheduledTime, slot, matchDuration)) {
+              const other = [
+                ...(teamAthleteMap[sched.team1Id] || []),
+                ...(teamAthleteMap[sched.team2Id] || [])
+              ];
+              if (other.some(id => matchAthletes.has(id))) { hasConflict = true; break; }
             }
           }
+          if (hasConflict) continue;
 
-          if (!hasConflict) {
-            // Validar disponibilidade regular do time (se houver cadastrada)
-            const getDayHelper = (date: Date) => {
-              const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-              return days[date.getDay()];
-            };
+          // ✅ Slot válido!
+          activeSchedule.push({
+            matchId: match.id, team1Id, team2Id,
+            scheduledTime: slot, venueId: resource.venueId, court: resource.courtName
+          });
 
-            const checkTeamAvail = (teamId: string, slotTime: string) => {
-              const team = teams?.find(t => t.id === teamId);
-              if (!team || !team.availability || team.availability.length === 0) return true;
-              
-              const mDate = parseHelper(slotTime);
-              if (!mDate) return true;
-              
-              const dayStr = getDayHelper(mDate);
-              const mHour = mDate.getHours();
-              const mMin = mDate.getMinutes();
-
-              const isUnavailableDate = team.availability.some((av: any) => av.type === 'unavailable' && av.date === slotTime.split('T')[0]);
-              if (isUnavailableDate) return false;
-
-              const regularAvails = team.availability.filter((a:any) => a.type !== 'unavailable');
-              if (regularAvails.length === 0) return true;
-
-              return regularAvails.some((av: any) => {
-                const isDayMatch = av.day === dayStr;
-                if (!isDayMatch) return false;
-                const [startH, startM] = av.start.split(':').map(Number);
-                const [endH, endM] = av.end.split(':').map(Number);
-                const timeVal = mHour * 60 + mMin;
-                return timeVal >= (startH * 60 + startM) && timeVal <= (endH * 60 + endM);
-              });
-            };
-
-            const checkVenueAvail = (venueId: string, slotTime: string) => {
-              const venue = venues?.find(v => v.id === venueId);
-              if (!venue || !venue.availability || venue.availability.length === 0) return true;
-              
-              const mDate = parseHelper(slotTime);
-              if (!mDate) return true;
-              
-              const dayStr = getDayHelper(mDate);
-              const mHour = mDate.getHours();
-              const mMin = mDate.getMinutes();
-
-              const isUnavailableDate = venue.availability.some((av: any) => av.type === 'unavailable' && av.date === slotTime.split('T')[0]);
-              if (isUnavailableDate) return false;
-
-              const avail: any[] = Array.isArray(venue.availability) ? venue.availability : [];
-              if (avail.length === 0) return true;
-              const regularAvails = avail.filter((a:any) => a.type !== 'unavailable' && a.day && a.start && a.end);
-              if (regularAvails.length === 0) return true;
-
-              return regularAvails.some((av: any) => {
-                if (av.day !== dayStr) return false;
-                const [startH, startM] = av.start.split(':').map(Number);
-                const [endH, endM] = av.end.split(':').map(Number);
-                const timeVal = mHour * 60 + mMin;
-                // Início >= abertura E fim da partida (início+duração) <= fechamento
-                return timeVal >= (startH * 60 + startM) && (timeVal + matchDuration) <= (endH * 60 + endM + 1);
-              });
-            };
-
-            const t1Ok = checkTeamAvail(team1Id, slot);
-            const t2Ok = checkTeamAvail(team2Id, slot);
-            const venueOk = checkVenueAvail(resource.venueId, slot);
-
-            if (t1Ok && t2Ok && venueOk) {
-              activeSchedule.push({
-                matchId: match.id,
-                team1Id,
-                team2Id,
-                scheduledTime: slot,
-                venueId: resource.venueId,
-                court: resource.courtName
-              });
-              const existingUpdate = updatesToSave.find(u => u.id === match.id);
-              if (existingUpdate) {
-                existingUpdate.scheduled_time = slot;
-                existingUpdate.venue_id = resource.venueId;
-                existingUpdate.court = resource.courtName;
-              } else {
-                updatesToSave.push({
-                  id: match.id,
-                  scheduled_time: slot,
-                  venue_id: resource.venueId,
-                  court: resource.courtName
-                });
-              }
-              scheduledCount++;
-              foundSlot = true;
-              break;
-            }
+          const existing = updatesToSave.find(u => u.id === match.id);
+          if (existing) {
+            existing.scheduled_time = slot;
+            existing.venue_id = resource.venueId;
+            existing.court = resource.courtName;
+          } else {
+            updatesToSave.push({
+              id: match.id, scheduled_time: slot,
+              venue_id: resource.venueId, court: resource.courtName
+            });
           }
+
+          scheduledCount++;
+          foundSlot = true;
+          break; // próximo match
         }
-        if (foundSlot) break;
+
+        if (foundSlot) break slotLoop;
+      }
+
+      // Se não achou slot: garantir que o jogo seja limpo no BD
+      if (!foundSlot) {
+        const existing = updatesToSave.find(u => u.id === match.id);
+        if (!existing) {
+          updatesToSave.push({ id: match.id, scheduled_time: null, venue_id: null, court: null });
+        }
       }
     }
 
-    // Salvar as alterações em lote
-    if (updatesToSave.length > 0) {
-      for (const update of updatesToSave) {
-        const { id, scheduled_time, venue_id, court } = update;
-        await supabase
-          .from('matches')
-          .update({
-            scheduled_time,
-            venue_id,
-            court
-          })
-          .eq('id', id);
-      }
+    // ─────────────────────────────────────────────────────────────────────────
+    // SALVAR EM LOTE
+    // ─────────────────────────────────────────────────────────────────────────
+    for (const u of updatesToSave) {
+      await supabase.from('matches')
+        .update({ scheduled_time: u.scheduled_time, venue_id: u.venue_id, court: u.court })
+        .eq('id', u.id);
     }
 
     res.json({
