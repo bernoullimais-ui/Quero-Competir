@@ -160,7 +160,7 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
         return Math.abs(matchTime - otherTime) < 3600000;
       });
       if (overlapping) {
-        conflicts.push(`Conflito de quadra com o Jogo ${overlapping.match_index} (${overlapping.category?.name}).`);
+        conflicts.push(`Conflito de quadra com o Jogo ${(overlapping.match_index !== undefined ? overlapping.match_index + 1 : 1)} (${overlapping.category?.name}).`);
       }
     }
 
@@ -189,7 +189,7 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
       });
 
       if (overlappingMatch) {
-        conflicts.push(`Conflito de Atleta: Atletas em comum jogando ao mesmo tempo no Jogo ${overlappingMatch.match_index} (${overlappingMatch.category?.name || "Outra Categoria"}).`);
+        conflicts.push(`Conflito de Atleta: Atletas em comum jogando ao mesmo tempo no Jogo ${(overlappingMatch.match_index !== undefined ? overlappingMatch.match_index + 1 : 1)} (${overlappingMatch.category?.name || "Outra Categoria"}).`);
       }
     }
 
@@ -586,7 +586,7 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
                   >
                     <div className="text-[10px] font-black text-indigo-600 mb-1">{match.tournament?.name}</div>
                     <div className="text-xs font-bold text-slate-800 mb-2">
-                       {match.category ? `${match.category.name} (${[match.category.gender, match.category.age_group].filter(Boolean).join(" ")})` : 'Categoria Mista'} • Jogo {match.game_number || 0}
+                       {match.category ? `${match.category.name} (${[match.category.gender, match.category.age_group].filter(Boolean).join(" ")})` : 'Categoria Mista'} • Jogo {match.match_index !== undefined ? match.match_index + 1 : 1}
                     </div>
                     <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
                       <div className="flex-1 truncate">{match.team1?.institution?.name || 'TBD'}</div>
@@ -651,7 +651,7 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
                           />
                         </div>
                         <div className="text-[10px] font-bold text-slate-500 mb-2 truncate">
-                           {match.category ? `${match.category.name} (${[match.category.gender, match.category.age_group].filter(Boolean).join(" ")})` : 'Mista'} • Jogo {match.game_number || 0}
+                           {match.category ? `${match.category.name} (${[match.category.gender, match.category.age_group].filter(Boolean).join(" ")})` : 'Mista'} • Jogo {match.match_index !== undefined ? match.match_index + 1 : 1}
                         </div>
                         <div className="flex items-center gap-2 text-sm font-black text-slate-800">
                           <div className="flex-1 truncate" title={match.team1?.institution?.name || 'TBD'}>{match.team1?.institution?.name || 'TBD'}</div>
@@ -711,7 +711,7 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
                 <tr key={match.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="text-[10px] font-black text-indigo-500 mb-1">
-                      {match.category?.name} {match.category?.gender || match.category?.age_group ? `(${[match.category?.gender, match.category?.age_group].filter(Boolean).join(" ")})` : ""} • JOGO {match.match_index}
+                      {match.category?.name} {match.category?.gender || match.category?.age_group ? `(${[match.category?.gender, match.category?.age_group].filter(Boolean).join(" ")})` : ""} • JOGO {match.match_index !== undefined ? match.match_index + 1 : 1}
                     </div>
                     <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
                       {match.team1?.institution?.logo_url && (
