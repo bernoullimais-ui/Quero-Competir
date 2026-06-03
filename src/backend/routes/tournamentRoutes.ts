@@ -4063,7 +4063,8 @@ router.post("/:id/auto-schedule", async (req, res) => {
     endDate,
     matchDuration = 60, 
     dailyStartTime = "08:00", 
-    dailyEndTime = "20:00", 
+    dailyEndTime = "20:00",
+    maxGamesPerDay = 2, 
     onlyUnscheduled = true,
     selectedVenues = []
   } = req.body;
@@ -4257,6 +4258,13 @@ router.post("/:id/auto-schedule", async (req, res) => {
       let foundSlot = false;
 
       for (const slot of slots) {
+        const slotDateStr = slot.split('T')[0];
+        const t1GamesToday = activeSchedule.filter(s => s.scheduledTime.startsWith(slotDateStr) && (s.team1Id === team1Id || s.team2Id === team1Id)).length;
+        const t2GamesToday = activeSchedule.filter(s => s.scheduledTime.startsWith(slotDateStr) && (s.team1Id === team2Id || s.team2Id === team2Id)).length;
+        if (t1GamesToday >= maxGamesPerDay || t2GamesToday >= maxGamesPerDay) {
+          continue; // Pula para o próximo slot porque um dos times já atingiu o limite no dia
+        }
+
         for (const resource of resources) {
           let hasConflict = false;
 
@@ -4272,9 +4280,23 @@ router.post("/:id/auto-schedule", async (req, res) => {
             // B. Conflito do mesmo time jogando simultaneamente
             if (scheduled.team1Id === team1Id || scheduled.team1Id === team2Id || 
                 scheduled.team2Id === team1Id || scheduled.team2Id === team2Id) {
-              if (isOverlap(scheduled.scheduledTime, slot, matchDuration)) {
-                hasConflict = true;
-                break;
+              
+              // Verifica se já estão jogando exatamente no mesmo horário (overlap)
+              // OU se estão jogando no horário anterior/seguinte (back-to-back) caso maxGamesPerDay > 1
+              const t1 = parseHelper(scheduled.scheduledTime);
+              const t2 = parseHelper(slot);
+              if (t1 && t2) {
+                const diffMin = Math.abs(t1.getTime() - t2.getTime()) / (60 * 1000);
+                
+                if (diffMin < matchDuration) {
+                  // É overlap (estão jogando ao mesmo tempo)
+                  hasConflict = true;
+                  break;
+                } else if (diffMin <= matchDuration && maxGamesPerDay > 1) {
+                  // É back-to-back (jogo seguido). Vamos bloquear.
+                  hasConflict = true;
+                  break;
+                }
               }
             }
 

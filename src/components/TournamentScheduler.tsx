@@ -32,6 +32,7 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
     matchDuration: 60,
     dailyStartTime: '08:00',
     dailyEndTime: '20:00',
+    maxGamesPerDay: 2,
     onlyUnscheduled: true,
     selectedVenues: [] as string[]
   });
@@ -871,6 +872,17 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
                     type="number" 
                     value={autoScheduleParams.matchDuration}
                     onChange={(e) => setAutoScheduleParams(prev => ({ ...prev, matchDuration: Number(e.target.value) }))}
+                    className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-2.5 text-xs font-semibold outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1" title="Máximo de jogos de uma mesma equipe num mesmo dia">Máx. Jogos/Dia/Equipe</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    max="5"
+                    value={autoScheduleParams.maxGamesPerDay}
+                    onChange={(e) => setAutoScheduleParams(prev => ({ ...prev, maxGamesPerDay: Number(e.target.value) }))}
                     className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-2.5 text-xs font-semibold outline-none focus:border-indigo-500"
                   />
                 </div>

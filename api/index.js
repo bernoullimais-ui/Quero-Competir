@@ -4052,6 +4052,7 @@ router2.post("/:id/auto-schedule", async (req, res) => {
     matchDuration = 60,
     dailyStartTime = "08:00",
     dailyEndTime = "20:00",
+    maxGamesPerDay = 2,
     onlyUnscheduled = true,
     selectedVenues = []
   } = req.body;
@@ -4185,6 +4186,12 @@ router2.post("/:id/auto-schedule", async (req, res) => {
       const allMatchAthletes = /* @__PURE__ */ new Set([...t1Athletes, ...t2Athletes]);
       let foundSlot = false;
       for (const slot of slots) {
+        const slotDateStr = slot.split("T")[0];
+        const t1GamesToday = activeSchedule.filter((s) => s.scheduledTime.startsWith(slotDateStr) && (s.team1Id === team1Id || s.team2Id === team1Id)).length;
+        const t2GamesToday = activeSchedule.filter((s) => s.scheduledTime.startsWith(slotDateStr) && (s.team1Id === team2Id || s.team2Id === team2Id)).length;
+        if (t1GamesToday >= maxGamesPerDay || t2GamesToday >= maxGamesPerDay) {
+          continue;
+        }
         for (const resource of resources) {
           let hasConflict = false;
           for (const scheduled of activeSchedule) {
@@ -4195,9 +4202,17 @@ router2.post("/:id/auto-schedule", async (req, res) => {
               }
             }
             if (scheduled.team1Id === team1Id || scheduled.team1Id === team2Id || scheduled.team2Id === team1Id || scheduled.team2Id === team2Id) {
-              if (isOverlap(scheduled.scheduledTime, slot, matchDuration)) {
-                hasConflict = true;
-                break;
+              const t1 = parseHelper(scheduled.scheduledTime);
+              const t2 = parseHelper(slot);
+              if (t1 && t2) {
+                const diffMin = Math.abs(t1.getTime() - t2.getTime()) / (60 * 1e3);
+                if (diffMin < matchDuration) {
+                  hasConflict = true;
+                  break;
+                } else if (diffMin <= matchDuration && maxGamesPerDay > 1) {
+                  hasConflict = true;
+                  break;
+                }
               }
             }
             const scheduledAthletes1 = teamAthleteMap[scheduled.team1Id] || [];
