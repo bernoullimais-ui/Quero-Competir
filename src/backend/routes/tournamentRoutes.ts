@@ -4271,6 +4271,24 @@ router.post("/:id/auto-schedule", async (req, res) => {
         }
 
         for (const resource of resources) {
+          // Verificar disponibilidade da sede ANTES de qualquer outra checagem
+          const getDayHelper2 = (date: Date) => ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][date.getDay()];
+          const slotDate2 = (() => { const m = slot.match(/^(d{4})-(d{2})-(d{2})T(d{2}):(d{2})/); return m ? new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]) : null; })();
+          const slotVenue = venues?.find(v => v.id === resource.venueId);
+          if (slotVenue && slotDate2) {
+            const availArr: any[] = Array.isArray(slotVenue.availability) ? slotVenue.availability : [];
+            if (availArr.length > 0) {
+              const dateOnly2 = slot.split('T')[0];
+              const dayStr2 = getDayHelper2(slotDate2);
+              const tMin2 = slotDate2.getHours() * 60 + slotDate2.getMinutes();
+              if (availArr.some(av => av.type === 'unavailable' && av.date === dateOnly2)) continue; // data bloqueada
+              const regAvail2 = availArr.filter(a => a.type !== 'unavailable' && a.day && a.start && a.end);
+              if (regAvail2.length > 0) {
+                const ok = regAvail2.some(av => av.day === dayStr2 && (() => { const [sh,sm]=av.start.split(':').map(Number);const [eh,em]=av.end.split(':').map(Number); return tMin2>=(sh*60+sm)&&(tMin2+matchDuration)<=(eh*60+em+1); })());
+                if (!ok) continue; // fora do horário da sede
+              }
+            }
+          }
           let hasConflict = false;
 
           for (const scheduled of activeSchedule) {
@@ -4366,8 +4384,6 @@ router.post("/:id/auto-schedule", async (req, res) => {
             };
 
             const checkVenueAvail = (venueId: string, slotTime: string) => {
-              const v = venues?.find(v => v.id === venueId);
-              if (v) console.log("Checking venue", v.id, "avail:", v.availability);
               const venue = venues?.find(v => v.id === venueId);
               if (!venue || !venue.availability || venue.availability.length === 0) return true;
               
@@ -4381,16 +4397,18 @@ router.post("/:id/auto-schedule", async (req, res) => {
               const isUnavailableDate = venue.availability.some((av: any) => av.type === 'unavailable' && av.date === slotTime.split('T')[0]);
               if (isUnavailableDate) return false;
 
-              const regularAvails = venue.availability.filter((a:any) => a.type !== 'unavailable');
+              const avail: any[] = Array.isArray(venue.availability) ? venue.availability : [];
+              if (avail.length === 0) return true;
+              const regularAvails = avail.filter((a:any) => a.type !== 'unavailable' && a.day && a.start && a.end);
               if (regularAvails.length === 0) return true;
 
               return regularAvails.some((av: any) => {
-                const isDayMatch = av.day === dayStr;
-                if (!isDayMatch) return false;
+                if (av.day !== dayStr) return false;
                 const [startH, startM] = av.start.split(':').map(Number);
                 const [endH, endM] = av.end.split(':').map(Number);
                 const timeVal = mHour * 60 + mMin;
-                return timeVal >= (startH * 60 + startM) && timeVal <= (endH * 60 + endM);
+                // Início >= abertura E fim da partida (início+duração) <= fechamento
+                return timeVal >= (startH * 60 + startM) && (timeVal + matchDuration) <= (endH * 60 + endM + 1);
               });
             };
 

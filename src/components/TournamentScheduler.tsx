@@ -68,14 +68,22 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
     return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
   };
 
-  const isTimeInRange = (timeHour: number, timeMin: number, start: string, end: string) => {
+  const isTimeInRange = (timeHour: number, timeMin: number, start: string, end: string, durationMin = 0) => {
+    if (!start || !end || !start.includes(':') || !end.includes(':')) return false;
     const [startH, startM] = start.split(':').map(Number);
     const [endH, endM] = end.split(':').map(Number);
     const timeVal = timeHour * 60 + timeMin;
     const startVal = startH * 60 + startM;
     const endVal = endH * 60 + endM;
-    return timeVal >= startVal && timeVal <= endVal;
+    // Início >= abertura E fim (início + duração) <= fechamento
+    return timeVal >= startVal && (timeVal + durationMin) <= endVal;
   };
+
+  // Duração efetiva das partidas — persiste no localStorage para sobreviver a reloads
+  const effectiveMatchDuration = React.useMemo(() => {
+    const stored = localStorage.getItem('lastMatchDuration');
+    return stored ? parseInt(stored, 10) : autoScheduleParams.matchDuration;
+  }, [autoScheduleParams.matchDuration]);
 
   const getMatchConflicts = (matchId: string) => {
     const conflicts: string[] = [];
@@ -104,10 +112,10 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
         if (isUnavailableDate) {
           conflicts.push(`Sede bloqueada nesta data.`);
         } else {
-          const regularAvails = venue.availability.filter((a:any) => a.type !== 'unavailable');
+          const regularAvails = venue.availability.filter((a:any) => a.type !== 'unavailable' && a.day && a.start && a.end);
           if (regularAvails.length > 0) {
              const hasAvailability = regularAvails.some((av: any) => 
-               av.day === dayStr && isTimeInRange(mHour, mMin, av.start, av.end)
+               av.day === dayStr && isTimeInRange(mHour, mMin, av.start, av.end, effectiveMatchDuration)
              );
              if (!hasAvailability) conflicts.push(`Sede indisponível neste horário (${dayStr}).`);
           }
@@ -121,10 +129,10 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
       if (isUnavailableDate) {
         conflicts.push(`Mandante (${match.team1.institution?.name}) bloqueado nesta data.`);
       } else {
-        const regularAvails = match.team1.availability.filter((a:any) => a.type !== 'unavailable');
+        const regularAvails = match.team1.availability.filter((a:any) => a.type !== 'unavailable' && a.day && a.start && a.end);
         if (regularAvails.length > 0) {
            const hasAvailability = regularAvails.some((av: any) => 
-             av.day === dayStr && isTimeInRange(mHour, mMin, av.start, av.end)
+             av.day === dayStr && isTimeInRange(mHour, mMin, av.start, av.end, effectiveMatchDuration)
            );
            if (!hasAvailability) conflicts.push(`Mandante (${match.team1.institution?.name}) indisponível neste horário (${dayStr}).`);
         }
@@ -137,10 +145,10 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
       if (isUnavailableDate) {
         conflicts.push(`Visitante (${match.team2.institution?.name}) bloqueado nesta data.`);
       } else {
-        const regularAvails = match.team2.availability.filter((a:any) => a.type !== 'unavailable');
+        const regularAvails = match.team2.availability.filter((a:any) => a.type !== 'unavailable' && a.day && a.start && a.end);
         if (regularAvails.length > 0) {
            const hasAvailability = regularAvails.some((av: any) => 
-             av.day === dayStr && isTimeInRange(mHour, mMin, av.start, av.end)
+             av.day === dayStr && isTimeInRange(mHour, mMin, av.start, av.end, effectiveMatchDuration)
            );
            if (!hasAvailability) conflicts.push(`Visitante (${match.team2.institution?.name}) indisponível neste horário (${dayStr}).`);
         }
@@ -156,8 +164,7 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
         const otherDate = parseLocalTime(other.scheduled_time);
         if (!otherDate) return false;
         const otherTime = otherDate.getTime();
-        // Conflito se a diferença for menor que 60 minutos (3600000 ms)
-        return Math.abs(matchTime - otherTime) < (autoScheduleParams.matchDuration * 60000);
+        return Math.abs(matchTime - otherTime) < (effectiveMatchDuration * 60000);
       });
       if (overlapping) {
         conflicts.push(`Conflito de quadra com o Jogo ${(overlapping.match_index !== undefined ? overlapping.match_index + 1 : 1)} (${overlapping.category?.name}).`);
@@ -177,8 +184,7 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
         const otherDate = parseLocalTime(other.scheduled_time);
         if (!otherDate) return false;
         const otherTime = otherDate.getTime();
-        // Conflito se a diferença for menor que 60 minutos (3600000 ms)
-        if (Math.abs(matchTime - otherTime) < (autoScheduleParams.matchDuration * 60000)) {
+        if (Math.abs(matchTime - otherTime) < (effectiveMatchDuration * 60000)) {
           const otherAthletes = [
             ...(teamAthleteMap[other.team1_id] || []),
             ...(teamAthleteMap[other.team2_id] || [])
@@ -289,6 +295,8 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
   const handleAutoSchedule = async () => {
     setScheduling(true);
     try {
+      // Persiste a duração para uso no detector de conflitos visual
+      localStorage.setItem('lastMatchDuration', String(autoScheduleParams.matchDuration));
       const res = await fetch(`/api/tournaments/${tournamentId}/auto-schedule`, {
         method: 'POST',
         headers: getHeaders({ 'Content-Type': 'application/json' }),
