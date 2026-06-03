@@ -1270,7 +1270,7 @@ export default function TournamentDashboard() {
           { id: "modalidades", label: "Modalidades", icon: ListChecks },
           { id: "inscricoes", label: "Inscrições", icon: Users },
           { id: "financeiro", label: "Financeiro", icon: DollarSign },
-          { id: "tabela", label: "Tabela / Bracket", icon: Trophy },
+          { id: "tabela", label: "Tabela", icon: Trophy },
           { id: "escala", label: "Escala de Partidas", icon: Calendar },
           { id: "classificacao", label: "Classificação", icon: TrendingUp },
           { id: "estatisticas", label: "Estatísticas", icon: BarChart3 },
