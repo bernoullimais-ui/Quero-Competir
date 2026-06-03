@@ -374,6 +374,18 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
       return m.category?.name === modality;
     }
     return m.tournament_category_id === filterCategoryId;
+  }).sort((a, b) => {
+    if (a.scheduled_time && b.scheduled_time) {
+      return a.scheduled_time.localeCompare(b.scheduled_time);
+    }
+    if (a.scheduled_time) return -1;
+    if (b.scheduled_time) return 1;
+    
+    // Se ambos não têm data, ordenar por índice do jogo
+    if (a.match_index !== undefined && b.match_index !== undefined) {
+      return a.match_index - b.match_index;
+    }
+    return 0;
   });
 
   const handleDragStart = (e: React.DragEvent, matchId: string) => {
