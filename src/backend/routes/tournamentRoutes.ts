@@ -4366,6 +4366,8 @@ router.post("/:id/auto-schedule", async (req, res) => {
             };
 
             const checkVenueAvail = (venueId: string, slotTime: string) => {
+              const v = venues?.find(v => v.id === venueId);
+              if (v) console.log("Checking venue", v.id, "avail:", v.availability);
               const venue = venues?.find(v => v.id === venueId);
               if (!venue || !venue.availability || venue.availability.length === 0) return true;
               
