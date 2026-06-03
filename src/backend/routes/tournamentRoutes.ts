@@ -4241,7 +4241,12 @@ router.post("/:id/auto-schedule", async (req, res) => {
     };
 
     let scheduledCount = 0;
-    const updatesToSave: { id: string; scheduled_time: string; venue_id: string; court: string }[] = [];
+    const updatesToSave: any[] = [];
+    if (!onlyUnscheduled) {
+      matchesToSchedule.forEach(m => {
+        updatesToSave.push({ id: m.id, scheduled_time: null, venue_id: null, court: null });
+      });
+    }
 
     // Algoritmo de Escolha de Horário / Slot Sem Conflitos
     for (const match of matchesToSchedule) {
@@ -4400,12 +4405,19 @@ router.post("/:id/auto-schedule", async (req, res) => {
                 venueId: resource.venueId,
                 court: resource.courtName
               });
-              updatesToSave.push({
-                id: match.id,
-                scheduled_time: slot,
-                venue_id: resource.venueId,
-                court: resource.courtName
-              });
+              const existingUpdate = updatesToSave.find(u => u.id === match.id);
+              if (existingUpdate) {
+                existingUpdate.scheduled_time = slot;
+                existingUpdate.venue_id = resource.venueId;
+                existingUpdate.court = resource.courtName;
+              } else {
+                updatesToSave.push({
+                  id: match.id,
+                  scheduled_time: slot,
+                  venue_id: resource.venueId,
+                  court: resource.courtName
+                });
+              }
               scheduledCount++;
               foundSlot = true;
               break;

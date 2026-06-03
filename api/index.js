@@ -4176,6 +4176,11 @@ router2.post("/:id/auto-schedule", async (req, res) => {
     };
     let scheduledCount = 0;
     const updatesToSave = [];
+    if (!onlyUnscheduled) {
+      matchesToSchedule.forEach((m) => {
+        updatesToSave.push({ id: m.id, scheduled_time: null, venue_id: null, court: null });
+      });
+    }
     for (const match of matchesToSchedule) {
       const team1Id = match.team1_id;
       const team2Id = match.team2_id;
@@ -4296,12 +4301,19 @@ router2.post("/:id/auto-schedule", async (req, res) => {
                 venueId: resource.venueId,
                 court: resource.courtName
               });
-              updatesToSave.push({
-                id: match.id,
-                scheduled_time: slot,
-                venue_id: resource.venueId,
-                court: resource.courtName
-              });
+              const existingUpdate = updatesToSave.find((u) => u.id === match.id);
+              if (existingUpdate) {
+                existingUpdate.scheduled_time = slot;
+                existingUpdate.venue_id = resource.venueId;
+                existingUpdate.court = resource.courtName;
+              } else {
+                updatesToSave.push({
+                  id: match.id,
+                  scheduled_time: slot,
+                  venue_id: resource.venueId,
+                  court: resource.courtName
+                });
+              }
               scheduledCount++;
               foundSlot = true;
               break;
