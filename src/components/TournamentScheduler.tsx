@@ -157,7 +157,7 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
         if (!otherDate) return false;
         const otherTime = otherDate.getTime();
         // Conflito se a diferença for menor que 60 minutos (3600000 ms)
-        return Math.abs(matchTime - otherTime) < 3600000;
+        return Math.abs(matchTime - otherTime) < (autoScheduleParams.matchDuration * 60000);
       });
       if (overlapping) {
         conflicts.push(`Conflito de quadra com o Jogo ${(overlapping.match_index !== undefined ? overlapping.match_index + 1 : 1)} (${overlapping.category?.name}).`);
@@ -178,7 +178,7 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
         if (!otherDate) return false;
         const otherTime = otherDate.getTime();
         // Conflito se a diferença for menor que 60 minutos (3600000 ms)
-        if (Math.abs(matchTime - otherTime) < 3600000) {
+        if (Math.abs(matchTime - otherTime) < (autoScheduleParams.matchDuration * 60000)) {
           const otherAthletes = [
             ...(teamAthleteMap[other.team1_id] || []),
             ...(teamAthleteMap[other.team2_id] || [])

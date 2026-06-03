@@ -4271,6 +4271,8 @@ router2.post("/:id/auto-schedule", async (req, res) => {
               const dayStr = getDayHelper(mDate);
               const mHour = mDate.getHours();
               const mMin = mDate.getMinutes();
+              const isUnavailableDate = venue.availability.some((av) => av.type === "unavailable" && av.date === slotTime.split("T")[0]);
+              if (isUnavailableDate) return false;
               const regularAvails = venue.availability.filter((a) => a.type !== "unavailable");
               if (regularAvails.length === 0) return true;
               return regularAvails.some((av) => {
