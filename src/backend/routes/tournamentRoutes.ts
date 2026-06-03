@@ -4360,10 +4360,35 @@ router.post("/:id/auto-schedule", async (req, res) => {
               });
             };
 
+            const checkVenueAvail = (venueId: string, slotTime: string) => {
+              const venue = venues?.find(v => v.id === venueId);
+              if (!venue || !venue.availability || venue.availability.length === 0) return true;
+              
+              const mDate = parseHelper(slotTime);
+              if (!mDate) return true;
+              
+              const dayStr = getDayHelper(mDate);
+              const mHour = mDate.getHours();
+              const mMin = mDate.getMinutes();
+
+              const regularAvails = venue.availability.filter((a:any) => a.type !== 'unavailable');
+              if (regularAvails.length === 0) return true;
+
+              return regularAvails.some((av: any) => {
+                const isDayMatch = av.day === dayStr;
+                if (!isDayMatch) return false;
+                const [startH, startM] = av.start.split(':').map(Number);
+                const [endH, endM] = av.end.split(':').map(Number);
+                const timeVal = mHour * 60 + mMin;
+                return timeVal >= (startH * 60 + startM) && timeVal <= (endH * 60 + endM);
+              });
+            };
+
             const t1Ok = checkTeamAvail(team1Id, slot);
             const t2Ok = checkTeamAvail(team2Id, slot);
+            const venueOk = checkVenueAvail(resource.venueId, slot);
 
-            if (t1Ok && t2Ok) {
+            if (t1Ok && t2Ok && venueOk) {
               activeSchedule.push({
                 matchId: match.id,
                 team1Id,
