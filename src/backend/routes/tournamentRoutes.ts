@@ -4264,8 +4264,8 @@ router.post("/:id/auto-schedule", async (req, res) => {
 
       for (const slot of slots) {
         const slotDateStr = slot.split('T')[0];
-        const t1GamesToday = activeSchedule.filter(s => s.scheduledTime.startsWith(slotDateStr) && (s.team1Id === team1Id || s.team2Id === team1Id)).length;
-        const t2GamesToday = activeSchedule.filter(s => s.scheduledTime.startsWith(slotDateStr) && (s.team1Id === team2Id || s.team2Id === team2Id)).length;
+        const t1GamesToday = team1Id ? activeSchedule.filter(s => s.scheduledTime.startsWith(slotDateStr) && (s.team1Id === team1Id || s.team2Id === team1Id)).length : 0;
+        const t2GamesToday = team2Id ? activeSchedule.filter(s => s.scheduledTime.startsWith(slotDateStr) && (s.team1Id === team2Id || s.team2Id === team2Id)).length : 0;
         if (t1GamesToday >= maxGamesPerDay || t2GamesToday >= maxGamesPerDay) {
           continue; // Pula para o próximo slot porque um dos times já atingiu o limite no dia
         }
