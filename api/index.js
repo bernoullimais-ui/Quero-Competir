@@ -4060,7 +4060,7 @@ router2.post("/:id/auto-schedule", async (req, res) => {
     const supabase = getSupabaseAdmin();
     const { data: matches, error: matchesError } = await supabase.from("matches").select("id, team1_id, team2_id, scheduled_time, venue_id, court, tournament_category_id, round, match_index").eq("tournament_id", tournamentId);
     if (matchesError) throw matchesError;
-    let venueQuery = supabase.from("venues").select("*");
+    let venueQuery = supabase.from("venues").select("id, name, address, availability, courts, courts_count, courts_json");
     if (selectedVenues.length > 0) {
       venueQuery = venueQuery.in("id", selectedVenues);
     }
@@ -4296,11 +4296,26 @@ router2.post("/:id/auto-schedule", async (req, res) => {
     for (const u of updatesToSave) {
       await supabase.from("matches").update({ scheduled_time: u.scheduled_time, venue_id: u.venue_id, court: u.court }).eq("id", u.id);
     }
+    const diagVenue = venues?.[0];
+    const diagSlots = allSlots.slice(0, 5).map((s) => ({
+      slot: s,
+      venueOk: diagVenue ? venueAvailableAt(diagVenue.id, s) : null
+    }));
     res.json({
       success: true,
-      message: `Tabelas geradas com sucesso! ${scheduledCount} partidas foram agendadas prevenindo conflitos de sedes e atletas simult\xE2neos.`,
+      message: `${scheduledCount} partidas agendadas. Fila: ${matchesToSchedule.length - scheduledCount} sem hor\xE1rio. Re-agendados por conflito: ${invalidPrev.length}. \xC2ncoras v\xE1lidas mantidas: ${validAnchors.length}.`,
       scheduledCount,
-      totalUnscheduledLeft: matchesToSchedule.length - scheduledCount
+      totalUnscheduledLeft: matchesToSchedule.length - scheduledCount,
+      _debug: {
+        venueCount: venues?.length,
+        venues: venues?.map((v) => ({ id: v.id, name: v.name, availCount: Array.isArray(v.availability) ? v.availability.length : 0 })),
+        slotsGenerated: allSlots.length,
+        firstSlots: allSlots.slice(0, 5),
+        diagVenueAvail: diagSlots,
+        invalidAnchorCount: invalidPrev.length,
+        validAnchorCount: validAnchors.length,
+        matchesToScheduleCount: matchesToSchedule.length
+      }
     });
   } catch (error) {
     console.error("[AutoSchedule Error]:", error);

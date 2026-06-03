@@ -158,6 +158,10 @@ export interface Database {
           address: string | null
           organizer_id: string | null
           created_at: string
+          availability: any[] | null
+          courts: any[] | null
+          courts_count: number | null
+          courts_json: any[] | null
         }
         Insert: {
           id?: string
@@ -165,6 +169,10 @@ export interface Database {
           address?: string | null
           organizer_id?: string | null
           created_at?: string
+          availability?: any[] | null
+          courts?: any[] | null
+          courts_count?: number | null
+          courts_json?: any[] | null
         }
         Update: {
           id?: string
@@ -172,6 +180,10 @@ export interface Database {
           address?: string | null
           organizer_id?: string | null
           created_at?: string
+          availability?: any[] | null
+          courts?: any[] | null
+          courts_count?: number | null
+          courts_json?: any[] | null
         }
       }
       organizations: {

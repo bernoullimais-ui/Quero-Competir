@@ -303,6 +303,7 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
         body: JSON.stringify(autoScheduleParams),
       });
       const data = await res.json();
+      if (data._debug) console.log('[AutoSchedule Debug]', JSON.stringify(data._debug, null, 2));
       if (res.ok && data.success) {
         setMessage(data.message);
         setIsAutoSchedulerOpen(false);

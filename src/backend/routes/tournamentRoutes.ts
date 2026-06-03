@@ -4080,8 +4080,8 @@ router.post("/:id/auto-schedule", async (req, res) => {
 
     if (matchesError) throw matchesError;
 
-    // 2. Buscar sedes cadastradas ou filtradas
-    let venueQuery = supabase.from('venues').select('*');
+    // 2. Buscar sedes (filtradas ou todas) — buscar 'availability' explicitamente
+    let venueQuery = supabase.from('venues').select('id, name, address, availability, courts, courts_count, courts_json');
     if (selectedVenues.length > 0) {
       venueQuery = venueQuery.in('id', selectedVenues);
     }
@@ -4413,11 +4413,28 @@ router.post("/:id/auto-schedule", async (req, res) => {
         .eq('id', u.id);
     }
 
+    // Diagnóstico: primeiros 3 slots testados para a primeira sede
+    const diagVenue = venues?.[0];
+    const diagSlots = allSlots.slice(0, 5).map(s => ({
+      slot: s,
+      venueOk: diagVenue ? venueAvailableAt(diagVenue.id, s) : null
+    }));
+
     res.json({
       success: true,
-      message: `Tabelas geradas com sucesso! ${scheduledCount} partidas foram agendadas prevenindo conflitos de sedes e atletas simultâneos.`,
+      message: `${scheduledCount} partidas agendadas. Fila: ${matchesToSchedule.length - scheduledCount} sem horário. Re-agendados por conflito: ${invalidPrev.length}. Âncoras válidas mantidas: ${validAnchors.length}.`,
       scheduledCount,
-      totalUnscheduledLeft: matchesToSchedule.length - scheduledCount
+      totalUnscheduledLeft: matchesToSchedule.length - scheduledCount,
+      _debug: {
+        venueCount: venues?.length,
+        venues: venues?.map(v => ({ id: v.id, name: v.name, availCount: Array.isArray(v.availability) ? v.availability.length : 0 })),
+        slotsGenerated: allSlots.length,
+        firstSlots: allSlots.slice(0, 5),
+        diagVenueAvail: diagSlots,
+        invalidAnchorCount: invalidPrev.length,
+        validAnchorCount: validAnchors.length,
+        matchesToScheduleCount: matchesToSchedule.length
+      }
     });
 
   } catch (error: any) {
