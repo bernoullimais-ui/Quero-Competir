@@ -28,6 +28,7 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
   const [isAutoSchedulerOpen, setIsAutoSchedulerOpen] = useState(false);
   const [autoScheduleParams, setAutoScheduleParams] = useState({
     startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
     matchDuration: 60,
     dailyStartTime: '08:00',
     dailyEndTime: '20:00',
@@ -853,6 +854,17 @@ export default function TournamentScheduler({ tournamentId, mode }: TournamentSc
                     className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-2.5 text-xs font-semibold outline-none focus:border-indigo-500"
                   />
                 </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Data de Fim</label>
+                  <input 
+                    type="date" 
+                    value={autoScheduleParams.endDate}
+                    onChange={(e) => setAutoScheduleParams(prev => ({ ...prev, endDate: e.target.value }))}
+                    className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-2.5 text-xs font-semibold outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Duração Média (Mins)</label>
                   <input 

@@ -4059,7 +4059,8 @@ router.get("/:id/team-members-all", async (req, res) => {
 router.post("/:id/auto-schedule", async (req, res) => {
   const { id: tournamentId } = req.params;
   const { 
-    startDate, 
+    startDate,
+    endDate,
     matchDuration = 60, 
     dailyStartTime = "08:00", 
     dailyEndTime = "20:00", 
@@ -4179,17 +4180,20 @@ router.post("/:id/auto-schedule", async (req, res) => {
     }
 
     // Auxiliar de criação de datas e horários de jogo (gerar slots)
-    const createTimeSlots = (startD: string, countNeeded: number) => {
+    const createTimeSlots = (startD: string, endD: string) => {
       const slots: string[] = [];
       let currentDate = new Date(startD + "T00:00:00");
+      let limitDate = endD ? new Date(endD + "T23:59:59") : new Date(new Date(startD + "T00:00:00").getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days max if not provided
       
       const [startH, startM] = dailyStartTime.split(':').map(Number);
       const [endH, endM] = dailyEndTime.split(':').map(Number);
       
       let dayOffset = 0;
-      while (slots.length < Math.max(countNeeded * 12, 100)) {
-        const dateStr = new Date(currentDate.getTime() + dayOffset * 24 * 60 * 60 * 1000)
-          .toISOString().split('T')[0];
+      while (true) {
+        const loopDate = new Date(currentDate.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+        if (loopDate > limitDate) break;
+        
+        const dateStr = loopDate.toISOString().split('T')[0];
         
         let currentHour = startH;
         let currentMinute = startM;
@@ -4207,11 +4211,12 @@ router.post("/:id/auto-schedule", async (req, res) => {
           }
         }
         dayOffset++;
+        if (dayOffset > 365) break; // failsafe
       }
       return slots;
     };
 
-    const slots = createTimeSlots(startDate, matchesToSchedule.length);
+    const slots = createTimeSlots(startDate, endDate || startDate);
 
     const parseHelper = (timeStr: string) => {
       const regexMatch = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);

@@ -4048,6 +4048,7 @@ router2.post("/:id/auto-schedule", async (req, res) => {
   const { id: tournamentId } = req.params;
   const {
     startDate,
+    endDate,
     matchDuration = 60,
     dailyStartTime = "08:00",
     dailyEndTime = "20:00",
@@ -4123,14 +4124,17 @@ router2.post("/:id/auto-schedule", async (req, res) => {
     if (onlyUnscheduled === false) {
       activeSchedule.length = 0;
     }
-    const createTimeSlots = (startD, countNeeded) => {
+    const createTimeSlots = (startD, endD) => {
       const slots2 = [];
       let currentDate = /* @__PURE__ */ new Date(startD + "T00:00:00");
+      let limitDate = endD ? /* @__PURE__ */ new Date(endD + "T23:59:59") : new Date((/* @__PURE__ */ new Date(startD + "T00:00:00")).getTime() + 30 * 24 * 60 * 60 * 1e3);
       const [startH, startM] = dailyStartTime.split(":").map(Number);
       const [endH, endM] = dailyEndTime.split(":").map(Number);
       let dayOffset = 0;
-      while (slots2.length < Math.max(countNeeded * 12, 100)) {
-        const dateStr = new Date(currentDate.getTime() + dayOffset * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
+      while (true) {
+        const loopDate = new Date(currentDate.getTime() + dayOffset * 24 * 60 * 60 * 1e3);
+        if (loopDate > limitDate) break;
+        const dateStr = loopDate.toISOString().split("T")[0];
         let currentHour = startH;
         let currentMinute = startM;
         const endMinutes = endH * 60 + endM;
@@ -4145,10 +4149,11 @@ router2.post("/:id/auto-schedule", async (req, res) => {
           }
         }
         dayOffset++;
+        if (dayOffset > 365) break;
       }
       return slots2;
     };
-    const slots = createTimeSlots(startDate, matchesToSchedule.length);
+    const slots = createTimeSlots(startDate, endDate || startDate);
     const parseHelper = (timeStr) => {
       const regexMatch = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
       if (!regexMatch) return null;
