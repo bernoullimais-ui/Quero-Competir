@@ -45,6 +45,7 @@ export default function PublicTournamentView() {
   const [isOrganizer, setIsOrganizer] = useState(false);
   const [selectedSubdivisions, setSelectedSubdivisions] = useState<Record<string, string>>({});
   const [selectedTabCat, setSelectedTabCat] = useState<string>("");
+  const [selfRegEnabled, setSelfRegEnabled] = useState(false);
 
   useEffect(() => {
     // Verificar se o usuário conectado é organizador para fins de moderação
@@ -62,14 +63,18 @@ export default function PublicTournamentView() {
 
     Promise.all([
       fetch(`/api/tournaments/${id}`).then(r => r.json()),
-      fetch(`/api/tournaments/${id}/categories`).then(r => r.json())
-    ]).then(([tData, cData]) => {
+      fetch(`/api/tournaments/${id}/categories`).then(r => r.json()),
+      fetch(`/api/tournaments/${id}/public-settings`).then(r => r.ok ? r.json() : null),
+    ]).then(([tData, cData, pubSettings]) => {
       setTournament(tData);
       if (tData.organization) applyBrandColors(tData.organization);
       const catsList = Array.isArray(cData) ? cData : [];
       setCategories(catsList);
       if (catsList.length > 0) {
         setSelectedTabCat(catsList[0].id);
+      }
+      if (pubSettings && !pubSettings.error) {
+        setSelfRegEnabled(true);
       }
       setLoading(false);
     }).catch(err => {
@@ -113,13 +118,21 @@ export default function PublicTournamentView() {
                 <Trophy size={32} className="text-white" />
               )}
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{tournament.name}</h1>
               <div className="flex flex-wrap items-center gap-4 mt-2 text-indigo-100 text-sm font-medium">
                 <span className="flex items-center gap-1"><Calendar size={14} /> {new Date(tournament.start_date).toLocaleDateString()}</span>
                 {tournament.location && <span className="flex items-center gap-1"><MapPin size={14} /> {tournament.location}</span>}
               </div>
             </div>
+            {selfRegEnabled && (
+              <Link
+                to={`/public/tournament/${id}/inscricao`}
+                className="shrink-0 bg-white text-indigo-700 px-5 py-3 rounded-2xl font-black text-sm hover:bg-indigo-50 transition shadow-lg shadow-indigo-900/20 flex items-center gap-2"
+              >
+                <Sparkles size={16} /> Inscrever-se
+              </Link>
+            )}
           </div>
         </div>
         

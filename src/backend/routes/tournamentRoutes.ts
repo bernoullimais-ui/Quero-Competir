@@ -2664,11 +2664,12 @@ const DATA_FILE = path.join(process.cwd(), 'src/backend/data/subscriptions.json'
 
 interface SubSettings {
   deadline: string;
-  feeType: 'free' | 'by_team' | 'by_team_and_athlete_institution' | 'by_team_and_athlete_parent';
+  feeType: 'free' | 'by_team' | 'by_team_and_athlete_institution' | 'by_team_and_athlete_parent' | 'by_individual_self';
   teamFee: number;
   athleteFee: number;
   status: 'open' | 'closed';
   requireMembership?: boolean;
+  allowIndependent?: boolean;
   registrationConfig?: any;
   maxVisitorsPerAthlete?: number;
 }
@@ -2775,6 +2776,7 @@ function mapSettingsToFrontend(dbSettings: any) {
     athleteFee: Number(dbSettings.athlete_fee) || 0,
     status: dbSettings.status || "open",
     requireMembership: !!dbSettings.require_membership,
+    allowIndependent: !!dbSettings.allow_independent,
     registrationConfig: dbSettings.registration_config || getDefaultRegistrationConfig(),
     maxVisitorsPerAthlete: Number(dbSettings.max_visitors_per_athlete) || 0
   };
@@ -2788,6 +2790,7 @@ function mapSettingsToDb(feSettings: any) {
     athlete_fee: Number(feSettings.athleteFee) || 0,
     status: feSettings.status || "open",
     require_membership: !!feSettings.requireMembership,
+    allow_independent: !!feSettings.allowIndependent,
     registration_config: feSettings.registrationConfig || getDefaultRegistrationConfig(),
     max_visitors_per_athlete: Number(feSettings.maxVisitorsPerAthlete) || 0
   };
@@ -3070,9 +3073,210 @@ router.get("/:id/athlete-subscriptions/institution/:instId", async (req, res) =>
   }
 });
 
+// ── PUBLIC: settings visíveis sem autenticação (para auto-inscrição) ─────────
+router.get("/:id/public-settings", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const tournamentId = req.params.id;
+
+    const [tResult, settingsResult, categoriesResult, registrationsResult] = await Promise.all([
+      supabase.from("tournaments").select("id, name, logo_url, start_date, end_date, owner_id, status").eq("id", tournamentId).maybeSingle(),
+      getSubscriptionSettings(tournamentId),
+      supabase.from("tournament_categories").select("id, name, gender, age_group, birth_year_min, birth_year_max, max_teams, rules_config").eq("tournament_id", tournamentId).order("name"),
+      supabase.from("tournament_registrations").select("institution_id, institutions(id, name, logo_url)").eq("tournament_id", tournamentId)
+    ]);
+
+    if (!tResult.data) return res.status(404).json({ error: "Torneio não encontrado" });
+
+    const tournament = tResult.data;
+    const settings = settingsResult;
+
+    // Only expose public-settings for tournaments with self-registration enabled
+    if (settings?.feeType !== "by_individual_self") {
+      return res.status(403).json({ error: "Este torneio não aceita inscrições individuais pelo portal." });
+    }
+
+    // Fetch org settings for branding
+    const { data: org } = await supabase.from("organizations").select("name, logo_url, primary_color").eq("id", tournament.owner_id).maybeSingle();
+
+    const institutions = (registrationsResult.data || [])
+      .map((r: any) => r.institutions)
+      .filter(Boolean);
+
+    // Add "Independente" if org allows it
+    if (settings?.allowIndependent) {
+      institutions.unshift({ id: null, name: "Independente / Sem clube", logo_url: null });
+    }
+
+    return res.json({
+      tournament: {
+        id: tournament.id,
+        name: tournament.name,
+        logoUrl: tournament.logo_url,
+        startDate: tournament.start_date,
+        endDate: tournament.end_date,
+        status: tournament.status,
+      },
+      organization: org || null,
+      settings: {
+        feeType: settings?.feeType,
+        athleteFee: settings?.athleteFee || 0,
+        deadline: settings?.deadline || null,
+        status: settings?.status || "open",
+        registrationConfig: settings?.registrationConfig || null,
+        allowIndependent: !!settings?.allowIndependent,
+        requireMembership: !!settings?.requireMembership,
+      },
+      categories: (categoriesResult.data || []),
+      institutions,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PUBLIC: auto-inscrição pelo responsável / atleta ─────────────────────────
+router.post("/:id/self-register", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const tournamentId = req.params.id;
+
+    const {
+      athleteName, birthDate, document: docNum, gender,
+      categoryId, institutionId,
+      parentName, parentPhone, parentEmail, parentPassword,
+      photoFile, documentFile,
+      authorizedImageUse, liabilityWaiver,
+      additionalData = {}
+    } = req.body;
+
+    // 1. Validate tournament & settings
+    const settings = await getSubscriptionSettings(tournamentId);
+    if (settings?.feeType !== "by_individual_self") {
+      return res.status(403).json({ error: "Este torneio não aceita inscrições individuais." });
+    }
+    if (settings?.status === "closed") {
+      return res.status(400).json({ error: "As inscrições para este torneio estão encerradas." });
+    }
+    if (settings?.deadline) {
+      const deadline = new Date(settings.deadline);
+      deadline.setHours(23, 59, 59, 999);
+      if (new Date() > deadline) {
+        return res.status(400).json({ error: "O prazo de inscrições já encerrou." });
+      }
+    }
+
+    // 2. Validate category eligibility by birth date
+    const { data: category } = await supabase.from("tournament_categories").select("*").eq("id", categoryId).eq("tournament_id", tournamentId).maybeSingle();
+    if (!category) return res.status(400).json({ error: "Categoria não encontrada neste torneio." });
+
+    if (birthDate && (category.birth_year_min || category.birth_year_max)) {
+      const birthYear = new Date(birthDate).getFullYear();
+      if (category.birth_year_min && birthYear < category.birth_year_min) {
+        return res.status(400).json({ error: `Atleta mais velho que o permitido para esta categoria (nascido antes de ${category.birth_year_min}).` });
+      }
+      if (category.birth_year_max && birthYear > category.birth_year_max) {
+        return res.status(400).json({ error: `Atleta mais novo que o permitido para esta categoria (nascido após ${category.birth_year_max}).` });
+      }
+    }
+
+    // 3. Check for duplicate registration
+    const { data: existingSub } = await supabase.from("athlete_subscriptions")
+      .select("id")
+      .eq("tournament_id", tournamentId)
+      .eq("category_id", categoryId)
+      .eq("document", docNum)
+      .maybeSingle();
+    if (existingSub) {
+      return res.status(409).json({ error: "Já existe uma inscrição nesta categoria para este documento." });
+    }
+
+    // 4. Auto-create or fetch guardian account
+    let guardianAccountId: string | null = null;
+    let guardianToken: string | null = null;
+    if (parentEmail) {
+      const { data: existingAcc } = await supabase.from("portal_accounts")
+        .select("id, password_hash")
+        .eq("email", parentEmail.toLowerCase())
+        .maybeSingle();
+
+      if (existingAcc) {
+        guardianAccountId = existingAcc.id;
+      } else {
+        // Create new guardian account
+        const bcrypt = await import("bcryptjs");
+        const hash = parentPassword ? await bcrypt.default.hash(parentPassword, 10) : null;
+        const newId = `guardian_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const { data: newAcc } = await supabase.from("portal_accounts").insert({
+          id: newId,
+          email: parentEmail.toLowerCase(),
+          name: parentName,
+          role: "guardian",
+          password_hash: hash,
+        }).select("id").maybeSingle();
+        guardianAccountId = newAcc?.id || null;
+      }
+
+      if (guardianAccountId) {
+        const { generateToken } = await import("../middleware/auth.ts");
+        guardianToken = generateToken({ id: guardianAccountId, role: "guardian", email: parentEmail });
+      }
+    }
+
+    // 5. If institutionId provided, ensure it's registered in the tournament
+    if (institutionId) {
+      const { data: existingReg } = await supabase.from("tournament_registrations")
+        .select("id").eq("tournament_id", tournamentId).eq("institution_id", institutionId).maybeSingle();
+      if (!existingReg) {
+        // Auto-register the institution in the tournament
+        await supabase.from("tournament_registrations").insert({ tournament_id: tournamentId, institution_id: institutionId });
+      }
+    }
+
+    // 6. Create athlete_subscription
+    const { data: sub, error: subErr } = await supabase.from("athlete_subscriptions").insert({
+      tournament_id: tournamentId,
+      institution_id: institutionId || null,
+      category_id: categoryId,
+      athlete_name: athleteName,
+      birth_date: birthDate,
+      document: docNum,
+      gender: gender || "Masculino",
+      parent_name: parentName,
+      parent_phone: parentPhone,
+      is_completed: true,
+      validation_status: "pending",
+      payment_status: settings?.athleteFee > 0 ? "pending" : "paid",
+      authorized_image_use: !!authorizedImageUse,
+      liability_waiver: !!liabilityWaiver,
+      photo_url: photoFile || null,
+      document_url: documentFile || null,
+      created_by: guardianAccountId,
+      additional_data: {
+        ...additionalData,
+        parentEmail,
+        registration_source: "self",
+      },
+    }).select().maybeSingle();
+
+    if (subErr) throw subErr;
+
+    return res.status(201).json({
+      subId: sub.id,
+      guardianToken,
+      athleteFee: settings?.athleteFee || 0,
+      message: "Inscrição realizada com sucesso! Aguarde a validação do organizador.",
+    });
+  } catch (err: any) {
+    console.error("[self-register]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Adicionar/Atualizar atletas pré-autorizados (pela instituição)
 // Adicionar/Atualizar atletas pré-autorizados (pela instituição)
 router.post("/:id/athlete-subscriptions", async (req, res) => {
+
   try {
     const tournamentId = req.params.id;
     const { institutionId, categoryId, athletes, sync } = req.body;

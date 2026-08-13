@@ -33,6 +33,7 @@ import PublicTournamentView from "./components/PublicTournamentView.tsx";
 import InstitutionPortal from "./components/InstitutionPortal.tsx";
 import VenuePortal from "./components/VenuePortal.tsx";
 import PublicAthleteRegistration from "./components/PublicAthleteRegistration.tsx";
+import PublicSelfRegistration from "./components/PublicSelfRegistration.tsx";
 import SettingsPage from "./components/Settings";
 import PublicInvitationPage from "./components/PublicInvitationPage.tsx";
 import DrawCeremony from "./components/DrawCeremony.tsx";
@@ -475,6 +476,12 @@ export default function App() {
               <Route path="/public/register-athlete/:subId" element={
                 <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar inscrição individual.</div>}>
                   <PublicAthleteRegistration />
+                </ErrorBoundary>
+              } />
+
+              <Route path="/public/tournament/:id/inscricao" element={
+                <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar formulário de inscrição.</div>}>
+                  <PublicSelfRegistration />
                 </ErrorBoundary>
               } />
 

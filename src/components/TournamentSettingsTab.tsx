@@ -43,11 +43,12 @@ interface RegistrationConfig {
 
 interface SubSettings {
   deadline: string;
-  feeType: 'free' | 'by_team' | 'by_team_and_athlete_institution' | 'by_team_and_athlete_parent';
+  feeType: 'free' | 'by_team' | 'by_team_and_athlete_institution' | 'by_team_and_athlete_parent' | 'by_individual_self';
   teamFee: number;
   athleteFee: number;
   status: 'open' | 'closed';
   requireMembership?: boolean;
+  allowIndependent?: boolean;
   registrationConfig: RegistrationConfig;
   maxVisitorsPerAthlete?: number;
 }
@@ -97,6 +98,7 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
     athleteFee: 0,
     status: "open",
     requireMembership: false,
+    allowIndependent: false,
     registrationConfig: getDefaultRegistrationConfig(),
     maxVisitorsPerAthlete: 0
   });
@@ -129,6 +131,7 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
           athleteFee: Number(data.athleteFee) || 0,
           status: data.status || "open",
           requireMembership: !!data.requireMembership,
+          allowIndependent: !!data.allowIndependent,
           registrationConfig: hasConfig ? data.registrationConfig : getDefaultRegistrationConfig(),
           maxVisitorsPerAthlete: Number(data.maxVisitorsPerAthlete) || 0
         });
@@ -413,13 +416,14 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 bg-white"
             >
               <option value="free">Gratuita</option>
-              <option value="by_team">Paga por Equipe</option>
+              <option value="by_team">Paga por Equipe (Pela Instituição)</option>
               <option value="by_team_and_athlete_institution">Paga por Equipe + Atletas (Pela Instituição)</option>
               <option value="by_team_and_athlete_parent">Paga por Equipe (Instituição) + Atletas (Pelos Responsáveis)</option>
+              <option value="by_individual_self">Individual — Paga pelo Responsável (Auto-Inscrição)</option>
             </select>
           </div>
 
-          {settings.feeType !== "free" && (
+          {settings.feeType !== "free" && settings.feeType !== "by_individual_self" && (
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Taxa por Equipe (R$)</label>
               <input 
@@ -434,7 +438,7 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
             </div>
           )}
 
-          {settings.feeType.includes("athlete") && (
+          {(settings.feeType.includes("athlete") || settings.feeType === "by_individual_self") && (
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Taxa por Atleta (R$)</label>
               <input 
@@ -446,6 +450,22 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
                 onChange={e => setSettings({...settings, athleteFee: Number(e.target.value)})}
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 bg-white"
               />
+            </div>
+          )}
+
+          {settings.feeType === "by_individual_self" && (
+            <div className="md:col-span-4 bg-cyan-50 border border-cyan-100 rounded-2xl p-4 flex items-center gap-4">
+              <input
+                type="checkbox"
+                id="allowIndependent"
+                checked={!!settings.allowIndependent}
+                onChange={e => setSettings({...settings, allowIndependent: e.target.checked})}
+                className="w-4 h-4 rounded accent-cyan-600"
+              />
+              <div>
+                <label htmlFor="allowIndependent" className="block text-sm font-bold text-cyan-800 cursor-pointer">Permitir atletas independentes (sem clube)</label>
+                <p className="text-xs text-slate-500 mt-0.5">Quando ativo, o participante pode se inscrever sem selecionar uma instituição.</p>
+              </div>
             </div>
           )}
 

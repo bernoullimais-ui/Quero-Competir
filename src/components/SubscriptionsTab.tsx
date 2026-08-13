@@ -314,7 +314,12 @@ export default function SubscriptionsTab({
                       {/* Header do Card Atleta */}
                       <div className="flex items-start justify-between border-b border-slate-55 pb-3">
                         <div>
-                          <h4 className="font-bold text-slate-800 text-md">{sub.athleteName}</h4>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-bold text-slate-800 text-md">{sub.athleteName}</h4>
+                            {sub.additionalData?.registration_source === "self" && (
+                              <span className="px-2 py-0.5 rounded-md text-[9px] uppercase font-black bg-cyan-50 border border-cyan-200 text-cyan-700">Auto-Inscrição</span>
+                            )}
+                          </div>
                           <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">
                             {inst?.name} • Cat: {cat?.name || "Mista"}
                           </p>

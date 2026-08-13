@@ -1,43 +1,21 @@
-// src/backend/app.ts
-import dotenv from "dotenv";
-import express from "express";
-import cors from "cors";
-import helmet from "helmet";
-import morgan from "morgan";
-
-// src/backend/routes/institutionRoutes.ts
-import { Router } from "express";
-
-// src/backend/lib/supabase.ts
-import { createClient } from "@supabase/supabase-js";
-var supabaseAdmin = null;
-function getSupabaseAdmin() {
-  if (!supabaseAdmin) {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error("CRITICAL: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY n\xE3o configurados!");
-      throw new Error("Missing Supabase credentials");
-    }
-    if (supabaseServiceKey.length < 50) {
-      console.warn("AVISO: A chave service_role parece curta demais. Verifique nos Segredos.");
-    }
-    const cleanUrl = supabaseUrl.replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
-    supabaseAdmin = createClient(cleanUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-  }
-  return supabaseAdmin;
-}
-
-// src/backend/routes/institutionRoutes.ts
-import fs from "fs";
-import path from "path";
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 
 // src/backend/middleware/auth.ts
+var auth_exports = {};
+__export(auth_exports, {
+  generateToken: () => generateToken,
+  optionalAuth: () => optionalAuth,
+  requireAuth: () => requireAuth,
+  requireRole: () => requireRole
+});
 import jwt from "jsonwebtoken";
 function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
@@ -93,8 +71,50 @@ function optionalAuth(req, res, next) {
   }
   next();
 }
+var init_auth = __esm({
+  "src/backend/middleware/auth.ts"() {
+  }
+});
+
+// src/backend/app.ts
+import dotenv from "dotenv";
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
 
 // src/backend/routes/institutionRoutes.ts
+import { Router } from "express";
+
+// src/backend/lib/supabase.ts
+import { createClient } from "@supabase/supabase-js";
+var supabaseAdmin = null;
+function getSupabaseAdmin() {
+  if (!supabaseAdmin) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("CRITICAL: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY n\xE3o configurados!");
+      throw new Error("Missing Supabase credentials");
+    }
+    if (supabaseServiceKey.length < 50) {
+      console.warn("AVISO: A chave service_role parece curta demais. Verifique nos Segredos.");
+    }
+    const cleanUrl = supabaseUrl.replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
+    supabaseAdmin = createClient(cleanUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+  }
+  return supabaseAdmin;
+}
+
+// src/backend/routes/institutionRoutes.ts
+init_auth();
+import fs from "fs";
+import path from "path";
 var router = Router();
 var ORG_INST_FILE = path.join(process.cwd(), "src", "backend", "data", "organizer_institutions.json");
 var INVITATIONS_FILE = path.join(process.cwd(), "src", "backend", "data", "institution_invitations.json");
@@ -1209,6 +1229,7 @@ var institutionRoutes_default = router;
 
 // src/backend/routes/tournamentRoutes.ts
 import { Router as Router2 } from "express";
+init_auth();
 import fs2 from "fs";
 import path2 from "path";
 import bcrypt from "bcryptjs";
@@ -3135,6 +3156,7 @@ function mapSettingsToFrontend(dbSettings) {
     athleteFee: Number(dbSettings.athlete_fee) || 0,
     status: dbSettings.status || "open",
     requireMembership: !!dbSettings.require_membership,
+    allowIndependent: !!dbSettings.allow_independent,
     registrationConfig: dbSettings.registration_config || getDefaultRegistrationConfig(),
     maxVisitorsPerAthlete: Number(dbSettings.max_visitors_per_athlete) || 0
   };
@@ -3147,6 +3169,7 @@ function mapSettingsToDb(feSettings) {
     athlete_fee: Number(feSettings.athleteFee) || 0,
     status: feSettings.status || "open",
     require_membership: !!feSettings.requireMembership,
+    allow_independent: !!feSettings.allowIndependent,
     registration_config: feSettings.registrationConfig || getDefaultRegistrationConfig(),
     max_visitors_per_athlete: Number(feSettings.maxVisitorsPerAthlete) || 0
   };
@@ -3353,6 +3376,169 @@ router2.get("/:id/athlete-subscriptions/institution/:instId", async (req, res) =
     }
     res.json(subs);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+router2.get("/:id/public-settings", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const tournamentId = req.params.id;
+    const [tResult, settingsResult, categoriesResult, registrationsResult] = await Promise.all([
+      supabase.from("tournaments").select("id, name, logo_url, start_date, end_date, owner_id, status").eq("id", tournamentId).maybeSingle(),
+      getSubscriptionSettings(tournamentId),
+      supabase.from("tournament_categories").select("id, name, gender, age_group, birth_year_min, birth_year_max, max_teams, rules_config").eq("tournament_id", tournamentId).order("name"),
+      supabase.from("tournament_registrations").select("institution_id, institutions(id, name, logo_url)").eq("tournament_id", tournamentId)
+    ]);
+    if (!tResult.data) return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
+    const tournament = tResult.data;
+    const settings = settingsResult;
+    if (settings?.feeType !== "by_individual_self") {
+      return res.status(403).json({ error: "Este torneio n\xE3o aceita inscri\xE7\xF5es individuais pelo portal." });
+    }
+    const { data: org } = await supabase.from("organizations").select("name, logo_url, primary_color").eq("id", tournament.owner_id).maybeSingle();
+    const institutions = (registrationsResult.data || []).map((r) => r.institutions).filter(Boolean);
+    if (settings?.allowIndependent) {
+      institutions.unshift({ id: null, name: "Independente / Sem clube", logo_url: null });
+    }
+    return res.json({
+      tournament: {
+        id: tournament.id,
+        name: tournament.name,
+        logoUrl: tournament.logo_url,
+        startDate: tournament.start_date,
+        endDate: tournament.end_date,
+        status: tournament.status
+      },
+      organization: org || null,
+      settings: {
+        feeType: settings?.feeType,
+        athleteFee: settings?.athleteFee || 0,
+        deadline: settings?.deadline || null,
+        status: settings?.status || "open",
+        registrationConfig: settings?.registrationConfig || null,
+        allowIndependent: !!settings?.allowIndependent,
+        requireMembership: !!settings?.requireMembership
+      },
+      categories: categoriesResult.data || [],
+      institutions
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+router2.post("/:id/self-register", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const tournamentId = req.params.id;
+    const {
+      athleteName,
+      birthDate,
+      document: docNum,
+      gender,
+      categoryId,
+      institutionId,
+      parentName,
+      parentPhone,
+      parentEmail,
+      parentPassword,
+      photoFile,
+      documentFile,
+      authorizedImageUse,
+      liabilityWaiver,
+      additionalData = {}
+    } = req.body;
+    const settings = await getSubscriptionSettings(tournamentId);
+    if (settings?.feeType !== "by_individual_self") {
+      return res.status(403).json({ error: "Este torneio n\xE3o aceita inscri\xE7\xF5es individuais." });
+    }
+    if (settings?.status === "closed") {
+      return res.status(400).json({ error: "As inscri\xE7\xF5es para este torneio est\xE3o encerradas." });
+    }
+    if (settings?.deadline) {
+      const deadline = new Date(settings.deadline);
+      deadline.setHours(23, 59, 59, 999);
+      if (/* @__PURE__ */ new Date() > deadline) {
+        return res.status(400).json({ error: "O prazo de inscri\xE7\xF5es j\xE1 encerrou." });
+      }
+    }
+    const { data: category } = await supabase.from("tournament_categories").select("*").eq("id", categoryId).eq("tournament_id", tournamentId).maybeSingle();
+    if (!category) return res.status(400).json({ error: "Categoria n\xE3o encontrada neste torneio." });
+    if (birthDate && (category.birth_year_min || category.birth_year_max)) {
+      const birthYear = new Date(birthDate).getFullYear();
+      if (category.birth_year_min && birthYear < category.birth_year_min) {
+        return res.status(400).json({ error: `Atleta mais velho que o permitido para esta categoria (nascido antes de ${category.birth_year_min}).` });
+      }
+      if (category.birth_year_max && birthYear > category.birth_year_max) {
+        return res.status(400).json({ error: `Atleta mais novo que o permitido para esta categoria (nascido ap\xF3s ${category.birth_year_max}).` });
+      }
+    }
+    const { data: existingSub } = await supabase.from("athlete_subscriptions").select("id").eq("tournament_id", tournamentId).eq("category_id", categoryId).eq("document", docNum).maybeSingle();
+    if (existingSub) {
+      return res.status(409).json({ error: "J\xE1 existe uma inscri\xE7\xE3o nesta categoria para este documento." });
+    }
+    let guardianAccountId = null;
+    let guardianToken = null;
+    if (parentEmail) {
+      const { data: existingAcc } = await supabase.from("portal_accounts").select("id, password_hash").eq("email", parentEmail.toLowerCase()).maybeSingle();
+      if (existingAcc) {
+        guardianAccountId = existingAcc.id;
+      } else {
+        const bcrypt3 = await import("bcryptjs");
+        const hash = parentPassword ? await bcrypt3.default.hash(parentPassword, 10) : null;
+        const newId = `guardian_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const { data: newAcc } = await supabase.from("portal_accounts").insert({
+          id: newId,
+          email: parentEmail.toLowerCase(),
+          name: parentName,
+          role: "guardian",
+          password_hash: hash
+        }).select("id").maybeSingle();
+        guardianAccountId = newAcc?.id || null;
+      }
+      if (guardianAccountId) {
+        const { generateToken: generateToken2 } = await Promise.resolve().then(() => (init_auth(), auth_exports));
+        guardianToken = generateToken2({ id: guardianAccountId, role: "guardian", email: parentEmail });
+      }
+    }
+    if (institutionId) {
+      const { data: existingReg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", tournamentId).eq("institution_id", institutionId).maybeSingle();
+      if (!existingReg) {
+        await supabase.from("tournament_registrations").insert({ tournament_id: tournamentId, institution_id: institutionId });
+      }
+    }
+    const { data: sub, error: subErr } = await supabase.from("athlete_subscriptions").insert({
+      tournament_id: tournamentId,
+      institution_id: institutionId || null,
+      category_id: categoryId,
+      athlete_name: athleteName,
+      birth_date: birthDate,
+      document: docNum,
+      gender: gender || "Masculino",
+      parent_name: parentName,
+      parent_phone: parentPhone,
+      is_completed: true,
+      validation_status: "pending",
+      payment_status: settings?.athleteFee > 0 ? "pending" : "paid",
+      authorized_image_use: !!authorizedImageUse,
+      liability_waiver: !!liabilityWaiver,
+      photo_url: photoFile || null,
+      document_url: documentFile || null,
+      created_by: guardianAccountId,
+      additional_data: {
+        ...additionalData,
+        parentEmail,
+        registration_source: "self"
+      }
+    }).select().maybeSingle();
+    if (subErr) throw subErr;
+    return res.status(201).json({
+      subId: sub.id,
+      guardianToken,
+      athleteFee: settings?.athleteFee || 0,
+      message: "Inscri\xE7\xE3o realizada com sucesso! Aguarde a valida\xE7\xE3o do organizador."
+    });
+  } catch (err) {
+    console.error("[self-register]", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -5078,6 +5264,7 @@ var tournamentRoutes_default = router2;
 
 // src/backend/routes/memberRoutes.ts
 import { Router as Router3 } from "express";
+init_auth();
 import fs3 from "fs";
 import path3 from "path";
 var router3 = Router3();
@@ -5195,6 +5382,7 @@ import { Router as Router4 } from "express";
 import * as fs4 from "fs";
 import * as path4 from "path";
 import bcrypt2 from "bcryptjs";
+init_auth();
 var router4 = Router4();
 var ACCOUNTS_FILE4 = path4.join(process.cwd(), "src/backend/data/accounts.json");
 var BCRYPT_ROUNDS = 10;
@@ -5652,6 +5840,7 @@ var authRoutes_default = router4;
 
 // src/backend/routes/membershipRoutes.ts
 import { Router as Router5 } from "express";
+init_auth();
 var router5 = Router5();
 router5.get("/status", async (req, res) => {
   const { memberId, organizationId, year } = req.query;
@@ -5767,6 +5956,7 @@ router5.post("/status-bulk", async (req, res) => {
 var membershipRoutes_default = router5;
 
 // src/backend/app.ts
+init_auth();
 dotenv.config();
 dotenv.config({ path: ".env.local", override: true });
 var app = express();
