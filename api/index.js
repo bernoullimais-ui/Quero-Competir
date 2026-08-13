@@ -1497,16 +1497,35 @@ router2.get("/:tournamentId/venues/:venueId/live", async (req, res) => {
 });
 router2.post("/", requireAuth, async (req, res) => {
   const { name, owner_id, description, start_date, end_date, logo_url } = req.body;
-  const organizerId = req.user.id;
-  let finalOwnerId = owner_id;
-  if (organizerId) {
-    const orgId = await getOrganizerReferenceIdAndSync(organizerId);
-    if (orgId) {
-      finalOwnerId = orgId;
-    }
-  }
+  const reqUser = req.user;
+  const accountId = reqUser.id;
   try {
     const supabase = getSupabaseAdmin();
+    let orgId = reqUser.referenceId || null;
+    if (!orgId) {
+      if (fs2.existsSync(ACCOUNTS_FILE2)) {
+        try {
+          const accounts = JSON.parse(fs2.readFileSync(ACCOUNTS_FILE2, "utf-8"));
+          const acct = accounts.find((a) => a.id === accountId);
+          if (acct?.referenceId) orgId = acct.referenceId;
+        } catch (_) {
+        }
+      }
+    }
+    if (!orgId) {
+      try {
+        const { data: acct } = await supabase.from("portal_accounts").select("reference_id").eq("id", accountId).maybeSingle();
+        if (acct?.reference_id) orgId = acct.reference_id;
+      } catch (_) {
+      }
+    }
+    if (!orgId) {
+      orgId = await getOrganizerReferenceIdAndSync(accountId);
+    }
+    const finalOwnerId = orgId || owner_id;
+    if (!finalOwnerId) {
+      return res.status(400).json({ error: "N\xE3o foi poss\xEDvel determinar a organiza\xE7\xE3o do torneio. Fa\xE7a logout e login novamente." });
+    }
     const { data, error } = await supabase.from("tournaments").insert([{ name, owner_id: finalOwnerId, description, start_date, end_date, logo_url }]).select().single();
     if (error) throw error;
     res.status(201).json(data);

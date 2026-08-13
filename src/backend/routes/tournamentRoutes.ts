@@ -390,18 +390,49 @@ router.get("/:tournamentId/venues/:venueId/live", async (req, res) => {
 // Criar torneio
 router.post("/", requireAuth, async (req, res) => {
   const { name, owner_id, description, start_date, end_date, logo_url } = req.body;
-  const organizerId = req.user!.id;
-
-  let finalOwnerId = owner_id;
-  if (organizerId) {
-    const orgId = await getOrganizerReferenceIdAndSync(organizerId);
-    if (orgId) {
-      finalOwnerId = orgId;
-    }
-  }
+  const reqUser = req.user!;
+  const accountId = reqUser.id;
 
   try {
     const supabase = getSupabaseAdmin();
+
+    // Resolve orgId using same fail-safe chain as GET /
+    let orgId: string | null = (reqUser as any).referenceId || null;
+
+    if (!orgId) {
+      // Try local accounts.json
+      if (fs.existsSync(ACCOUNTS_FILE)) {
+        try {
+          const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, "utf-8"));
+          const acct = accounts.find((a: any) => a.id === accountId);
+          if (acct?.referenceId) orgId = acct.referenceId;
+        } catch (_) {}
+      }
+    }
+
+    if (!orgId) {
+      // Fallback: Supabase portal_accounts (works on Vercel)
+      try {
+        const { data: acct } = await supabase
+          .from("portal_accounts")
+          .select("reference_id")
+          .eq("id", accountId)
+          .maybeSingle();
+        if (acct?.reference_id) orgId = acct.reference_id;
+      } catch (_) {}
+    }
+
+    if (!orgId) {
+      // Last resort: try legacy sync helper
+      orgId = await getOrganizerReferenceIdAndSync(accountId);
+    }
+
+    const finalOwnerId = orgId || owner_id;
+
+    if (!finalOwnerId) {
+      return res.status(400).json({ error: "Não foi possível determinar a organização do torneio. Faça logout e login novamente." });
+    }
+
     const { data, error } = await supabase
       .from('tournaments')
       .insert([{ name, owner_id: finalOwnerId, description, start_date, end_date, logo_url }])
@@ -409,12 +440,13 @@ router.post("/", requireAuth, async (req, res) => {
       .single();
 
     if (error) throw error;
-    
+
     res.status(201).json(data);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 router.get("/institution/:institutionId/teams", async (req, res) => {
   try {
