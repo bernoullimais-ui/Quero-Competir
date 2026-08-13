@@ -10,57 +10,83 @@ const ORG_INST_FILE = path.join(process.cwd(), "src", "backend", "data", "organi
 const INVITATIONS_FILE = path.join(process.cwd(), "src", "backend", "data", "institution_invitations.json");
 const ACCOUNTS_FILE = path.join(process.cwd(), "src", "backend", "data", "accounts.json");
 
-// Dynamic seed helper
-function ensureFilesAndSeed() {
-  const dir = path.dirname(ORG_INST_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+// ── Organizer→Institution mapping backed by Supabase (Vercel-safe) ────────────
+// Falls back to local JSON for local dev environments.
 
-  if (!fs.existsSync(ORG_INST_FILE)) {
-    const seed = {
-      "acc_ttzf2b4if": [
-        "905c7902-56f0-44e1-ab79-54029c7b0611" // Bernoulli+
-      ],
-      "org-1": [
-        "35a45ad5-602d-4332-8a86-21268ed399ba", // Sport for Kids
-        "69fd6aae-a179-4277-ac4c-516db38086c1", // FLUIR
-        "52965e85-4fc0-48b7-8ef9-60c0bcbe50dc", // Pequeno Liceu
-        "266cd154-0730-47d7-b96b-7577f98e4937", // Bunny
-        "d7e59a23-96c3-4963-9d7f-0376897fea31", // Segunda Gaveta
-        "8a90c3bb-0ccc-48ed-8d95-4ce719d9f5b1", // Escola Pan Americana
-        "48efa856-f0c8-447f-a08d-91c7501cc905", // AKA
-        "81f171a9-1894-41d2-a71a-1bb00e86f72a"  // Dom Pedrinho
-      ]
-    };
-    fs.writeFileSync(ORG_INST_FILE, JSON.stringify(seed, null, 2), "utf-8");
-  }
+async function loadOrgInstitutionsDb(organizerId: string): Promise<string[]> {
+  // 1. Try Supabase organizer_institutions table (works on Vercel)
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("organizer_institutions")
+      .select("institution_id")
+      .eq("organizer_account_id", organizerId);
+    if (!error && data) {
+      return data.map((r: any) => r.institution_id);
+    }
+  } catch (_) {}
 
-  if (!fs.existsSync(INVITATIONS_FILE)) {
-    fs.writeFileSync(INVITATIONS_FILE, JSON.stringify([], null, 2), "utf-8");
-  }
+  // 2. Fallback: local JSON (dev environment)
+  try {
+    if (fs.existsSync(ORG_INST_FILE)) {
+      const map: Record<string, string[]> = JSON.parse(fs.readFileSync(ORG_INST_FILE, "utf-8"));
+      return map[organizerId] || [];
+    }
+  } catch (_) {}
+
+  return [];
 }
 
-ensureFilesAndSeed();
-
-function loadOrgInstitutions(): Record<string, string[]> {
-  ensureFilesAndSeed();
+async function saveOrgInstitutionDb(organizerId: string, institutionId: string): Promise<void> {
+  // 1. Persist to Supabase
   try {
-    return JSON.parse(fs.readFileSync(ORG_INST_FILE, "utf-8"));
-  } catch (e) {
-    return {};
-  }
+    const supabase = getSupabaseAdmin();
+    await supabase
+      .from("organizer_institutions")
+      .upsert({ organizer_account_id: organizerId, institution_id: institutionId })
+      .select();
+  } catch (_) {}
+
+  // 2. Also update local JSON (keeps dev env in sync)
+  try {
+    const dir = path.dirname(ORG_INST_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    let map: Record<string, string[]> = {};
+    if (fs.existsSync(ORG_INST_FILE)) {
+      map = JSON.parse(fs.readFileSync(ORG_INST_FILE, "utf-8"));
+    }
+    if (!map[organizerId]) map[organizerId] = [];
+    if (!map[organizerId].includes(institutionId)) map[organizerId].push(institutionId);
+    fs.writeFileSync(ORG_INST_FILE, JSON.stringify(map, null, 2), "utf-8");
+  } catch (_) {}
+}
+
+// Keep legacy sync helpers for code paths that haven't been migrated yet
+function loadOrgInstitutions(): Record<string, string[]> {
+  try {
+    if (fs.existsSync(ORG_INST_FILE)) return JSON.parse(fs.readFileSync(ORG_INST_FILE, "utf-8"));
+  } catch (_) {}
+  return {};
 }
 
 function saveOrgInstitutions(data: Record<string, string[]>) {
-  ensureFilesAndSeed();
   try {
+    const dir = path.dirname(ORG_INST_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(ORG_INST_FILE, JSON.stringify(data, null, 2), "utf-8");
-  } catch (e) {}
+  } catch (_) {}
+}
+
+function ensureInvitationsFile() {
+  try {
+    const dir = path.dirname(INVITATIONS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!fs.existsSync(INVITATIONS_FILE)) fs.writeFileSync(INVITATIONS_FILE, "[]", "utf-8");
+  } catch (_) {}
 }
 
 function loadInvitations(): any[] {
-  ensureFilesAndSeed();
+  ensureInvitationsFile();
   try {
     return JSON.parse(fs.readFileSync(INVITATIONS_FILE, "utf-8"));
   } catch (e) {
@@ -69,7 +95,7 @@ function loadInvitations(): any[] {
 }
 
 function saveInvitations(data: any[]) {
-  ensureFilesAndSeed();
+  ensureInvitationsFile();
   try {
     fs.writeFileSync(INVITATIONS_FILE, JSON.stringify(data, null, 2), "utf-8");
   } catch (e) {}
@@ -77,20 +103,28 @@ function saveInvitations(data: any[]) {
 
 function getUserRoleAndReferenceId(userId: string): { role: string | null; name: string | null, referenceId: string | null } {
   try {
-    if (!fs.existsSync(ACCOUNTS_FILE)) return { role: null, name: null, referenceId: null };
-    const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, "utf-8"));
-    const user = accounts.find((a: any) => a.id === userId);
-    if (user) {
-      return { 
-        role: user.role || null, 
-        name: user.name || null,
-        referenceId: user.referenceId || null 
-      };
+    if (fs.existsSync(ACCOUNTS_FILE)) {
+      const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, "utf-8"));
+      const user = accounts.find((a: any) => a.id === userId);
+      if (user) return { role: user.role || null, name: user.name || null, referenceId: user.referenceId || null };
     }
-  } catch (e) {
-    console.error(e);
-  }
+  } catch (e) {}
   return { role: null, name: null, referenceId: null };
+}
+
+async function getUserRoleFromDb(userId: string, jwtRole?: string): Promise<string | null> {
+  if (jwtRole) return jwtRole;
+  // Try local JSON first
+  const local = getUserRoleAndReferenceId(userId);
+  if (local.role) return local.role;
+  // Fallback to Supabase portal_accounts
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase.from("portal_accounts").select("role").eq("id", userId).maybeSingle();
+    return data?.role || null;
+  } catch (_) {
+    return null;
+  }
 }
 
 // Registrar uma nova instituição
@@ -100,68 +134,41 @@ router.post("/", requireAuth, async (req, res) => {
 
   try {
     const supabase = getSupabaseAdmin();
-    
-    // Tenta inserir com tax_id (que parece ser o atual no banco)
-    const { data, error } = await supabase
-      .from('institutions')
-      .insert([
-        { 
-          name, 
-          tax_id: document_number, 
-          email, 
-          responsible_name, 
-          responsible_phone,
-          logo_url
-        }
-      ])
-      .select()
-      .maybeSingle();
 
-    if (error) {
-      // Caso o banco mude para document_number ou cnpj, tentamos os fallbacks
-      if (error.message.includes('tax_id')) {
-        const { data: d2, error: e2 } = await supabase
-          .from('institutions')
-          .insert([{ name, document_number, email, responsible_name, responsible_phone, logo_url }])
-          .select().maybeSingle();
-        if (!e2) {
-          if (organizerId && d2 && d2.id) {
-            const b = loadOrgInstitutions();
-            if (!b[organizerId]) b[organizerId] = [];
-            if (!b[organizerId].includes(d2.id)) b[organizerId].push(d2.id);
-            saveOrgInstitutions(b);
-          }
-          return res.status(201).json(d2);
-        }
+    // Insert institution — try different column names for compatibility
+    let instData: any = null;
+    let instError: any = null;
 
-        const { data: d3, error: e3 } = await supabase
-          .from('institutions')
-          .insert([{ name, cnpj: document_number, email, responsible_name, responsible_phone, logo_url }])
-          .select().maybeSingle();
-        if (!e3) {
-          if (organizerId && d3 && d3.id) {
-            const b = loadOrgInstitutions();
-            if (!b[organizerId]) b[organizerId] = [];
-            if (!b[organizerId].includes(d3.id)) b[organizerId].push(d3.id);
-            saveOrgInstitutions(b);
-          }
-          return res.status(201).json(d3);
-        }
-      }
-      throw error;
+    const attempts = [
+      { tax_id: document_number, name, email, responsible_name, responsible_phone, logo_url },
+      { document_number, name, email, responsible_name, responsible_phone, logo_url },
+      { cnpj: document_number, name, email, responsible_name, responsible_phone, logo_url },
+    ];
+
+    for (const payload of attempts) {
+      const { data, error } = await supabase.from('institutions').insert([payload]).select().maybeSingle();
+      if (!error) { instData = data; break; }
+      instError = error;
+      if (!error.message.includes('tax_id') && !error.message.includes('document_number') && !error.message.includes('cnpj')) break;
     }
 
-    if (organizerId && data && data.id) {
-      const b = loadOrgInstitutions();
-      if (!b[organizerId]) b[organizerId] = [];
-      if (!b[organizerId].includes(data.id)) b[organizerId].push(data.id);
-      saveOrgInstitutions(b);
+    if (!instData) {
+      console.error("Erro Final Supabase:", instError);
+      return res.status(500).json({
+        error: instError?.message || "Erro ao criar instituição",
+        hint: "Verifique se a coluna de documento no banco é 'tax_id', 'document_number' ou 'cnpj'"
+      });
     }
 
-    res.status(201).json(data);
+    // Persist organizer→institution mapping to Supabase (Vercel-safe)
+    if (organizerId && instData.id) {
+      await saveOrgInstitutionDb(organizerId, instData.id);
+    }
+
+    res.status(201).json(instData);
   } catch (error: any) {
     console.error("Erro Final Supabase:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: error.message,
       hint: "Verifique se a coluna de documento no banco é 'tax_id', 'document_number' ou 'cnpj'"
     });
@@ -260,78 +267,48 @@ router.put("/:id", requireAuth, async (req, res) => {
 router.get("/", requireAuth, async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const organizerId = req.user!.id;
+    const reqUser = req.user!;
+    const organizerId = reqUser.id;
     const allPlatform = req.query.all_platform === "true";
 
-    let isSuperAdmin = false;
+    // Resolve role from JWT (most reliable) or fallback sources
+    const role = await getUserRoleFromDb(organizerId, (reqUser as any).role);
+    const isSuperAdmin = role === "super_admin";
+
+    // Load institutions allowed for this organizer from Supabase (Vercel-safe)
     let allowedInstIds: string[] = [];
-    
-    if (organizerId) {
-      const { role } = getUserRoleAndReferenceId(organizerId);
-      isSuperAdmin = role === "super_admin";
-      
-      const mapping = loadOrgInstitutions();
-      allowedInstIds = mapping[organizerId] || [];
+    if (!isSuperAdmin) {
+      allowedInstIds = await loadOrgInstitutionsDb(organizerId);
     }
 
+    // Fetch institutions — try different column names for compatibility
     let rawData: any[] = [];
     let fetchError: any = null;
 
-    // Tentativa 1: tax_id
-    let { data, error } = await supabase
-      .from('institutions')
-      .select('id, name, tax_id, logo_url, created_at')
-      .order('name');
-    
+    let { data, error } = await supabase.from('institutions').select('id, name, tax_id, logo_url, created_at').order('name');
     if (!error) {
       rawData = data?.map(i => ({ ...i, document_number: i.tax_id })) || [];
     } else {
-      // Tentativa 2: document_number
-      let { data: d2, error: e2 } = await supabase
-        .from('institutions')
-        .select('id, name, document_number, logo_url, created_at')
-        .order('name');
-      
+      let { data: d2, error: e2 } = await supabase.from('institutions').select('id, name, document_number, logo_url, created_at').order('name');
       if (!e2) {
         rawData = d2 || [];
       } else {
-        // Tentativa 3: cnpj
-        let { data: d3, error: e3 } = await supabase
-          .from('institutions')
-          .select('id, name, cnpj, logo_url, created_at')
-          .order('name');
-        
-        if (!e3) {
-          rawData = d3?.map(i => ({ ...i, document_number: i.cnpj })) || [];
-        } else {
-          fetchError = error || e2 || e3;
-        }
+        let { data: d3, error: e3 } = await supabase.from('institutions').select('id, name, cnpj, logo_url, created_at').order('name');
+        if (!e3) rawData = d3?.map(i => ({ ...i, document_number: i.cnpj })) || [];
+        else fetchError = error || e2 || e3;
       }
     }
 
     if (fetchError) throw fetchError;
 
-    // Se houver ID de organizador informado e ele NÃO for um super_admin
-    if (organizerId && !isSuperAdmin) {
-      if (allPlatform) {
-        // Restringido: Não expõe mais dados de outros organizadores em caso de escala!
-        const result = rawData
-          .filter(inst => allowedInstIds.includes(inst.id))
-          .map(inst => ({
-            ...inst,
-            is_managed: true
-          }));
-        return res.json(result);
-      } else {
-        // Filtro estrito: apenas as que ele gerencia/tem direito
-        const result = rawData.filter(inst => allowedInstIds.includes(inst.id));
-        return res.json(result);
-      }
+    if (!isSuperAdmin) {
+      const result = rawData
+        .filter(inst => allowedInstIds.includes(inst.id))
+        .map(inst => allPlatform ? { ...inst, is_managed: true } : inst);
+      return res.json(result);
     }
 
-    // Default do administrador ou rota pública de listagem
     return res.json(rawData);
-
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
