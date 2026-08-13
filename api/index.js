@@ -1547,16 +1547,35 @@ router2.get("/", async (req, res) => {
     const reqUser = req.user;
     const organizerId = reqUser?.id || req.headers["x-organizer-id"];
     let organizerRole = reqUser?.role;
-    if (organizerId && !organizerRole && fs2.existsSync(ACCOUNTS_FILE2)) {
-      const accounts = JSON.parse(fs2.readFileSync(ACCOUNTS_FILE2, "utf-8"));
-      const user = accounts.find((a) => a.id === organizerId);
-      if (user) organizerRole = user.role;
+    let jwtReferenceId = reqUser?.referenceId || null;
+    if (organizerId && !organizerRole) {
+      if (fs2.existsSync(ACCOUNTS_FILE2)) {
+        try {
+          const accounts = JSON.parse(fs2.readFileSync(ACCOUNTS_FILE2, "utf-8"));
+          const user = accounts.find((a) => a.id === organizerId);
+          if (user) {
+            organizerRole = user.role;
+            if (!jwtReferenceId && user.referenceId) jwtReferenceId = user.referenceId;
+          }
+        } catch (_) {
+        }
+      }
+      if (!organizerRole) {
+        try {
+          const { data: acc } = await supabase.from("portal_accounts").select("role, reference_id").eq("id", organizerId).maybeSingle();
+          if (acc) {
+            organizerRole = acc.role;
+            if (!jwtReferenceId && acc.reference_id) jwtReferenceId = acc.reference_id;
+          }
+        } catch (_) {
+        }
+      }
     }
     let orgId = null;
     let isSuperAdmin = organizerRole === "super_admin";
     let isInstitution = organizerRole === "institution";
     if (organizerId && !isSuperAdmin && !isInstitution) {
-      orgId = await getOrganizerReferenceIdAndSync(organizerId);
+      orgId = jwtReferenceId || await getOrganizerReferenceIdAndSync(organizerId);
     }
     let query = supabase.from("tournaments").select("*").neq("status", "cancelled");
     if (orgId && !isSuperAdmin && !isInstitution) {
