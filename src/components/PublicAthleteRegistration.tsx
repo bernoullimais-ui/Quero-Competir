@@ -119,7 +119,7 @@ export default function PublicAthleteRegistration() {
       stages.push({ id: "terms", label: "Termos" });
     }
     
-    const needsIndividualPayment = data?.settings?.feeType === "by_team_and_athlete_parent";
+    const needsIndividualPayment = data?.settings?.feeType === "by_team_and_athlete_parent" || data?.settings?.feeType === "by_individual_self";
     const needsMembershipPayment = data?.settings?.requireMembership && data?.membershipStatus === "pending";
     if ((needsIndividualPayment || needsMembershipPayment) && !paymentConfirmed) {
       stages.push({ id: "payment", label: "Pagamento" });
@@ -313,7 +313,7 @@ export default function PublicAthleteRegistration() {
       setCurrentStep("upload");
     } else if (regConfig.terms.some((t: any) => t.enabled)) {
       setCurrentStep("terms");
-    } else if ((data?.settings?.feeType === "by_team_and_athlete_parent" || (data?.settings?.requireMembership && data?.membershipStatus === "pending")) && !paymentConfirmed) {
+    } else if ((data?.settings?.feeType === "by_team_and_athlete_parent" || data?.settings?.feeType === "by_individual_self" || (data?.settings?.requireMembership && data?.membershipStatus === "pending")) && !paymentConfirmed) {
       setCurrentStep("payment");
     } else {
       executeCompleteSubscription();
@@ -350,7 +350,7 @@ export default function PublicAthleteRegistration() {
     // Navigation
     if (regConfig.terms.some((t: any) => t.enabled)) {
       setCurrentStep("terms");
-    } else if ((data?.settings?.feeType === "by_team_and_athlete_parent" || (data?.settings?.requireMembership && data?.membershipStatus === "pending")) && !paymentConfirmed) {
+    } else if ((data?.settings?.feeType === "by_team_and_athlete_parent" || data?.settings?.feeType === "by_individual_self" || (data?.settings?.requireMembership && data?.membershipStatus === "pending")) && !paymentConfirmed) {
       setCurrentStep("payment");
     } else {
       executeCompleteSubscription();
@@ -370,7 +370,7 @@ export default function PublicAthleteRegistration() {
       }
     }
     
-    const needsIndividualPayment = data?.settings?.feeType === "by_team_and_athlete_parent";
+    const needsIndividualPayment = data?.settings?.feeType === "by_team_and_athlete_parent" || data?.settings?.feeType === "by_individual_self";
     const needsMembershipPayment = data?.settings?.requireMembership && data?.membershipStatus === "pending";
 
     if ((needsIndividualPayment || needsMembershipPayment) && !paymentConfirmed) {

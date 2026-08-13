@@ -50,6 +50,7 @@ interface SubSettings {
   requireMembership?: boolean;
   allowIndependent?: boolean;
   maxEventsPerParticipant?: number;
+  feePricingModel?: 'per_event' | 'fixed_package';
   registrationConfig: RegistrationConfig;
   maxVisitorsPerAthlete?: number;
 }
@@ -101,6 +102,7 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
     requireMembership: false,
     allowIndependent: false,
     maxEventsPerParticipant: 1,
+    feePricingModel: "per_event",
     registrationConfig: getDefaultRegistrationConfig(),
     maxVisitorsPerAthlete: 0
   });
@@ -135,6 +137,7 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
           requireMembership: !!data.requireMembership,
           allowIndependent: !!data.allowIndependent,
           maxEventsPerParticipant: Number(data.maxEventsPerParticipant) || 1,
+          feePricingModel: data.feePricingModel || "per_event",
           registrationConfig: hasConfig ? data.registrationConfig : getDefaultRegistrationConfig(),
           maxVisitorsPerAthlete: Number(data.maxVisitorsPerAthlete) || 0
         });
@@ -468,6 +471,20 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
                 onChange={e => setSettings({...settings, maxEventsPerParticipant: Math.max(1, Number(e.target.value))})}
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 bg-white"
               />
+            </div>
+          )}
+
+          {settings.feeType === "by_individual_self" && (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Cálculo da Taxa por Atleta</label>
+              <select
+                value={settings.feePricingModel || "per_event"}
+                onChange={e => setSettings({...settings, feePricingModel: e.target.value as any})}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 bg-white"
+              >
+                <option value="per_event">Multiplicar Por Prova Selecionada (ex: 2× R$ 80 = R$ 160)</option>
+                <option value="fixed_package">Pacote Fixo Único (ex: R$ 80 fixo até o limite de provas)</option>
+              </select>
             </div>
           )}
 

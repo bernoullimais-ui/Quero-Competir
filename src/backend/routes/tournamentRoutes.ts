@@ -2671,6 +2671,7 @@ interface SubSettings {
   requireMembership?: boolean;
   allowIndependent?: boolean;
   maxEventsPerParticipant?: number;
+  feePricingModel?: 'per_event' | 'fixed_package';
   registrationConfig?: any;
   maxVisitorsPerAthlete?: number;
 }
@@ -2779,6 +2780,7 @@ function mapSettingsToFrontend(dbSettings: any) {
     requireMembership: !!dbSettings.require_membership,
     allowIndependent: !!dbSettings.allow_independent,
     maxEventsPerParticipant: Number(dbSettings.max_events_per_participant) || 1,
+    feePricingModel: dbSettings.fee_pricing_model || "per_event",
     registrationConfig: dbSettings.registration_config || getDefaultRegistrationConfig(),
     maxVisitorsPerAthlete: Number(dbSettings.max_visitors_per_athlete) || 0
   };
@@ -2794,6 +2796,7 @@ function mapSettingsToDb(feSettings: any) {
     require_membership: !!feSettings.requireMembership,
     allow_independent: !!feSettings.allowIndependent,
     max_events_per_participant: Number(feSettings.maxEventsPerParticipant) || 1,
+    fee_pricing_model: feSettings.feePricingModel || "per_event",
     registration_config: feSettings.registrationConfig || getDefaultRegistrationConfig(),
     max_visitors_per_athlete: Number(feSettings.maxVisitorsPerAthlete) || 0
   };
@@ -3139,6 +3142,7 @@ router.get("/:id/public-settings", async (req, res) => {
         registrationConfig: settings?.registrationConfig || null,
         allowIndependent: !!settings?.allowIndependent,
         maxEventsPerParticipant: settings?.maxEventsPerParticipant || 1,
+        feePricingModel: settings?.feePricingModel || "per_event",
         requireMembership: !!settings?.requireMembership,
       },
       categories: (categoriesResult.data || []),
@@ -3277,7 +3281,7 @@ router.post("/:id/self-register", async (req, res) => {
         parent_name: finalParentName,
         parent_phone: parentPhone,
         is_completed: true,
-        validation_status: "pending",
+        validation_status: "approved",
         payment_status: settings?.athleteFee > 0 ? "pending" : "paid",
         authorized_image_use: !!authorizedImageUse,
         liability_waiver: !!liabilityWaiver,
@@ -3321,12 +3325,18 @@ router.post("/:id/self-register", async (req, res) => {
       }
     }
 
+    const feePricingModel = settings?.feePricingModel || "per_event";
+    const unitFee = settings?.athleteFee || 0;
+    const totalFee = feePricingModel === "fixed_package" ? unitFee : unitFee * targetCategoryIds.length;
+
     return res.status(201).json({
       subIds: createdSubIds,
       subId: createdSubIds[0] || null,
       guardianToken,
-      athleteFee: settings?.athleteFee || 0,
-      message: "Inscrição realizada com sucesso! Aguarde a validação do organizador.",
+      athleteFee: unitFee,
+      totalFee,
+      feePricingModel,
+      message: "Inscrição realizada com sucesso!",
     });
   } catch (err: any) {
     console.error("[self-register]", err);

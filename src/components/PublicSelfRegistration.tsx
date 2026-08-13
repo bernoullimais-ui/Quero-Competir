@@ -153,6 +153,12 @@ export default function PublicSelfRegistration() {
     { id: "terms",      label: "Termos",       icon: Shield },
   ];
 
+  const feePricingModel = settings?.feePricingModel || "per_event";
+  const unitAthleteFee = settings?.athleteFee || 0;
+  const totalAthleteFee = feePricingModel === "fixed_package"
+    ? unitAthleteFee
+    : unitAthleteFee * selectedCategoryIds.length;
+
   const stepIndex = activeSteps.findIndex(s => s.id === step);
 
   function toggleCategory(catId: string) {
@@ -205,7 +211,7 @@ export default function PublicSelfRegistration() {
       }
       setResultSubIds(data.subIds || (data.subId ? [data.subId] : []));
       setGuardianToken(data.guardianToken);
-      setAthleteFee(data.athleteFee || 0);
+      setAthleteFee(data.totalFee ?? data.athleteFee ?? 0);
 
       if (data.guardianToken) {
         const stored = {
@@ -255,7 +261,7 @@ export default function PublicSelfRegistration() {
           <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 size={44} className="text-emerald-600" />
           </div>
-          <h2 className="text-2xl font-black text-slate-800 mb-2">Inscrição Realizada!</h2>
+          <h2 className="text-2xl font-black text-slate-800 mb-2">Inscrição Confirmada!</h2>
           <p className="text-slate-500 text-sm mb-1">
             <strong className="text-slate-700">{athleteName}</strong> foi inscrito(a) em {selectedCategoryIds.length} prova{selectedCategoryIds.length > 1 ? "s" : ""}.
           </p>
@@ -264,23 +270,37 @@ export default function PublicSelfRegistration() {
               Protocolo: <span className="font-mono font-bold text-slate-600">{resultSubIds[0]?.slice(0, 8).toUpperCase()}</span>
             </p>
           )}
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-left mb-4">
-            <p className="text-xs font-bold text-amber-700 mb-1">⏳ Aguardando Validação</p>
-            <p className="text-xs text-slate-500 leading-relaxed">A organização revisará e validará sua inscrição. Você será notificado quando for aprovada.</p>
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-left mb-4">
+            <p className="text-xs font-bold text-emerald-700 mb-1">✅ Inscrição Aprovada</p>
+            <p className="text-xs text-slate-500 leading-relaxed">Sua inscrição foi confirmada no sistema.</p>
           </div>
-          {athleteFee > 0 && (
-            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-left mb-4">
-              <p className="text-xs font-bold text-indigo-700 mb-1">💳 Taxa: R$ {(athleteFee * selectedCategoryIds.length).toFixed(2)} ({selectedCategoryIds.length}× R$ {athleteFee.toFixed(2)})</p>
-              <p className="text-xs text-slate-500">O pagamento será solicitado após a aprovação.</p>
+          {totalAthleteFee > 0 && (
+            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-left mb-6">
+              <p className="text-xs font-bold text-indigo-700 mb-1">
+                💳 Taxa Total: R$ {totalAthleteFee.toFixed(2)}
+              </p>
+              <p className="text-xs text-slate-500">
+                {feePricingModel === "fixed_package"
+                  ? `Pacote único (R$ ${unitAthleteFee.toFixed(2)}) para até ${maxEvents} prova(s)`
+                  : `${selectedCategoryIds.length} prova(s) × R$ ${unitAthleteFee.toFixed(2)}`}
+              </p>
             </div>
           )}
           <div className="flex flex-col gap-3">
+            {totalAthleteFee > 0 && resultSubIds.length > 0 && (
+              <button
+                onClick={() => navigate(`/public/register-athlete/${resultSubIds[0]}`)}
+                className="w-full bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-sm hover:bg-emerald-700 transition shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
+              >
+                💳 Pagar Inscrição Agora (PIX / Cartão)
+              </button>
+            )}
             {guardianToken && (
-              <button onClick={() => navigate("/")} className="w-full bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition text-sm">
+              <button onClick={() => navigate("/")} className="w-full border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold hover:bg-slate-50 transition text-sm">
                 Acompanhar minhas inscrições
               </button>
             )}
-            <Link to={`/public/tournament/${tournamentId}`} className="w-full border border-slate-200 text-slate-600 px-6 py-3 rounded-xl font-bold hover:bg-slate-50 transition text-sm block">
+            <Link to={`/public/tournament/${tournamentId}`} className="w-full text-slate-400 font-semibold hover:text-slate-600 py-2 transition text-xs block">
               Ver o torneio
             </Link>
           </div>
@@ -673,8 +693,10 @@ export default function PublicSelfRegistration() {
                     <span className="font-bold text-slate-700">{selectedCategories.map((c: any) => c.name).join(", ")}</span>
                     <span className="text-slate-500 font-semibold">Taxa</span>
                     <span className="font-bold text-slate-700">
-                      {settings?.athleteFee > 0
-                        ? `R$ ${(settings.athleteFee * selectedCategoryIds.length).toFixed(2)} (${selectedCategoryIds.length}× R$ ${settings.athleteFee.toFixed(2)})`
+                      {totalAthleteFee > 0
+                        ? feePricingModel === "fixed_package"
+                          ? `R$ ${totalAthleteFee.toFixed(2)} (Pacote fixo)`
+                          : `R$ ${totalAthleteFee.toFixed(2)} (${selectedCategoryIds.length}× R$ ${unitAthleteFee.toFixed(2)})`
                         : "Gratuita"}
                     </span>
                     <span className="text-slate-500 font-semibold">Responsável</span>
