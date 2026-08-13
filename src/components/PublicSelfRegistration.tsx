@@ -130,7 +130,12 @@ export default function PublicSelfRegistration() {
     return true;
   });
 
-  const maxEvents: number = pageData?.settings?.maxEventsPerParticipant ?? 1;
+  const settings = pageData?.settings;
+  const tournament = pageData?.tournament;
+  const selectedCategories = (pageData?.categories ?? []).filter((c: any) => selectedCategoryIds.includes(c.id));
+  const selectedInstitution = pageData?.institutions?.find((i: any) => i.id === institutionId);
+
+  const maxEvents: number = settings?.maxEventsPerParticipant ?? 1;
   const uploadsConfig: any[] = settings?.registrationConfig?.uploads || [];
   const hasEnabledUploads = uploadsConfig.length === 0
     ? true
