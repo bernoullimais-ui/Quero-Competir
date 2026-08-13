@@ -462,12 +462,36 @@ router.get("/", async (req, res) => {
     const reqUser = (req as any).user;
     const organizerId = reqUser?.id || (req.headers["x-organizer-id"] as string);
     let organizerRole = reqUser?.role;
+    // referenceId from JWT token (most reliable — no filesystem dependency)
+    let jwtReferenceId: string | null = (reqUser as any)?.referenceId || null;
 
     // Try to get role from accounts if not in JWT
-    if (organizerId && !organizerRole && fs.existsSync(ACCOUNTS_FILE)) {
-      const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, "utf-8"));
-      const user = accounts.find((a: any) => a.id === organizerId);
-      if (user) organizerRole = user.role;
+    if (organizerId && !organizerRole) {
+      // 1st: try local JSON (fast, works locally)
+      if (fs.existsSync(ACCOUNTS_FILE)) {
+        try {
+          const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, "utf-8"));
+          const user = accounts.find((a: any) => a.id === organizerId);
+          if (user) {
+            organizerRole = user.role;
+            if (!jwtReferenceId && user.referenceId) jwtReferenceId = user.referenceId;
+          }
+        } catch (_) {}
+      }
+      // 2nd: fallback to Supabase portal_accounts (works on Vercel where filesystem is ephemeral)
+      if (!organizerRole) {
+        try {
+          const { data: acc } = await supabase
+            .from("portal_accounts")
+            .select("role, reference_id")
+            .eq("id", organizerId)
+            .maybeSingle();
+          if (acc) {
+            organizerRole = acc.role;
+            if (!jwtReferenceId && acc.reference_id) jwtReferenceId = acc.reference_id;
+          }
+        } catch (_) {}
+      }
     }
 
     let orgId: string | null = null;
@@ -475,7 +499,8 @@ router.get("/", async (req, res) => {
     let isInstitution = organizerRole === "institution";
 
     if (organizerId && !isSuperAdmin && !isInstitution) {
-      orgId = await getOrganizerReferenceIdAndSync(organizerId);
+      // Prefer referenceId from JWT/accounts (avoids extra DB round-trip and filesystem issues)
+      orgId = jwtReferenceId || await getOrganizerReferenceIdAndSync(organizerId);
     }
 
     let query = supabase.from('tournaments').select('*').neq('status', 'cancelled');
