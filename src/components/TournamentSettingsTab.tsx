@@ -49,6 +49,7 @@ interface SubSettings {
   status: 'open' | 'closed';
   requireMembership?: boolean;
   allowIndependent?: boolean;
+  maxEventsPerParticipant?: number;
   registrationConfig: RegistrationConfig;
   maxVisitorsPerAthlete?: number;
 }
@@ -99,6 +100,7 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
     status: "open",
     requireMembership: false,
     allowIndependent: false,
+    maxEventsPerParticipant: 1,
     registrationConfig: getDefaultRegistrationConfig(),
     maxVisitorsPerAthlete: 0
   });
@@ -132,6 +134,7 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
           status: data.status || "open",
           requireMembership: !!data.requireMembership,
           allowIndependent: !!data.allowIndependent,
+          maxEventsPerParticipant: Number(data.maxEventsPerParticipant) || 1,
           registrationConfig: hasConfig ? data.registrationConfig : getDefaultRegistrationConfig(),
           maxVisitorsPerAthlete: Number(data.maxVisitorsPerAthlete) || 0
         });
@@ -448,6 +451,21 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
                 placeholder="0.00"
                 value={settings.athleteFee || ""}
                 onChange={e => setSettings({...settings, athleteFee: Number(e.target.value)})}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 bg-white"
+              />
+            </div>
+          )}
+
+          {settings.feeType === "by_individual_self" && (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Limite de Provas por Atleta</label>
+              <input 
+                type="number"
+                min="1"
+                max="20"
+                placeholder="1"
+                value={settings.maxEventsPerParticipant || 1}
+                onChange={e => setSettings({...settings, maxEventsPerParticipant: Math.max(1, Number(e.target.value))})}
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 bg-white"
               />
             </div>

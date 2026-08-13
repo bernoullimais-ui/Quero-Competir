@@ -2670,6 +2670,7 @@ interface SubSettings {
   status: 'open' | 'closed';
   requireMembership?: boolean;
   allowIndependent?: boolean;
+  maxEventsPerParticipant?: number;
   registrationConfig?: any;
   maxVisitorsPerAthlete?: number;
 }
@@ -2777,6 +2778,7 @@ function mapSettingsToFrontend(dbSettings: any) {
     status: dbSettings.status || "open",
     requireMembership: !!dbSettings.require_membership,
     allowIndependent: !!dbSettings.allow_independent,
+    maxEventsPerParticipant: Number(dbSettings.max_events_per_participant) || 1,
     registrationConfig: dbSettings.registration_config || getDefaultRegistrationConfig(),
     maxVisitorsPerAthlete: Number(dbSettings.max_visitors_per_athlete) || 0
   };
@@ -2791,6 +2793,7 @@ function mapSettingsToDb(feSettings: any) {
     status: feSettings.status || "open",
     require_membership: !!feSettings.requireMembership,
     allow_independent: !!feSettings.allowIndependent,
+    max_events_per_participant: Number(feSettings.maxEventsPerParticipant) || 1,
     registration_config: feSettings.registrationConfig || getDefaultRegistrationConfig(),
     max_visitors_per_athlete: Number(feSettings.maxVisitorsPerAthlete) || 0
   };
@@ -3135,6 +3138,7 @@ router.get("/:id/public-settings", async (req, res) => {
         status: settings?.status || "open",
         registrationConfig: settings?.registrationConfig || null,
         allowIndependent: !!settings?.allowIndependent,
+        maxEventsPerParticipant: settings?.maxEventsPerParticipant || 1,
         requireMembership: !!settings?.requireMembership,
       },
       categories: (categoriesResult.data || []),
@@ -3153,12 +3157,21 @@ router.post("/:id/self-register", async (req, res) => {
 
     const {
       athleteName, birthDate, document: docNum, gender,
-      categoryId, institutionId,
+      categoryId, categoryIds: rawCategoryIds, institutionId,
       parentName, parentPhone, parentEmail, parentPassword,
       photoFile, documentFile,
       authorizedImageUse, liabilityWaiver,
+      isSelfGuardian,
       additionalData = {}
     } = req.body;
+
+    const targetCategoryIds: string[] = Array.isArray(rawCategoryIds) && rawCategoryIds.length > 0
+      ? rawCategoryIds
+      : categoryId ? [categoryId] : [];
+
+    if (targetCategoryIds.length === 0) {
+      return res.status(400).json({ error: "Nenhuma prova/categoria selecionada." });
+    }
 
     // 1. Validate tournament & settings
     const settings = await getSubscriptionSettings(tournamentId);
@@ -3176,34 +3189,42 @@ router.post("/:id/self-register", async (req, res) => {
       }
     }
 
-    // 2. Validate category eligibility by birth date
-    const { data: category } = await supabase.from("tournament_categories").select("*").eq("id", categoryId).eq("tournament_id", tournamentId).maybeSingle();
-    if (!category) return res.status(400).json({ error: "Categoria não encontrada neste torneio." });
+    const maxEvents = settings?.maxEventsPerParticipant || 1;
+    if (maxEvents > 0 && targetCategoryIds.length > maxEvents) {
+      return res.status(400).json({ error: `O limite máximo é de ${maxEvents} prova(s) por participante.` });
+    }
 
-    if (birthDate && (category.birth_year_min || category.birth_year_max)) {
-      const birthYear = new Date(birthDate).getFullYear();
-      if (category.birth_year_min && birthYear < category.birth_year_min) {
-        return res.status(400).json({ error: `Atleta mais velho que o permitido para esta categoria (nascido antes de ${category.birth_year_min}).` });
+    // 2. Validate category eligibility by birth date & check existing subscriptions
+    for (const catId of targetCategoryIds) {
+      const { data: category } = await supabase.from("tournament_categories").select("*").eq("id", catId).eq("tournament_id", tournamentId).maybeSingle();
+      if (!category) return res.status(400).json({ error: `Categoria não encontrada (${catId}).` });
+
+      if (birthDate && (category.birth_year_min || category.birth_year_max)) {
+        const birthYear = new Date(birthDate).getFullYear();
+        if (category.birth_year_min && birthYear < category.birth_year_min) {
+          return res.status(400).json({ error: `Atleta não elegível para ${category.name} (nascido antes de ${category.birth_year_min}).` });
+        }
+        if (category.birth_year_max && birthYear > category.birth_year_max) {
+          return res.status(400).json({ error: `Atleta não elegível para ${category.name} (nascido após ${category.birth_year_max}).` });
+        }
       }
-      if (category.birth_year_max && birthYear > category.birth_year_max) {
-        return res.status(400).json({ error: `Atleta mais novo que o permitido para esta categoria (nascido após ${category.birth_year_max}).` });
+
+      const { data: existingSub } = await supabase.from("athlete_subscriptions")
+        .select("id")
+        .eq("tournament_id", tournamentId)
+        .eq("category_id", catId)
+        .eq("document", docNum)
+        .maybeSingle();
+      if (existingSub) {
+        return res.status(409).json({ error: `Já existe uma inscrição na prova "${category.name}" para este documento.` });
       }
     }
 
-    // 3. Check for duplicate registration
-    const { data: existingSub } = await supabase.from("athlete_subscriptions")
-      .select("id")
-      .eq("tournament_id", tournamentId)
-      .eq("category_id", categoryId)
-      .eq("document", docNum)
-      .maybeSingle();
-    if (existingSub) {
-      return res.status(409).json({ error: "Já existe uma inscrição nesta categoria para este documento." });
-    }
-
-    // 4. Auto-create or fetch guardian account
+    // 3. Auto-create or fetch guardian account
     let guardianAccountId: string | null = null;
     let guardianToken: string | null = null;
+    const finalParentName = isSelfGuardian ? athleteName : parentName;
+
     if (parentEmail) {
       const { data: existingAcc } = await supabase.from("portal_accounts")
         .select("id, password_hash")
@@ -3213,14 +3234,13 @@ router.post("/:id/self-register", async (req, res) => {
       if (existingAcc) {
         guardianAccountId = existingAcc.id;
       } else {
-        // Create new guardian account
         const bcrypt = await import("bcryptjs");
         const hash = parentPassword ? await bcrypt.default.hash(parentPassword, 10) : null;
         const newId = `guardian_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const { data: newAcc } = await supabase.from("portal_accounts").insert({
           id: newId,
           email: parentEmail.toLowerCase(),
-          name: parentName,
+          name: finalParentName,
           role: "guardian",
           password_hash: hash,
         }).select("id").maybeSingle();
@@ -3233,46 +3253,77 @@ router.post("/:id/self-register", async (req, res) => {
       }
     }
 
-    // 5. If institutionId provided, ensure it's registered in the tournament
+    // 4. If institutionId provided, ensure registered
     if (institutionId) {
       const { data: existingReg } = await supabase.from("tournament_registrations")
         .select("id").eq("tournament_id", tournamentId).eq("institution_id", institutionId).maybeSingle();
       if (!existingReg) {
-        // Auto-register the institution in the tournament
         await supabase.from("tournament_registrations").insert({ tournament_id: tournamentId, institution_id: institutionId });
       }
     }
 
-    // 6. Create athlete_subscription
-    const { data: sub, error: subErr } = await supabase.from("athlete_subscriptions").insert({
-      tournament_id: tournamentId,
-      institution_id: institutionId || null,
-      category_id: categoryId,
-      athlete_name: athleteName,
-      birth_date: birthDate,
-      document: docNum,
-      gender: gender || "Masculino",
-      parent_name: parentName,
-      parent_phone: parentPhone,
-      is_completed: true,
-      validation_status: "pending",
-      payment_status: settings?.athleteFee > 0 ? "pending" : "paid",
-      authorized_image_use: !!authorizedImageUse,
-      liability_waiver: !!liabilityWaiver,
-      photo_url: photoFile || null,
-      document_url: documentFile || null,
-      created_by: guardianAccountId,
-      additional_data: {
-        ...additionalData,
-        parentEmail,
-        registration_source: "self",
-      },
-    }).select().maybeSingle();
+    // 5. Create athlete_subscriptions for each selected category
+    const createdSubIds: string[] = [];
 
-    if (subErr) throw subErr;
+    for (const catId of targetCategoryIds) {
+      const insertData: any = {
+        tournament_id: tournamentId,
+        institution_id: institutionId || null,
+        category_id: catId,
+        athlete_name: athleteName,
+        birth_date: birthDate,
+        document: docNum,
+        gender: gender || "Masculino",
+        parent_name: finalParentName,
+        parent_phone: parentPhone,
+        is_completed: true,
+        validation_status: "pending",
+        payment_status: settings?.athleteFee > 0 ? "pending" : "paid",
+        authorized_image_use: !!authorizedImageUse,
+        liability_waiver: !!liabilityWaiver,
+        photo_url: photoFile || null,
+        document_url: documentFile || null,
+        additional_data: {
+          ...additionalData,
+          parentEmail,
+          isSelfGuardian: !!isSelfGuardian,
+          registration_source: "self",
+        },
+      };
+
+      if (guardianAccountId) {
+        insertData.created_by = guardianAccountId;
+      }
+
+      const { data: sub, error: subErr } = await supabase
+        .from("athlete_subscriptions")
+        .insert(insertData)
+        .select()
+        .maybeSingle();
+
+      if (subErr) {
+        // If created_by column has schema cache delay, retry without created_by field
+        if (subErr.message?.includes("created_by")) {
+          delete insertData.created_by;
+          insertData.additional_data.created_by = guardianAccountId;
+          const { data: retrySub, error: retryErr } = await supabase
+            .from("athlete_subscriptions")
+            .insert(insertData)
+            .select()
+            .maybeSingle();
+          if (retryErr) throw retryErr;
+          if (retrySub) createdSubIds.push(retrySub.id);
+        } else {
+          throw subErr;
+        }
+      } else if (sub) {
+        createdSubIds.push(sub.id);
+      }
+    }
 
     return res.status(201).json({
-      subId: sub.id,
+      subIds: createdSubIds,
+      subId: createdSubIds[0] || null,
       guardianToken,
       athleteFee: settings?.athleteFee || 0,
       message: "Inscrição realizada com sucesso! Aguarde a validação do organizador.",
