@@ -131,29 +131,46 @@ export default function PublicSelfRegistration() {
   });
 
   const maxEvents: number = pageData?.settings?.maxEventsPerParticipant ?? 1;
-  const settings = pageData?.settings;
-  const tournament = pageData?.tournament;
-  const selectedCategories = (pageData?.categories ?? []).filter((c: any) => selectedCategoryIds.includes(c.id));
-  const selectedInstitution = pageData?.institutions?.find((i: any) => i.id === institutionId);
+  const uploadsConfig: any[] = settings?.registrationConfig?.uploads || [];
+  const hasEnabledUploads = uploadsConfig.length === 0
+    ? true
+    : uploadsConfig.some((u: any) => u.enabled !== false);
 
-  const stepIndex = steps.findIndex(s => s.id === step);
+  const isPhotoEnabled = uploadsConfig.length === 0
+    ? true
+    : uploadsConfig.some((u: any) => (u.id === "photo" || u.label?.toLowerCase().includes("foto")) && u.enabled !== false);
+
+  const isDocEnabled = uploadsConfig.length === 0
+    ? true
+    : uploadsConfig.some((u: any) => (u.id === "document" || u.label?.toLowerCase().includes("documento") || u.label?.toLowerCase().includes("rg")) && u.enabled !== false);
+
+  const activeSteps = [
+    { id: "athlete",     label: "Atleta",      icon: User },
+    { id: "institution", label: "Clube",        icon: Building2 },
+    { id: "category",   label: "Provas",       icon: Trophy },
+    { id: "guardian",   label: "Responsável",  icon: Heart },
+    ...(hasEnabledUploads ? [{ id: "docs", label: "Documentos", icon: Upload }] : []),
+    { id: "terms",      label: "Termos",       icon: Shield },
+  ];
+
+  const stepIndex = activeSteps.findIndex(s => s.id === step);
 
   function toggleCategory(catId: string) {
     setSelectedCategoryIds(prev => {
       if (prev.includes(catId)) return prev.filter(id => id !== catId);
-      if (maxEvents > 0 && prev.length >= maxEvents) return prev; // limit reached
+      if (maxEvents > 0 && prev.length >= maxEvents) return prev;
       return [...prev, catId];
     });
   }
 
   const handleNext = () => {
-    const order: Step[] = ["athlete", "institution", "category", "guardian", "docs", "terms"];
+    const order = activeSteps.map(s => s.id as Step);
     const idx = order.indexOf(step as Step);
-    if (idx < order.length - 1) setStep(order[idx + 1]);
+    if (idx >= 0 && idx < order.length - 1) setStep(order[idx + 1]);
   };
 
   const handleBack = () => {
-    const order: Step[] = ["athlete", "institution", "category", "guardian", "docs", "terms"];
+    const order = activeSteps.map(s => s.id as Step);
     const idx = order.indexOf(step as Step);
     if (idx > 0) setStep(order[idx - 1]);
   };
@@ -302,7 +319,7 @@ export default function PublicSelfRegistration() {
       {/* Progress */}
       <div className="max-w-2xl mx-auto px-4 pt-6">
         <div className="flex items-center gap-1 mb-8">
-          {steps.map((s, i) => {
+          {activeSteps.map((s, i) => {
             const done = stepIndex > i;
             const current = stepIndex === i;
             return (
@@ -313,7 +330,7 @@ export default function PublicSelfRegistration() {
                   </div>
                   <span className={`text-[10px] font-bold hidden sm:block ${current ? "text-indigo-600" : done ? "text-emerald-600" : "text-slate-400"}`}>{s.label}</span>
                 </div>
-                {i < steps.length - 1 && <div className={`flex-1 h-0.5 rounded-full transition-all ${done ? "bg-emerald-400" : "bg-slate-100"}`} />}
+                {i < activeSteps.length - 1 && <div className={`flex-1 h-0.5 rounded-full transition-all ${done ? "bg-emerald-400" : "bg-slate-100"}`} />}
               </React.Fragment>
             );
           })}
@@ -580,44 +597,48 @@ export default function PublicSelfRegistration() {
                   <p className="text-slate-500 text-sm mt-1">Faça o envio dos documentos do atleta.</p>
                 </div>
                 <div className="space-y-4">
-                  <div className="bg-white rounded-2xl border border-slate-200 p-5">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Foto de Rosto (3×4)</label>
-                    {photoFile ? (
-                      <div className="flex items-center gap-3">
-                        <img src={photoFile} alt="Foto" className="w-16 h-16 rounded-xl object-cover border border-slate-200" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-700 truncate">{photoName}</p>
-                          <button onClick={() => { setPhotoFile(null); setPhotoName(""); }} className="text-xs text-rose-500 font-semibold hover:underline mt-0.5">Remover</button>
+                  {isPhotoEnabled && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-3">Foto de Rosto (3×4)</label>
+                      {photoFile ? (
+                        <div className="flex items-center gap-3">
+                          <img src={photoFile} alt="Foto" className="w-16 h-16 rounded-xl object-cover border border-slate-200" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-slate-700 truncate">{photoName}</p>
+                            <button onClick={() => { setPhotoFile(null); setPhotoName(""); }} className="text-xs text-rose-500 font-semibold hover:underline mt-0.5">Remover</button>
+                          </div>
+                          <Check size={18} className="text-emerald-500 shrink-0" />
                         </div>
-                        <Check size={18} className="text-emerald-500 shrink-0" />
-                      </div>
-                    ) : (
-                      <label className="flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition">
-                        <Upload size={24} className="text-slate-400" />
-                        <span className="text-xs font-bold text-slate-500">Clique para selecionar</span>
-                        <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setPhotoFile(await fileToBase64(f)); setPhotoName(f.name); } }} />
-                      </label>
-                    )}
-                  </div>
-                  <div className="bg-white rounded-2xl border border-slate-200 p-5">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-3">RG / CNH / Certidão de Nascimento</label>
-                    {docFile ? (
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0"><FileText size={18} className="text-slate-500" /></div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-700 truncate">{docFileName}</p>
-                          <button onClick={() => { setDocFile(null); setDocFileName(""); }} className="text-xs text-rose-500 font-semibold hover:underline mt-0.5">Remover</button>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition">
+                          <Upload size={24} className="text-slate-400" />
+                          <span className="text-xs font-bold text-slate-500">Clique para selecionar</span>
+                          <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setPhotoFile(await fileToBase64(f)); setPhotoName(f.name); } }} />
+                        </label>
+                      )}
+                    </div>
+                  )}
+                  {isDocEnabled && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-3">RG / CNH / Certidão de Nascimento</label>
+                      {docFile ? (
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0"><FileText size={18} className="text-slate-500" /></div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-slate-700 truncate">{docFileName}</p>
+                            <button onClick={() => { setDocFile(null); setDocFileName(""); }} className="text-xs text-rose-500 font-semibold hover:underline mt-0.5">Remover</button>
+                          </div>
+                          <Check size={18} className="text-emerald-500 shrink-0" />
                         </div>
-                        <Check size={18} className="text-emerald-500 shrink-0" />
-                      </div>
-                    ) : (
-                      <label className="flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition">
-                        <Upload size={24} className="text-slate-400" />
-                        <span className="text-xs font-bold text-slate-500">Clique para selecionar</span>
-                        <input type="file" accept="image/*,application/pdf" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setDocFile(await fileToBase64(f)); setDocFileName(f.name); } }} />
-                      </label>
-                    )}
-                  </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition">
+                          <Upload size={24} className="text-slate-400" />
+                          <span className="text-xs font-bold text-slate-500">Clique para selecionar</span>
+                          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setDocFile(await fileToBase64(f)); setDocFileName(f.name); } }} />
+                        </label>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-3">
                   <button onClick={handleBack} className="px-5 py-3 rounded-xl border border-slate-200 font-bold text-sm text-slate-600 hover:bg-slate-50"><ChevronLeft size={16} /></button>
