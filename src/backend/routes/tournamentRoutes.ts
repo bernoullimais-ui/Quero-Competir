@@ -2904,10 +2904,9 @@ async function getSubscriptionSettings(tournamentId: string) {
 async function saveSubscriptionSettings(tournamentId: string, payload: any) {
   try {
     const supabase = getSupabaseAdmin();
-    console.log("[DEBUG] saveSubscriptionSettings payload received:", payload);
     const dbPayload = mapSettingsToDb(payload);
-    console.log("[DEBUG] saveSubscriptionSettings dbPayload mapping:", dbPayload);
-    
+    console.log("[saveSubscriptionSettings] dbPayload:", JSON.stringify(dbPayload));
+
     const { error } = await supabase
       .from('tournament_subscription_settings')
       .upsert({
@@ -2916,18 +2915,27 @@ async function saveSubscriptionSettings(tournamentId: string, payload: any) {
       });
 
     if (error) {
-      console.error("[DEBUG] Supabase upsert error:", error);
+      console.error("[saveSubscriptionSettings] Supabase upsert error:", error.message, error.details);
+      // Don't silently fall through — log and also persist to JSON as backup
     } else {
-      console.log("[DEBUG] Supabase upsert succeeded!");
-      return payload;
+      console.log("[saveSubscriptionSettings] Supabase upsert OK — re-reading to confirm");
+      // Re-read from Supabase to return the actual persisted values
+      const { data: saved } = await supabase
+        .from('tournament_subscription_settings')
+        .select('*')
+        .eq('tournament_id', tournamentId)
+        .maybeSingle();
+      if (saved) {
+        const mapped = mapSettingsToFrontend(saved);
+        console.log("[saveSubscriptionSettings] confirmed feeType in DB:", saved.fee_type);
+        return mapped;
+      }
     }
-    
-    console.warn("Supabase upsert failed, falling back to JSON:", error.message);
   } catch (err: any) {
-    console.warn("Supabase exception on save subscription settings, using JSON fallback", err.message);
+    console.warn("[saveSubscriptionSettings] Supabase exception:", err.message);
   }
 
-  // Fallback to local JSON
+  // Fallback to local JSON (dev env or Supabase unavailable)
   const db = loadDb();
   db.settings[tournamentId] = {
     deadline: payload.deadline || "",
@@ -2936,12 +2944,14 @@ async function saveSubscriptionSettings(tournamentId: string, payload: any) {
     athleteFee: Number(payload.athleteFee) || 0,
     status: payload.status || "open",
     requireMembership: !!payload.requireMembership,
+    allowIndependent: !!payload.allowIndependent,
     registrationConfig: payload.registrationConfig || getDefaultRegistrationConfig(),
     maxVisitorsPerAthlete: Number(payload.maxVisitorsPerAthlete) || 0
   };
   saveDb(db);
   return db.settings[tournamentId];
 }
+
 
 async function getAthleteSubscriptions(tournamentId: string, institutionId?: string) {
   try {

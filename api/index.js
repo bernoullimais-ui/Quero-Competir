@@ -3245,22 +3245,25 @@ async function getSubscriptionSettings(tournamentId) {
 async function saveSubscriptionSettings(tournamentId, payload) {
   try {
     const supabase = getSupabaseAdmin();
-    console.log("[DEBUG] saveSubscriptionSettings payload received:", payload);
     const dbPayload = mapSettingsToDb(payload);
-    console.log("[DEBUG] saveSubscriptionSettings dbPayload mapping:", dbPayload);
+    console.log("[saveSubscriptionSettings] dbPayload:", JSON.stringify(dbPayload));
     const { error } = await supabase.from("tournament_subscription_settings").upsert({
       tournament_id: tournamentId,
       ...dbPayload
     });
     if (error) {
-      console.error("[DEBUG] Supabase upsert error:", error);
+      console.error("[saveSubscriptionSettings] Supabase upsert error:", error.message, error.details);
     } else {
-      console.log("[DEBUG] Supabase upsert succeeded!");
-      return payload;
+      console.log("[saveSubscriptionSettings] Supabase upsert OK \u2014 re-reading to confirm");
+      const { data: saved } = await supabase.from("tournament_subscription_settings").select("*").eq("tournament_id", tournamentId).maybeSingle();
+      if (saved) {
+        const mapped = mapSettingsToFrontend(saved);
+        console.log("[saveSubscriptionSettings] confirmed feeType in DB:", saved.fee_type);
+        return mapped;
+      }
     }
-    console.warn("Supabase upsert failed, falling back to JSON:", error.message);
   } catch (err) {
-    console.warn("Supabase exception on save subscription settings, using JSON fallback", err.message);
+    console.warn("[saveSubscriptionSettings] Supabase exception:", err.message);
   }
   const db = loadDb();
   db.settings[tournamentId] = {
@@ -3270,6 +3273,7 @@ async function saveSubscriptionSettings(tournamentId, payload) {
     athleteFee: Number(payload.athleteFee) || 0,
     status: payload.status || "open",
     requireMembership: !!payload.requireMembership,
+    allowIndependent: !!payload.allowIndependent,
     registrationConfig: payload.registrationConfig || getDefaultRegistrationConfig(),
     maxVisitorsPerAthlete: Number(payload.maxVisitorsPerAthlete) || 0
   };
