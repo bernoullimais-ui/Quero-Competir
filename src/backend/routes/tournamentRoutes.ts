@@ -458,59 +458,67 @@ router.get("/", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
 
-    // Use JWT user if available, otherwise fall back to header (public/unauthenticated contexts)
     const reqUser = (req as any).user;
-    const organizerId = reqUser?.id || (req.headers["x-organizer-id"] as string);
-    let organizerRole = reqUser?.role;
-    // referenceId from JWT token (most reliable — no filesystem dependency)
-    let jwtReferenceId: string | null = (reqUser as any)?.referenceId || null;
+    const accountId: string | undefined = reqUser?.id || (req.headers["x-organizer-id"] as string) || undefined;
 
-    // Try to get role from accounts if not in JWT
-    if (organizerId && !organizerRole) {
-      // 1st: try local JSON (fast, works locally)
+    // ── 1. Resolve role and orgId from every available source ──────────────────
+    let role: string | null = reqUser?.role || null;
+    let orgId: string | null = reqUser?.referenceId || null;
+
+    // If JWT gave us both, we're done. Otherwise dig deeper.
+    if (accountId && (!role || !orgId)) {
+      // Try local accounts.json first (works in dev)
       if (fs.existsSync(ACCOUNTS_FILE)) {
         try {
           const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, "utf-8"));
-          const user = accounts.find((a: any) => a.id === organizerId);
-          if (user) {
-            organizerRole = user.role;
-            if (!jwtReferenceId && user.referenceId) jwtReferenceId = user.referenceId;
+          const acct = accounts.find((a: any) => a.id === accountId);
+          if (acct) {
+            if (!role) role = acct.role || null;
+            if (!orgId && acct.referenceId) orgId = acct.referenceId;
           }
         } catch (_) {}
       }
-      // 2nd: fallback to Supabase portal_accounts (works on Vercel where filesystem is ephemeral)
-      if (!organizerRole) {
+
+      // Fallback: query Supabase portal_accounts (works on Vercel/serverless)
+      if (!role || !orgId) {
         try {
-          const { data: acc } = await supabase
+          const { data: acct } = await supabase
             .from("portal_accounts")
             .select("role, reference_id")
-            .eq("id", organizerId)
+            .eq("id", accountId)
             .maybeSingle();
-          if (acc) {
-            organizerRole = acc.role;
-            if (!jwtReferenceId && acc.reference_id) jwtReferenceId = acc.reference_id;
+          if (acct) {
+            if (!role) role = acct.role || null;
+            if (!orgId && acct.reference_id) orgId = acct.reference_id;
           }
         } catch (_) {}
       }
     }
 
-    let orgId: string | null = null;
-    let isSuperAdmin = organizerRole === "super_admin";
-    let isInstitution = organizerRole === "institution";
+    // ── 2. Build query based on resolved role ──────────────────────────────────
+    const isSuperAdmin = role === "super_admin";
+    const isInstitution = role === "institution";
+    const isOrganizer = role === "organizer" || role === "venue";
+    const isAuthenticated = !!accountId;
 
-    if (organizerId && !isSuperAdmin && !isInstitution) {
-      // Prefer referenceId from JWT/accounts (avoids extra DB round-trip and filesystem issues)
-      orgId = jwtReferenceId || await getOrganizerReferenceIdAndSync(organizerId);
+    let query = supabase.from("tournaments").select("*").neq("status", "cancelled");
+
+    if (isSuperAdmin) {
+      // Super admin: sees everything — no filter
+    } else if (isInstitution) {
+      // Institutions see all public tournaments — no filter
+    } else if (isAuthenticated && isOrganizer) {
+      // Organizer MUST be scoped to their org
+      if (!orgId) {
+        // Can't determine org — return empty to avoid data leak
+        console.warn(`[tournaments GET] Organizer ${accountId} has no orgId resolved — returning empty list`);
+        return res.json([]);
+      }
+      query = query.eq("owner_id", orgId);
     }
+    // Unauthenticated: returns all (public browsing)
 
-    let query = supabase.from('tournaments').select('*').neq('status', 'cancelled');
-
-    if (orgId && !isSuperAdmin && !isInstitution) {
-      query = query.eq('owner_id', orgId);
-    }
-
-    const { data, error } = await query.order('start_date', { ascending: true });
-
+    const { data, error } = await query.order("start_date", { ascending: true });
     if (error) throw error;
     res.json(data);
   } catch (error: any) {

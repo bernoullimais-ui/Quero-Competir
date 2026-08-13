@@ -1545,40 +1545,44 @@ router2.get("/", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
     const reqUser = req.user;
-    const organizerId = reqUser?.id || req.headers["x-organizer-id"];
-    let organizerRole = reqUser?.role;
-    let jwtReferenceId = reqUser?.referenceId || null;
-    if (organizerId && !organizerRole) {
+    const accountId = reqUser?.id || req.headers["x-organizer-id"] || void 0;
+    let role = reqUser?.role || null;
+    let orgId = reqUser?.referenceId || null;
+    if (accountId && (!role || !orgId)) {
       if (fs2.existsSync(ACCOUNTS_FILE2)) {
         try {
           const accounts = JSON.parse(fs2.readFileSync(ACCOUNTS_FILE2, "utf-8"));
-          const user = accounts.find((a) => a.id === organizerId);
-          if (user) {
-            organizerRole = user.role;
-            if (!jwtReferenceId && user.referenceId) jwtReferenceId = user.referenceId;
+          const acct = accounts.find((a) => a.id === accountId);
+          if (acct) {
+            if (!role) role = acct.role || null;
+            if (!orgId && acct.referenceId) orgId = acct.referenceId;
           }
         } catch (_) {
         }
       }
-      if (!organizerRole) {
+      if (!role || !orgId) {
         try {
-          const { data: acc } = await supabase.from("portal_accounts").select("role, reference_id").eq("id", organizerId).maybeSingle();
-          if (acc) {
-            organizerRole = acc.role;
-            if (!jwtReferenceId && acc.reference_id) jwtReferenceId = acc.reference_id;
+          const { data: acct } = await supabase.from("portal_accounts").select("role, reference_id").eq("id", accountId).maybeSingle();
+          if (acct) {
+            if (!role) role = acct.role || null;
+            if (!orgId && acct.reference_id) orgId = acct.reference_id;
           }
         } catch (_) {
         }
       }
     }
-    let orgId = null;
-    let isSuperAdmin = organizerRole === "super_admin";
-    let isInstitution = organizerRole === "institution";
-    if (organizerId && !isSuperAdmin && !isInstitution) {
-      orgId = jwtReferenceId || await getOrganizerReferenceIdAndSync(organizerId);
-    }
+    const isSuperAdmin = role === "super_admin";
+    const isInstitution = role === "institution";
+    const isOrganizer = role === "organizer" || role === "venue";
+    const isAuthenticated = !!accountId;
     let query = supabase.from("tournaments").select("*").neq("status", "cancelled");
-    if (orgId && !isSuperAdmin && !isInstitution) {
+    if (isSuperAdmin) {
+    } else if (isInstitution) {
+    } else if (isAuthenticated && isOrganizer) {
+      if (!orgId) {
+        console.warn(`[tournaments GET] Organizer ${accountId} has no orgId resolved \u2014 returning empty list`);
+        return res.json([]);
+      }
       query = query.eq("owner_id", orgId);
     }
     const { data, error } = await query.order("start_date", { ascending: true });
