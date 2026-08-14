@@ -365,6 +365,7 @@ export default function PublicTournamentView() {
                                   category={cat}
                                   athleteSubs={athleteSubs}
                                   tournamentId={id!}
+                                  readOnly={true}
                                 />
                               ) : (
                                 <TournamentBracket 
@@ -441,6 +442,7 @@ export default function PublicTournamentView() {
                                 category={cat}
                                 athleteSubs={athleteSubs}
                                 tournamentId={id!}
+                                readOnly={true}
                               />
                             ) : (
                               <TournamentBracket 

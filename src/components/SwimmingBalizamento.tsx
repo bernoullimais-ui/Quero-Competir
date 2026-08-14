@@ -6,6 +6,7 @@ interface SwimmingBalizamentoProps {
   category: any;
   athleteSubs: any[];
   tournamentId: string;
+  readOnly?: boolean;
 }
 
 interface LaneAssignment {
@@ -23,7 +24,7 @@ interface Heat {
   lanes: LaneAssignment[];
 }
 
-export default function SwimmingBalizamento({ category, athleteSubs, tournamentId }: SwimmingBalizamentoProps) {
+export default function SwimmingBalizamento({ category, athleteSubs, tournamentId, readOnly = false }: SwimmingBalizamentoProps) {
   const [lanesCount, setLanesCount] = useState<number>(6);
   const [heats, setHeats] = useState<Heat[]>([]);
   const [editingResults, setEditingResults] = useState<Record<string, string>>({});
@@ -208,57 +209,61 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
               {category.name} <span className="text-slate-400 font-normal">({category.gender} {category.age_group})</span>
             </h3>
             <p className="text-xs text-slate-500">
-              Configure o número de raias da piscina para distribuir os atletas automaticamente em Séries (Baterias).
+              {readOnly ? "Visualização oficial do balizamento de raias e séries." : "Configure o número de raias da piscina para distribuir os atletas automaticamente em Séries (Baterias)."}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={handlePrintSumula}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-2 border border-slate-200 cursor-pointer"
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-2 border border-slate-200 cursor-pointer shadow-xs"
             >
               <Printer size={16} /> Imprimir Súmula
             </button>
-            <button
-              onClick={() => {
-                generateBalizamento();
-                success("Balizamento atualizado!");
-              }}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow-sm cursor-pointer"
-            >
-              <RefreshCw size={16} /> Recalcular Balizamento
-            </button>
-          </div>
-        </div>
-
-        {/* Number of Lanes Selector (2 to 8) */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-150">
-          <div className="space-y-0.5">
-            <span className="text-xs font-black text-slate-700 uppercase tracking-wider block">
-              Quantidade de Raias da Piscina
-            </span>
-            <span className="text-xs text-slate-500">
-              Selecione o número de raias disponíveis (2 a 8)
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {[2, 3, 4, 5, 6, 7, 8].map((num) => (
+            {!readOnly && (
               <button
-                key={num}
-                type="button"
-                onClick={() => setLanesCount(num)}
-                className={`w-10 h-10 rounded-xl font-black text-sm transition-all border cursor-pointer flex items-center justify-center ${
-                  lanesCount === num
-                    ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100 scale-105"
-                    : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
-                }`}
+                onClick={() => {
+                  generateBalizamento();
+                  success("Balizamento atualizado!");
+                }}
+                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow-sm cursor-pointer"
               >
-                {num}
+                <RefreshCw size={16} /> Recalcular Balizamento
               </button>
-            ))}
+            )}
           </div>
         </div>
+
+        {/* Number of Lanes Selector (2 to 8) - Oculto em modo público readOnly */}
+        {!readOnly && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-150">
+            <div className="space-y-0.5">
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider block">
+                Quantidade de Raias da Piscina
+              </span>
+              <span className="text-xs text-slate-500">
+                Selecione o número de raias disponíveis (2 a 8)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[2, 3, 4, 5, 6, 7, 8].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => setLanesCount(num)}
+                  className={`w-10 h-10 rounded-xl font-black text-sm transition-all border cursor-pointer flex items-center justify-center ${
+                    lanesCount === num
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100 scale-105"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
+                  }`}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Summary Statistics Badges */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-bold">
@@ -381,16 +386,22 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
                             {lane.seedTime || "--:--.--"}
                           </td>
 
-                          {/* Result Time Input */}
+                          {/* Result Time Input / Text */}
                           <td className="py-3 px-4">
                             {isOccupied ? (
-                              <input
-                                type="text"
-                                placeholder="00:32.50"
-                                value={editingResults[lane.athleteId!] || ""}
-                                onChange={(e) => handleTimeChange(lane.athleteId!, e.target.value)}
-                                className="w-28 px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
-                              />
+                              readOnly ? (
+                                <span className="font-mono font-bold text-slate-700 text-xs">
+                                  {editingResults[lane.athleteId!] || lane.resultTime || "--:--.--"}
+                                </span>
+                              ) : (
+                                <input
+                                  type="text"
+                                  placeholder="00:32.50"
+                                  value={editingResults[lane.athleteId!] || ""}
+                                  onChange={(e) => handleResultChange(lane.athleteId!, e.target.value)}
+                                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
+                                />
+                              )
                             ) : (
                               <span className="text-slate-300">—</span>
                             )}
