@@ -38,6 +38,7 @@ import SettingsPage from "./components/Settings";
 import PublicInvitationPage from "./components/PublicInvitationPage.tsx";
 import DrawCeremony from "./components/DrawCeremony.tsx";
 import PublicPaymentPage from "./components/PublicPaymentPage.tsx";
+import PublicOrganizationPortal from "./components/PublicOrganizationPortal.tsx";
 
 const queryClient = new QueryClient();
 
@@ -492,6 +493,22 @@ export default function App() {
               <Route path="/public/torneio/:id/inscricao" element={
                 <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar formulário de inscrição.</div>}>
                   <PublicSelfRegistration />
+                </ErrorBoundary>
+              } />
+
+              <Route path="/org/:subdomain" element={
+                <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar o portal da organização.</div>}>
+                  <PublicOrganizationPortal />
+                </ErrorBoundary>
+              } />
+              <Route path="/organizacao/:subdomain" element={
+                <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar o portal da organização.</div>}>
+                  <PublicOrganizationPortal />
+                </ErrorBoundary>
+              } />
+              <Route path="/o/:subdomain" element={
+                <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar o portal da organização.</div>}>
+                  <PublicOrganizationPortal />
                 </ErrorBoundary>
               } />
 

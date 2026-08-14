@@ -235,6 +235,65 @@ router.put("/organization", requireAuth, async (req, res) => {
   }
 });
 
+// ── PUBLIC: Portal Público da Organização por Subdomínio ou ID ───────────────
+router.get("/public/org/:subdomainOrId", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const target = decodeURIComponent(req.params.subdomainOrId).trim();
+
+    // 1. Fetch organization by subdomain or id
+    let { data: org } = await supabase
+      .from('organizations')
+      .select('*')
+      .or(`subdomain.eq.${target},id.eq.${target}`)
+      .maybeSingle();
+
+    if (!org) {
+      // Fallback: case-insensitive search
+      const { data: allOrgs } = await supabase.from('organizations').select('*');
+      if (allOrgs) {
+        org = allOrgs.find(o => 
+          o.subdomain?.toLowerCase() === target.toLowerCase() ||
+          o.id === target ||
+          o.name?.toLowerCase().replace(/[^a-z0-9]/g, "") === target.toLowerCase()
+        ) || null;
+      }
+    }
+
+    if (!org) {
+      return res.status(404).json({ error: "Organização não encontrada" });
+    }
+
+    // 2. Fetch tournaments associated with this organization
+    const { data: tournaments } = await supabase
+      .from('tournaments')
+      .select('id, name, description, start_date, end_date, location, logo_url, status, owner_id')
+      .order('start_date', { ascending: false });
+
+    let orgTournaments = (tournaments || []).filter(t => t.owner_id === org.id);
+
+    if (orgTournaments.length === 0 && tournaments) {
+      const matched = [];
+      for (const t of tournaments) {
+        if (t.owner_id) {
+          const resolvedOrgId = await getOrganizerReferenceIdAndSync(t.owner_id);
+          if (resolvedOrgId === org.id) {
+            matched.push(t);
+          }
+        }
+      }
+      orgTournaments = matched.length > 0 ? matched : tournaments;
+    }
+
+    res.json({
+      organization: org,
+      tournaments: orgTournaments
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Buscar uma partida específica
 router.get("/match/:matchId", async (req, res) => {
   try {

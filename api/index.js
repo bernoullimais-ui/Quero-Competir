@@ -1456,6 +1456,44 @@ router2.put("/organization", requireAuth, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+router2.get("/public/org/:subdomainOrId", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const target = decodeURIComponent(req.params.subdomainOrId).trim();
+    let { data: org } = await supabase.from("organizations").select("*").or(`subdomain.eq.${target},id.eq.${target}`).maybeSingle();
+    if (!org) {
+      const { data: allOrgs } = await supabase.from("organizations").select("*");
+      if (allOrgs) {
+        org = allOrgs.find(
+          (o) => o.subdomain?.toLowerCase() === target.toLowerCase() || o.id === target || o.name?.toLowerCase().replace(/[^a-z0-9]/g, "") === target.toLowerCase()
+        ) || null;
+      }
+    }
+    if (!org) {
+      return res.status(404).json({ error: "Organiza\xE7\xE3o n\xE3o encontrada" });
+    }
+    const { data: tournaments } = await supabase.from("tournaments").select("id, name, description, start_date, end_date, location, logo_url, status, owner_id").order("start_date", { ascending: false });
+    let orgTournaments = (tournaments || []).filter((t) => t.owner_id === org.id);
+    if (orgTournaments.length === 0 && tournaments) {
+      const matched = [];
+      for (const t of tournaments) {
+        if (t.owner_id) {
+          const resolvedOrgId = await getOrganizerReferenceIdAndSync(t.owner_id);
+          if (resolvedOrgId === org.id) {
+            matched.push(t);
+          }
+        }
+      }
+      orgTournaments = matched.length > 0 ? matched : tournaments;
+    }
+    res.json({
+      organization: org,
+      tournaments: orgTournaments
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 router2.get("/match/:matchId", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
