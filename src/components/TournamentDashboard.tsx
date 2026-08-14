@@ -409,6 +409,23 @@ export default function TournamentDashboard() {
   const [copiedLink, setCopiedLink] = useState(false);
 
   const [selectedCatForBracket, setSelectedCatForBracket] = useState<any>(null);
+  const [onlyWithAthletes, setOnlyWithAthletes] = useState<boolean>(true);
+
+  // Auto-select category with registered athletes
+  useEffect(() => {
+    if (categories.length > 0 && athleteSubs.length > 0 && onlyWithAthletes) {
+      const catWithAthletes = categories.find((cat) =>
+        athleteSubs.some((sub: any) => sub.categoryId === cat.id || sub.category_id === cat.id)
+      );
+      if (catWithAthletes) {
+        if (!selectedCatForBracket || !athleteSubs.some((sub: any) => sub.categoryId === selectedCatForBracket.id || sub.category_id === selectedCatForBracket.id)) {
+          setSelectedCatForBracket(catWithAthletes);
+        }
+      }
+    } else if (categories.length > 0 && !selectedCatForBracket) {
+      setSelectedCatForBracket(categories[0]);
+    }
+  }, [categories, athleteSubs, onlyWithAthletes]);
   const [bracketMatches, setBracketMatches] = useState<any[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [showMatchModal, setShowMatchModal] = useState(false);
@@ -2123,23 +2140,53 @@ export default function TournamentDashboard() {
                 <p className="text-slate-500 text-xs">Selecione a categoria ou prova para visualizar os confrontos e raias.</p>
               </div>
               
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {/* Checkbox de filtro */}
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-2xl cursor-pointer hover:bg-slate-100 transition-colors shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={onlyWithAthletes}
+                    onChange={(e) => setOnlyWithAthletes(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span>Apenas com inscritos</span>
+                </label>
+
                 {/* Lista Selecionável de Categorias (Select Dropdown) */}
                 <div className="min-w-[280px]">
-                  <select
-                    value={selectedCatForBracket?.id || ""}
-                    onChange={(e) => {
-                      const cat = categories.find(c => c.id === e.target.value);
-                      if (cat) setSelectedCatForBracket(cat);
-                    }}
-                    className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-250 rounded-2xl font-bold text-sm text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors shadow-sm cursor-pointer"
-                  >
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name} ({cat.gender || ""} {cat.age_group || ""})
-                      </option>
-                    ))}
-                  </select>
+                  {(() => {
+                    const categoriesForSelect = categories.filter((cat) => {
+                      if (!onlyWithAthletes) return true;
+                      const count = athleteSubs.filter((sub: any) => 
+                        sub.categoryId === cat.id || sub.category_id === cat.id
+                      ).length;
+                      return count > 0;
+                    });
+
+                    const displayList = categoriesForSelect.length > 0 ? categoriesForSelect : categories;
+
+                    return (
+                      <select
+                        value={selectedCatForBracket?.id || ""}
+                        onChange={(e) => {
+                          const cat = categories.find(c => c.id === e.target.value);
+                          if (cat) setSelectedCatForBracket(cat);
+                        }}
+                        className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-250 rounded-2xl font-bold text-sm text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors shadow-sm cursor-pointer"
+                      >
+                        {displayList.map((cat) => {
+                          const athleteCount = athleteSubs.filter((sub: any) => 
+                            sub.categoryId === cat.id || sub.category_id === cat.id
+                          ).length;
+                          return (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.name} ({cat.gender || ""} {cat.age_group || ""}) — {athleteCount} {athleteCount === 1 ? "inscrito" : "inscritos"}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    );
+                  })()}
                 </div>
 
                 {selectedCatForBracket && bracketMatches.length > 0 && !(
