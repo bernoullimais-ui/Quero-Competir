@@ -186,7 +186,12 @@ export default function PublicAthleteRegistration() {
           setAcceptedTerms(initialTerms);
         }
         if (resData.subscription && resData.subscription.isCompleted) {
-          setCurrentStep("success");
+          const needsPayment = (resData.settings?.feeType === "by_team_and_athlete_parent" || resData.settings?.feeType === "by_individual_self" || (resData.settings?.requireMembership && resData.membershipStatus === "pending")) && resData.subscription.paymentStatus !== "paid";
+          if (needsPayment) {
+            setCurrentStep("payment");
+          } else {
+            setCurrentStep("success");
+          }
         }
         setLoading(false);
       })
@@ -498,7 +503,7 @@ export default function PublicAthleteRegistration() {
           photoUrl: regConfig.uploads.find((u: any) => u.id === "photo")?.enabled ? photoFile : null,
           authorizedImageUse: regConfig.terms.find((t: any) => t.id === "imageUse")?.enabled ? !!acceptedTerms["imageUse"] : false,
           liabilityWaiver: regConfig.terms.find((t: any) => t.id === "liability")?.enabled ? !!acceptedTerms["liability"] : false,
-          paymentStatus: (data?.settings?.feeType === "by_team_and_athlete_parent" || paymentConfirmed) ? "paid" : "paid"
+          paymentStatus: (paymentConfirmed || data?.subscription?.paymentStatus === "paid") ? "paid" : "pending"
         })
       });
 
@@ -1233,7 +1238,7 @@ export default function PublicAthleteRegistration() {
           {currentStep === "payment" && (
             <div className="space-y-6">
               {(() => {
-                const athleteFee = settings.feeType === "by_team_and_athlete_parent" ? (settings.athleteFee || 0) : 0;
+                const athleteFee = (settings.feeType === "by_team_and_athlete_parent" || settings.feeType === "by_individual_self") ? (settings.athleteFee || 0) : 0;
                 const membershipFee = (settings.requireMembership && data?.membershipStatus === "pending") 
                   ? (data?.organization?.membership_fee_amount || 50) 
                   : 0;

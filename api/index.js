@@ -4001,7 +4001,8 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
     }
     const { data: tData } = await supabase.from("tournaments").select("name, owner_id, start_date").eq("id", sub.tournamentId).single();
     const settings = await getSubscriptionSettings(sub.tournamentId);
-    const athleteFee = settings?.feeType === "by_team_and_athlete_parent" ? settings.athleteFee || 0 : 0;
+    const isIndividualFee = settings?.feeType === "by_team_and_athlete_parent" || settings?.feeType === "by_individual_self";
+    const athleteFee = isIndividualFee ? settings?.athleteFee || 0 : 0;
     let membershipFee = 0;
     let membershipStatus = "active";
     let orgName = "Liga";
