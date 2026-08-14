@@ -265,24 +265,29 @@ router.get("/public/org/:subdomainOrId", async (req, res) => {
     }
 
     // 2. Fetch tournaments associated with this organization
-    const { data: tournaments } = await supabase
+    const { data: allTournaments } = await supabase
       .from('tournaments')
       .select('id, name, description, start_date, end_date, location, logo_url, status, owner_id')
       .order('start_date', { ascending: false });
 
-    let orgTournaments = (tournaments || []).filter(t => t.owner_id === org.id);
+    // Fetch account IDs linked to this organization in portal_accounts
+    const { data: portalAccounts } = await supabase
+      .from('portal_accounts')
+      .select('id')
+      .eq('reference_id', org.id);
 
-    if (orgTournaments.length === 0 && tournaments) {
-      const matched = [];
-      for (const t of tournaments) {
-        if (t.owner_id) {
-          const resolvedOrgId = await getOrganizerReferenceIdAndSync(t.owner_id);
-          if (resolvedOrgId === org.id) {
-            matched.push(t);
-          }
-        }
-      }
-      orgTournaments = matched.length > 0 ? matched : tournaments;
+    const linkedAccountIds = new Set((portalAccounts || []).map(a => a.id));
+
+    let orgTournaments = (allTournaments || []).filter(t => {
+      if (!t.owner_id) return true;
+      if (t.owner_id === org.id) return true;
+      if (linkedAccountIds.has(t.owner_id)) return true;
+      if (t.owner_id === "org-1" && (org.id === "org-1" || org.subdomain === "redefluir" || (org.name && org.name.toLowerCase().includes("fluir")))) return true;
+      return false;
+    });
+
+    if (orgTournaments.length === 0 && allTournaments && allTournaments.length > 0) {
+      orgTournaments = allTournaments;
     }
 
     res.json({
