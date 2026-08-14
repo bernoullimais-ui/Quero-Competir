@@ -40,6 +40,9 @@ export default function SubscriptionsTab({
   const [subViewMode, setSubViewMode] = useState<"institutions" | "athletes">("institutions");
   const [subFilter, setSubFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [subSearch, setSubSearch] = useState("");
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
+  const [selectedInstitutionFilter, setSelectedInstitutionFilter] = useState("all");
+  const [selectedGenderFilter, setSelectedGenderFilter] = useState("all");
   
   const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
   const [validationFeedback, setValidationFeedback] = useState("");
@@ -255,43 +258,153 @@ export default function SubscriptionsTab({
             );
           })()}
 
-          {/* Filtros e Busca */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-4">
-            <div className="flex gap-2 p-1 bg-slate-200/50 rounded-xl w-fit">
-              {(["all", "pending", "approved", "rejected"] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setSubFilter(f)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    subFilter === f ? "bg-white shadow text-indigo-600" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {f === "all" && "Todos"}
-                  {f === "pending" && "Pendentes"}
-                  {f === "approved" && "Aprovados"}
-                  {f === "rejected" && "Recusados"}
-                </button>
-              ))}
-            </div>
-
-            <input 
-              type="text"
-              placeholder="Pesquisar por nome de atleta..."
-              value={subSearch}
-              onChange={e => setSubSearch(e.target.value)}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white max-w-xs w-full"
-            />
-          </div>
-
-          {/* Lista de Fichas individuais */}
+          {/* Lista de Fichas individuais e Filtros */}
           {(() => {
             let filtered = athleteSubs;
             if (subFilter !== "all") {
               filtered = filtered.filter(s => s.validationStatus === subFilter);
             }
             if (subSearch) {
-              filtered = filtered.filter(s => s.athleteName.toLowerCase().includes(subSearch.toLowerCase()));
+              filtered = filtered.filter(s => (s.athleteName || "").toLowerCase().includes(subSearch.toLowerCase()));
             }
+            if (selectedCategoryFilter !== "all") {
+              filtered = filtered.filter(s => s.categoryId === selectedCategoryFilter);
+            }
+            if (selectedInstitutionFilter !== "all") {
+              filtered = filtered.filter(s => s.institutionId === selectedInstitutionFilter);
+            }
+            if (selectedGenderFilter !== "all") {
+              filtered = filtered.filter(s => {
+                const cat = categories.find(c => c.id === s.categoryId);
+                if (!cat) return false;
+                return (cat.gender || "").toLowerCase() === selectedGenderFilter.toLowerCase();
+              });
+            }
+
+            const exportToCSV = () => {
+              if (filtered.length === 0) {
+                toastWarning("Nenhum participante localizado para exportação.");
+                return;
+              }
+
+              const headers = ["Nome do Atleta", "CPF", "Instituição", "Prova / Categoria", "Gênero", "Status Validação", "Status Pagamento", "Responsável", "Telefone Resp."];
+              const rows = filtered.map(sub => {
+                const inst = institutions.find(i => i.id === sub.institutionId);
+                const cat = categories.find(c => c.id === sub.categoryId);
+                return [
+                  `"${sub.athleteName || ''}"`,
+                  `"${sub.document || ''}"`,
+                  `"${inst?.name || 'Independente'}"`,
+                  `"${cat?.name || 'Mista'}"`,
+                  `"${cat?.gender || 'Geral'}"`,
+                  `"${sub.validationStatus === 'approved' ? 'Aprovado' : sub.validationStatus === 'rejected' ? 'Recusado' : 'Pendente'}"`,
+                  `"${sub.paymentStatus === 'paid' ? 'Pago' : 'Pendente'}"`,
+                  `"${sub.parentName || ''}"`,
+                  `"${sub.parentPhone || ''}"`
+                ];
+              });
+
+              const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+              const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.setAttribute("href", url);
+              link.setAttribute("download", `inscricoes_atletas_${tournamentId}_${new Date().toISOString().slice(0, 10)}.csv`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              toastSuccess(`Lista com ${filtered.length} participante(s) exportada com sucesso (CSV)!`);
+            };
+
+            return (
+              <>
+                {/* Painel Completo de Filtros e Busca */}
+                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-200/80 mb-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    {/* Filtros por Status */}
+                    <div className="flex flex-wrap gap-1.5 p-1 bg-slate-200/60 rounded-xl">
+                      {(["all", "pending", "approved", "rejected"] as const).map(f => (
+                        <button
+                          key={f}
+                          onClick={() => setSubFilter(f)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            subFilter === f ? "bg-white shadow-sm text-indigo-700 font-extrabold" : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          {f === "all" && "Todos os Status"}
+                          {f === "pending" && "Pendentes"}
+                          {f === "approved" && "Aprovados"}
+                          {f === "rejected" && "Recusados"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Botão Exportar Relatório / CSV */}
+                    <button
+                      type="button"
+                      onClick={exportToCSV}
+                      className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-sm shadow-emerald-200 cursor-pointer"
+                    >
+                      <Download size={15} /> Exportar Lista ({filtered.length} Atletas)
+                    </button>
+                  </div>
+
+                  {/* Linha de Filtros Avançados: Busca, Categoria/Prova, Instituição, Gênero */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-slate-200/60">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Buscar por Nome</label>
+                      <input 
+                        type="text"
+                        placeholder="Nome do atleta..."
+                        value={subSearch}
+                        onChange={e => setSubSearch(e.target.value)}
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white focus:border-indigo-500 shadow-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Filtrar por Prova / Categoria</label>
+                      <select
+                        value={selectedCategoryFilter}
+                        onChange={e => setSelectedCategoryFilter(e.target.value)}
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white text-slate-700 focus:border-indigo-500 shadow-sm cursor-pointer"
+                      >
+                        <option value="all">Todas as Provas / Categorias</option>
+                        {categories.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Filtrar por Clube / Instituição</label>
+                      <select
+                        value={selectedInstitutionFilter}
+                        onChange={e => setSelectedInstitutionFilter(e.target.value)}
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white text-slate-700 focus:border-indigo-500 shadow-sm cursor-pointer"
+                      >
+                        <option value="all">Todas as Instituições / Clubes</option>
+                        {institutions.map(i => (
+                          <option key={i.id} value={i.id}>{i.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Filtrar por Gênero</label>
+                      <select
+                        value={selectedGenderFilter}
+                        onChange={e => setSelectedGenderFilter(e.target.value)}
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white text-slate-700 focus:border-indigo-500 shadow-sm cursor-pointer"
+                      >
+                        <option value="all">Todos os Gêneros</option>
+                        <option value="Feminino">Feminino</option>
+                        <option value="Masculino">Masculino</option>
+                        <option value="Misto">Misto</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
 
             if (filtered.length === 0) {
               return (
@@ -455,6 +568,7 @@ export default function SubscriptionsTab({
                   );
                 })}
               </div>
+            </>
             );
           })()}
         </div>
