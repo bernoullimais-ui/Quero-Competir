@@ -37,6 +37,136 @@ const getSubdivisions = (cat: any) => {
   return list;
 };
 
+const getLaneOrder = (numLanes: number): number[] => {
+  switch (numLanes) {
+    case 8: return [4, 5, 3, 6, 2, 7, 1, 8];
+    case 7: return [4, 5, 3, 6, 2, 7, 1];
+    case 6: return [3, 4, 2, 5, 1, 6];
+    case 5: return [3, 4, 2, 5, 1];
+    case 4: return [2, 3, 1, 4];
+    case 3: return [2, 3, 1];
+    case 2: return [1, 2];
+    default: return Array.from({ length: numLanes }, (_, i) => i + 1);
+  }
+};
+
+const handlePrintAllSumulas = (displayCats: any[], athleteSubs: any[], tournament: any) => {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return;
+
+  const lanesCount = 6;
+  const laneOrder = getLaneOrder(lanesCount);
+
+  const proofsHtml = displayCats.map((cat, idx) => {
+    const catAthletes = athleteSubs.filter((s: any) => 
+      (s.categoryId === cat.id || s.category_id === cat.id) &&
+      (s.validationStatus === "approved" || s.validation_status === "approved" || s.isCompleted || s.is_completed || !s.validationStatus)
+    ).sort((a, b) => {
+      const timeA = a.additionalData?.seed_time || a.additional_data?.seed_time || "99:99.99";
+      const timeB = b.additionalData?.seed_time || b.additional_data?.seed_time || "99:99.99";
+      return timeA.localeCompare(timeB);
+    });
+
+    const totalAthletes = catAthletes.length;
+    const numHeats = Math.max(1, Math.ceil(totalAthletes / lanesCount));
+    const heatsList: any[] = [];
+
+    for (let h = 0; h < numHeats; h++) {
+      const heatAthletes = catAthletes.slice(h * lanesCount, (h + 1) * lanesCount);
+      const laneAssignments = Array.from({ length: lanesCount }, (_, i) => ({ laneNumber: i + 1 }));
+
+      heatAthletes.forEach((ath: any, index: number) => {
+        const targetLaneNum = laneOrder[index] || (index + 1);
+        const laneObj = laneAssignments.find(l => l.laneNumber === targetLaneNum);
+        if (laneObj) {
+          (laneObj as any).athleteName = ath.athleteName || ath.athlete_name;
+          (laneObj as any).institutionName = ath.institutionName || ath.institution_name || ath.institution?.name || ath.additionalData?.club_name || ath.additionalData?.institution_name || "Avulso";
+          (laneObj as any).seedTime = ath.additionalData?.seed_time || ath.additional_data?.seed_time || "--:--.--";
+        }
+      });
+
+      heatsList.push({ heatNumber: h + 1, lanes: laneAssignments });
+    }
+
+    return `
+      <div class="proof-section">
+        <div class="proof-header">
+          PROVA #${idx + 1} — ${cat.name} (${cat.gender || ""} ${cat.age_group || ""})
+        </div>
+        <p style="margin: 4px 0 14px 0; font-size: 11px; color: #64748b; font-weight: 500;">
+          Total de Inscritos: ${totalAthletes} atletas • Raias por Disputa: ${lanesCount} • Séries: ${numHeats}
+        </p>
+
+        ${heatsList.map(h => `
+          <div class="heat-title">SÉRIE ${h.heatNumber} de ${numHeats}</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 45px; text-align: center;">Raia</th>
+                <th>Atleta</th>
+                <th>Clube / Entidade</th>
+                <th style="width: 110px;">Tempo Inscrição</th>
+                <th style="width: 110px;">Tempo Final</th>
+                <th style="width: 70px;">Classif.</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${h.lanes.map((l: any) => `
+                <tr>
+                  <td class="lane-num">${l.laneNumber}</td>
+                  <td><strong>${l.athleteName || "—"}</strong></td>
+                  <td>${l.institutionName || "—"}</td>
+                  <td>${l.seedTime || "--:--.--"}</td>
+                  <td>___:___.___</td>
+                  <td></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `).join("")}
+      </div>
+    `;
+  }).join("");
+
+  const fullHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>SÚMULA GERAL DE BALIZAMENTO - ${tournament?.name || "Natação"}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 25px; color: #0f172a; line-height: 1.4; }
+          .main-header { border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 25px; }
+          .main-title { font-size: 20px; font-weight: bold; margin: 0; text-transform: uppercase; }
+          .sub-title { font-size: 13px; color: #475569; margin-top: 4px; font-weight: 600; }
+          .proof-section { page-break-after: always; margin-bottom: 35px; }
+          .proof-section:last-child { page-break-after: auto; }
+          .proof-header { background-color: #0f172a; color: white; padding: 8px 12px; font-size: 13px; font-weight: bold; border-radius: 6px; text-transform: uppercase; }
+          .heat-title { background-color: #f1f5f9; color: #1e293b; padding: 6px 10px; font-size: 11px; font-weight: bold; border-left: 4px solid #3b82f6; margin-top: 15px; margin-bottom: 8px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; page-break-inside: avoid; }
+          th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
+          th { background-color: #f8fafc; font-weight: bold; text-transform: uppercase; font-size: 10px; color: #334155; }
+          .lane-num { font-weight: bold; text-align: center; width: 45px; background-color: #f1f5f9; }
+        </style>
+      </head>
+      <body>
+        <div class="main-header">
+          <div class="main-title">${tournament?.name || "Torneio de Natação"}</div>
+          <div class="sub-title">SÚMULA GERAL DE BALIZAMENTO E PROGRAMAÇÃO DE PROVAS</div>
+        </div>
+
+        ${proofsHtml}
+      </body>
+    </html>
+  `;
+
+  printWindow.document.write(fullHtml);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+  }, 300);
+};
+
 export default function PublicTournamentView() {
   const { id } = useParams();
   const [tournament, setTournament] = useState<any>(null);
@@ -228,7 +358,6 @@ export default function PublicTournamentView() {
         </div>
       </header>
 
-      {/* Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === "evento" && (
           <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-red-55 rounded-xl">Erro ao carregar informações gerais do evento.</div>}>
@@ -247,7 +376,6 @@ export default function PublicTournamentView() {
                   </div>
                   
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
-                    {/* Checkbox Apenas com inscritos */}
                     <label className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-2xl cursor-pointer hover:bg-slate-100 transition-colors shrink-0">
                       <input
                         type="checkbox"
@@ -258,7 +386,6 @@ export default function PublicTournamentView() {
                       <span>Apenas com inscritos</span>
                     </label>
 
-                    {/* Select Dropdown de Provas */}
                     <div className="min-w-[280px]">
                       {(() => {
                         const filteredCategories = categories.filter((cat) => {
@@ -297,30 +424,8 @@ export default function PublicTournamentView() {
                   </div>
                 </div>
 
-                {/* ── VIEW: TODAS AS PROVAS (ORDEM GERAL DO BALIZAMENTO) ── */}
                 {selectedTabCat === "all" ? (
                   <div className="space-y-8">
-                    <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white p-6 rounded-3xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 text-indigo-300 font-black text-xs uppercase tracking-widest mb-1">
-                          <Timer size={16} />
-                          Programação Oficial de Provas
-                        </div>
-                        <h3 className="text-xl font-bold">Ordem Geral do Balizamento</h3>
-                        <p className="text-slate-300 text-xs mt-0.5">
-                          Exibindo a sequência cronológica oficial das baterias e raias do torneio.
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={() => window.print()}
-                        className="flex items-center gap-2 px-5 py-3 bg-white text-indigo-950 hover:bg-indigo-50 font-bold rounded-2xl text-xs shadow-lg transition-all shrink-0 cursor-pointer"
-                      >
-                        <Clock size={16} />
-                        Imprimir Balizamento Completo 🖨️
-                      </button>
-                    </div>
-
                     {(() => {
                       const displayCats = categories.filter((cat) => {
                         if (!onlyWithAthletes) return true;
@@ -338,52 +443,78 @@ export default function PublicTournamentView() {
                         );
                       }
 
-                      return displayCats.map((cat, idx) => {
-                        const isSwimming = cat.rules_config?.sport_type === "swimming" ||
-                          cat.name?.toLowerCase().includes("natação") ||
-                          cat.name?.toLowerCase().includes("natacao") ||
-                          tournament?.name?.toLowerCase().includes("natação") ||
-                          tournament?.name?.toLowerCase().includes("natacao");
-
-                        return (
-                          <div key={cat.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="p-5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <span className="w-8 h-8 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black text-xs shadow-md">
-                                  #{idx + 1}
-                                </span>
-                                <div>
-                                  <h4 className="font-bold text-slate-800 text-base">{cat.name}</h4>
-                                  <p className="text-xs text-slate-500 font-medium">{cat.gender} • {cat.age_group}</p>
-                                </div>
+                      return (
+                        <>
+                          <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white p-6 rounded-3xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-2 text-indigo-300 font-black text-xs uppercase tracking-widest mb-1">
+                                <Timer size={16} />
+                                Programação Oficial de Provas
                               </div>
+                              <h3 className="text-xl font-bold">Ordem Geral do Balizamento</h3>
+                              <p className="text-slate-300 text-xs mt-0.5">
+                                Exibindo a sequência cronológica oficial das baterias e raias do torneio.
+                              </p>
                             </div>
 
-                            <div className="p-5">
-                              {isSwimming ? (
-                                <SwimmingBalizamento
-                                  category={cat}
-                                  athleteSubs={athleteSubs}
-                                  tournamentId={id!}
-                                  readOnly={true}
-                                />
-                              ) : (
-                                <TournamentBracket 
-                                  tournamentId={id!} 
-                                  categoryId={cat.id} 
-                                  groupCount={cat.group_count || 1} 
-                                  disputeSystem={cat.dispute_system || 'elimination'} 
-                                  selectedSubdivision=""
-                                />
-                              )}
-                            </div>
+                            <button
+                              onClick={() => handlePrintAllSumulas(displayCats, athleteSubs, tournament)}
+                              className="flex items-center gap-2 px-5 py-3 bg-white text-indigo-950 hover:bg-indigo-50 font-bold rounded-2xl text-xs shadow-lg transition-all shrink-0 cursor-pointer"
+                            >
+                              <Clock size={16} />
+                              Imprimir Balizamento Completo 🖨️
+                            </button>
                           </div>
-                        );
-                      });
+
+                          <div className="space-y-8">
+                            {displayCats.map((cat, idx) => {
+                              const isSwimming = cat.rules_config?.sport_type === "swimming" ||
+                                cat.name?.toLowerCase().includes("natação") ||
+                                cat.name?.toLowerCase().includes("natacao") ||
+                                tournament?.name?.toLowerCase().includes("natação") ||
+                                tournament?.name?.toLowerCase().includes("natacao");
+
+                              return (
+                                <div key={cat.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                                  <div className="p-5 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <span className="w-8 h-8 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black text-xs shadow-md">
+                                        #{idx + 1}
+                                      </span>
+                                      <div>
+                                        <h4 className="font-bold text-slate-800 text-base">{cat.name}</h4>
+                                        <p className="text-xs text-slate-500 font-medium">{cat.gender} • {cat.age_group}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="p-5">
+                                    {isSwimming ? (
+                                      <SwimmingBalizamento
+                                        category={cat}
+                                        athleteSubs={athleteSubs}
+                                        tournamentId={id!}
+                                        readOnly={true}
+                                      />
+                                    ) : (
+                                      <TournamentBracket 
+                                        tournamentId={id!} 
+                                        categoryId={cat.id} 
+                                        groupCount={cat.group_count || 1} 
+                                        disputeSystem={cat.dispute_system || 'elimination'} 
+                                        selectedSubdivision=""
+                                      />
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      );
                     })()}
                   </div>
                 ) : (
-                  /* ── VIEW: PROVA INDIVIDUAL SELECIONADA ── */
                   (() => {
                     const cat = categories.find(c => c.id === selectedTabCat);
                     if (!cat) return null;
