@@ -5435,6 +5435,180 @@ router2.post("/public/athlete-subscription/match/:matchId/athlete/:athleteId/vis
     res.status(500).json({ error: err.message });
   }
 });
+router2.post("/:id/seed-athletes-v2", async (req, res) => {
+  try {
+    const tournamentId = req.params.id;
+    const supabase = getSupabaseAdmin();
+    const clubs = [
+      "Clube Fluir de Nata\xE7\xE3o",
+      "Academia Tubar\xE3o Aqu\xE1tica",
+      "Clube Regatas Baiano",
+      "Associa\xE7\xE3o Aqu\xE1tica Salvador",
+      "Esporte Clube Vit\xF3ria Aqu\xE1tica",
+      "Nata\xE7\xE3o & Cia"
+    ];
+    const { data: existingSubs } = await supabase.from("athlete_subscriptions").select("*").eq("tournament_id", tournamentId);
+    if (existingSubs && existingSubs.length > 0) {
+      for (const sub of existingSubs) {
+        const clubName = clubs[Math.floor(Math.random() * clubs.length)];
+        const addData = sub.additional_data || {};
+        if (!addData.club_name && !addData.institution_name) {
+          addData.club_name = clubName;
+          addData.institution_name = clubName;
+          await supabase.from("athlete_subscriptions").update({ additional_data: addData }).eq("id", sub.id);
+        }
+      }
+    }
+    const { data: categories } = await supabase.from("tournament_categories").select("*").eq("tournament_id", tournamentId);
+    if (!categories || categories.length === 0) {
+      return res.status(400).json({ error: "Nenhuma categoria encontrada." });
+    }
+    const firstNames = [
+      "Gabriel",
+      "Lucas",
+      "Matheus",
+      "Pedro",
+      "Guilherme",
+      "Gustavo",
+      "Felipe",
+      "Rafael",
+      "Bernardo",
+      "Enzo",
+      "Mariana",
+      "Beatriz",
+      "Sofia",
+      "Isabella",
+      "Camila",
+      "Larissa",
+      "Giovanna",
+      "Let\xEDcia",
+      "Amanda",
+      "Bruna",
+      "Rodrigo",
+      "Thiago",
+      "Vinicius",
+      "Bruno",
+      "Eduardo",
+      "Diego",
+      "Leonardo",
+      "Marcelo",
+      "Arthur",
+      "Heitor",
+      "Carolina",
+      "Helena",
+      "Luiza",
+      "Alice",
+      "Fernanda",
+      "Juliana",
+      "Nat\xE1lia",
+      "Patr\xEDcia",
+      "Vanessa",
+      "Aline",
+      "Caio",
+      "Daniel",
+      "Hugo",
+      "Igor",
+      "Jo\xE3o",
+      "Kevyn",
+      "Luan",
+      "Miguel",
+      "Murilo",
+      "Ot\xE1vio",
+      "Paula",
+      "Renata",
+      "Sabrina",
+      "Tain\xE1",
+      "Vit\xF3ria",
+      "Yasmin",
+      "Bianca",
+      "Clara",
+      "Debora",
+      "Evelyn"
+    ];
+    const lastNames = [
+      "Silva",
+      "Santos",
+      "Oliveira",
+      "Souza",
+      "Rodrigues",
+      "Ferreira",
+      "Alves",
+      "Pereira",
+      "Lima",
+      "Gomes",
+      "Costa",
+      "Ribeiro",
+      "Martins",
+      "Carvalho",
+      "Almeida",
+      "Lopes",
+      "Soares",
+      "Fernandes",
+      "Vieira",
+      "Barbosa",
+      "Rocha",
+      "Dias",
+      "Nascimento",
+      "Andrade",
+      "Moreira",
+      "Nunes",
+      "Marques",
+      "Machado",
+      "Mendes",
+      "Freitas"
+    ];
+    const generateCPF = () => {
+      const num = () => Math.floor(Math.random() * 900 + 100);
+      return `${num()}.${num()}.${num()}-${Math.floor(Math.random() * 90 + 10)}`;
+    };
+    const generateTime = () => {
+      const min = "00";
+      const sec = String(Math.floor(Math.random() * 35 + 24)).padStart(2, "0");
+      const ms = String(Math.floor(Math.random() * 99)).padStart(2, "0");
+      return `${min}:${sec}.${ms}`;
+    };
+    let totalNew = 0;
+    for (const cat of categories) {
+      const currentSubs = (existingSubs || []).filter((s) => s.category_id === cat.id);
+      const targetCount = 12;
+      const needed = Math.max(0, targetCount - currentSubs.length);
+      for (let i = 0; i < needed; i++) {
+        const fn = firstNames[Math.floor(Math.random() * firstNames.length)];
+        const ln = lastNames[Math.floor(Math.random() * lastNames.length)];
+        const name = `${fn} ${ln}`;
+        const club = clubs[Math.floor(Math.random() * clubs.length)];
+        const birthYear = cat.birth_year_max ? cat.birth_year_max : cat.birth_year_min ? cat.birth_year_min : 1995;
+        const insertData = {
+          tournament_id: tournamentId,
+          category_id: cat.id,
+          athlete_name: name,
+          birth_date: `${birthYear}-05-15`,
+          document: generateCPF(),
+          gender: cat.gender || "Masculino",
+          is_completed: true,
+          validation_status: "approved",
+          payment_status: "paid",
+          additional_data: {
+            seed_time: Math.random() > 0.1 ? generateTime() : "",
+            club_name: club,
+            institution_name: club,
+            registration_source: "seed_script_v2"
+          }
+        };
+        const { data } = await supabase.from("athlete_subscriptions").insert(insertData).select().maybeSingle();
+        if (data) totalNew++;
+      }
+    }
+    res.json({
+      success: true,
+      message: `Clubes atribu\xEDdos e +${totalNew} novos atletas inseridos! Cada prova agora possui em m\xE9dia 12 inscritos.`,
+      newCount: totalNew
+    });
+  } catch (err) {
+    console.error("Erro no seed v2:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 var tournamentRoutes_default = router2;
 
 // src/backend/routes/memberRoutes.ts

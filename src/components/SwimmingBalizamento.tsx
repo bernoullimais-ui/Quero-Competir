@@ -83,7 +83,7 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
         if (laneObj) {
           laneObj.athleteId = ath.id;
           laneObj.athleteName = ath.athleteName;
-          laneObj.institutionName = ath.institutionName || "Avulso";
+          laneObj.institutionName = ath.institutionName || ath.institution_name || ath.institution?.name || ath.additionalData?.club_name || ath.additionalData?.institution_name || "Avulso";
           laneObj.seedTime = ath.additionalData?.seed_time || "--:--.--";
           laneObj.resultTime = editingResults[ath.id] || "";
         }
