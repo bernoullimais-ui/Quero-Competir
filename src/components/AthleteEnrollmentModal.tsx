@@ -248,7 +248,8 @@ export default function AthleteEnrollmentModal({ isOpen, onClose, tournamentId, 
             additionalData: {
               age_group: age,
               graduation: grad,
-              weight_class: wt
+              weight_class: wt,
+              seed_time: cData.seed_time || ""
             }
           };
         });

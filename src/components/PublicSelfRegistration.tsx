@@ -74,6 +74,7 @@ export default function PublicSelfRegistration() {
 
   // Step 3 — Categories (multi-select)
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [seedTimes, setSeedTimes] = useState<Record<string, string>>({});
 
   // Step 4 — Guardian
   const [isSelfGuardian, setIsSelfGuardian] = useState(false);
@@ -205,7 +206,7 @@ export default function PublicSelfRegistration() {
           authorizedImageUse: acceptedImageUse,
           liabilityWaiver: acceptedLiability,
           isSelfGuardian,
-          additionalData: { bloodType, allergies, emergencyContact },
+          additionalData: { bloodType, allergies, emergencyContact, seedTimes },
         })
       });
       const data = await res.json();
@@ -512,6 +513,21 @@ export default function PublicSelfRegistration() {
                               {cat.gender} · {cat.age_group}
                               {(cat.birth_year_min || cat.birth_year_max) && ` · Nasc. ${cat.birth_year_min || ""}–${cat.birth_year_max || ""}`}
                             </p>
+
+                            {selected && (
+                              <div className="mt-3 pt-3 border-t border-indigo-200/60 flex flex-col sm:flex-row items-start sm:items-center gap-2" onClick={e => e.stopPropagation()}>
+                                <label className="text-xs font-bold text-indigo-900 whitespace-nowrap flex items-center gap-1">
+                                  ⏱️ Tempo de Inscrição / Balizamento:
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="00:32.50"
+                                  value={seedTimes[cat.id] || ""}
+                                  onChange={(e) => setSeedTimes(prev => ({ ...prev, [cat.id]: e.target.value }))}
+                                  className="px-3 py-1.5 border border-indigo-300 rounded-xl text-xs font-mono font-bold text-indigo-950 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 w-36 shadow-xs"
+                                />
+                              </div>
+                            )}
                           </div>
                         </button>
                       );
