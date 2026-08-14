@@ -5930,4 +5930,96 @@ router.post("/public/athlete-subscription/match/:matchId/athlete/:athleteId/visi
   }
 });
 
+router.post("/:id/seed-athletes", async (req, res) => {
+  try {
+    const tournamentId = req.params.id;
+    const { count = 100 } = req.body;
+    const supabase = getSupabaseAdmin();
+
+    const { data: categories, error: catErr } = await supabase
+      .from("tournament_categories")
+      .select("*")
+      .eq("tournament_id", tournamentId);
+
+    if (catErr || !categories || categories.length === 0) {
+      return res.status(400).json({ error: "Nenhuma categoria encontrada para este torneio." });
+    }
+
+    const firstNames = [
+      "Gabriel", "Lucas", "Matheus", "Pedro", "Guilherme", "Gustavo", "Felipe", "Rafael", "Bernardo", "Enzo",
+      "Mariana", "Beatriz", "Sofia", "Isabella", "Camila", "Larissa", "Giovanna", "Letícia", "Amanda", "Bruna",
+      "Rodrigo", "Thiago", "Vinicius", "Bruno", "Eduardo", "Diego", "Leonardo", "Marcelo", "Arthur", "Heitor",
+      "Carolina", "Helena", "Luiza", "Alice", "Fernanda", "Juliana", "Natália", "Patrícia", "Vanessa", "Aline"
+    ];
+
+    const lastNames = [
+      "Silva", "Santos", "Oliveira", "Souza", "Rodrigues", "Ferreira", "Alves", "Pereira", "Lima", "Gomes",
+      "Costa", "Ribeiro", "Martins", "Carvalho", "Almeida", "Lopes", "Soares", "Fernandes", "Vieira", "Barbosa",
+      "Rocha", "Dias", "Nascimento", "Andrade", "Moreira", "Nunes", "Marques", "Machado", "Mendes", "Freitas"
+    ];
+
+    const generateCPF = () => {
+      const num = () => Math.floor(Math.random() * 900 + 100);
+      return `${num()}.${num()}.${num()}-${Math.floor(Math.random() * 90 + 10)}`;
+    };
+
+    const generateTime = () => {
+      const min = "00";
+      const sec = String(Math.floor(Math.random() * 35 + 24)).padStart(2, '0');
+      const ms = String(Math.floor(Math.random() * 99)).padStart(2, '0');
+      return `${min}:${sec}.${ms}`;
+    };
+
+    const inserted: any[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const category = categories[i % categories.length];
+      const fn = firstNames[Math.floor(Math.random() * firstNames.length)];
+      const ln = lastNames[Math.floor(Math.random() * lastNames.length)];
+      const name = `${fn} ${ln}`;
+
+      const birthYear = category.birth_year_max 
+        ? category.birth_year_max 
+        : (category.birth_year_min ? category.birth_year_min : 1995);
+
+      const birthDate = `${birthYear}-05-15`;
+
+      const insertData = {
+        tournament_id: tournamentId,
+        category_id: category.id,
+        athlete_name: name,
+        birth_date: birthDate,
+        document: generateCPF(),
+        gender: category.gender || "Masculino",
+        is_completed: true,
+        validation_status: "approved",
+        payment_status: "paid",
+        additional_data: {
+          seed_time: Math.random() > 0.15 ? generateTime() : "",
+          registration_source: "seed_script"
+        }
+      };
+
+      const { data, error } = await supabase
+        .from("athlete_subscriptions")
+        .insert(insertData)
+        .select()
+        .maybeSingle();
+
+      if (data) {
+        inserted.push(data);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `${inserted.length} participantes fictícios inseridos com sucesso em ${categories.length} categorias!`,
+      count: inserted.length
+    });
+  } catch (err: any) {
+    console.error("Erro ao gerar participantes fictícios:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
