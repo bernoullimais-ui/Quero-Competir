@@ -466,6 +466,11 @@ export default function App() {
                   <PublicTournamentView />
                 </ErrorBoundary>
               } />
+              <Route path="/public/torneio/:id" element={
+                <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar o torneio.</div>}>
+                  <PublicTournamentView />
+                </ErrorBoundary>
+              } />
 
               <Route path="/public/tournament/:id/categories/:categoryId/draw" element={
                 <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar a cerimônia de sorteio.</div>}>
@@ -480,6 +485,11 @@ export default function App() {
               } />
 
               <Route path="/public/tournament/:id/inscricao" element={
+                <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar formulário de inscrição.</div>}>
+                  <PublicSelfRegistration />
+                </ErrorBoundary>
+              } />
+              <Route path="/public/torneio/:id/inscricao" element={
                 <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar formulário de inscrição.</div>}>
                   <PublicSelfRegistration />
                 </ErrorBoundary>

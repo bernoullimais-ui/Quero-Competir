@@ -305,7 +305,7 @@ export default function PublicSelfRegistration() {
                 Acompanhar minhas inscrições
               </button>
             )}
-            <Link to={`/public/tournament/${tournamentId}`} className="w-full text-slate-400 font-semibold hover:text-slate-600 py-2 transition text-xs block">
+            <Link to={`/public/torneio/${tournamentId}`} className="w-full text-slate-400 font-semibold hover:text-slate-600 py-2 transition text-xs block">
               Ver o torneio
             </Link>
           </div>
@@ -337,7 +337,7 @@ export default function PublicSelfRegistration() {
             <h1 className="font-black text-slate-800 text-sm truncate">{tournament?.name}</h1>
             <p className="text-xs text-slate-400 font-medium">Inscrição Individual</p>
           </div>
-          <Link to={`/public/tournament/${tournamentId}`} className="text-slate-400 hover:text-slate-600 p-1 text-lg font-bold">✕</Link>
+          <Link to={`/public/torneio/${tournamentId}`} className="text-slate-400 hover:text-slate-600 p-1 text-lg font-bold">✕</Link>
         </div>
       </div>
 

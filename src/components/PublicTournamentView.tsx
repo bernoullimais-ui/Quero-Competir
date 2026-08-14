@@ -150,7 +150,7 @@ export default function PublicTournamentView() {
 
             {selfRegEnabled && (
               <Link
-                to={`/public/tournament/${id}/inscricao`}
+                to={`/public/torneio/${id}/inscricao`}
                 className="shrink-0 bg-white text-indigo-700 px-6 py-3.5 rounded-2xl font-black text-sm hover:bg-indigo-50 transition shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2"
               >
                 <Sparkles size={16} /> Inscrever-se

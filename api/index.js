@@ -1222,9 +1222,9 @@ router.post("/payments/webhook", async (req, res) => {
           const { data: subData } = await supabase.from("athlete_subscriptions").select("*").eq("id", orderCode).maybeSingle();
           if (subData && subData.payment_status !== "paid") {
             await supabase.from("athlete_subscriptions").update({ payment_status: "paid" }).eq("id", orderCode);
-            const { data: tData } = await supabase.from("tournaments").select("owner_id, start_date").eq("id", subData.tournament_id).maybeSingle();
+            const { data: tData2 } = await supabase.from("tournaments").select("owner_id, start_date").eq("id", subData.tournament_id).maybeSingle();
             const { data: tSettings } = await supabase.from("tournament_subscription_settings").select("require_membership").eq("tournament_id", subData.tournament_id).maybeSingle();
-            if (tSettings?.require_membership && tData) {
+            if (tSettings?.require_membership && tData2) {
               const { data: existingMember } = await supabase.from("members").select("id").eq("document_number", subData.document).maybeSingle();
               let athleteId = existingMember?.id;
               if (!athleteId) {
@@ -1238,10 +1238,10 @@ router.post("/payments/webhook", async (req, res) => {
                 if (newMember) athleteId = newMember.id;
               }
               if (athleteId) {
-                const year = new Date(tData.start_date).getFullYear();
+                const year = new Date(tData2.start_date).getFullYear();
                 await supabase.from("memberships").upsert({
                   member_id: athleteId,
-                  organization_id: tData.owner_id,
+                  organization_id: tData2.owner_id,
                   year,
                   status: "active",
                   payment_status: "paid",
@@ -1779,11 +1779,35 @@ router2.patch("/matches/bulk-update", requireAuth, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+function slugify(text) {
+  if (!text) return "";
+  return text.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/\s+/g, "-").replace(/[^\w\-]+/g, "").replace(/\-\-+/g, "-");
+}
+async function findTournamentByIdOrSlug(idOrSlug) {
+  const supabase = getSupabaseAdmin();
+  const decoded = decodeURIComponent(idOrSlug).trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decoded);
+  if (isUuid) {
+    const { data } = await supabase.from("tournaments").select("*").eq("id", decoded).maybeSingle();
+    if (data) return data;
+  }
+  const { data: allTournaments } = await supabase.from("tournaments").select("*");
+  if (allTournaments && allTournaments.length > 0) {
+    const targetSlug = slugify(decoded);
+    const matched = allTournaments.find(
+      (t) => t.id === decoded || slugify(t.name) === targetSlug || t.name.toLowerCase() === decoded.toLowerCase()
+    );
+    if (matched) return matched;
+  }
+  return null;
+}
 router2.get("/:id", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.from("tournaments").select("*").eq("id", req.params.id).single();
-    if (error) throw error;
+    const data = await findTournamentByIdOrSlug(req.params.id);
+    if (!data) {
+      return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
+    }
     let organization = null;
     if (data && data.owner_id) {
       const orgId = await getOrganizerReferenceIdAndSync(data.owner_id);
@@ -1835,7 +1859,7 @@ router2.get("/:id/matches", async (req, res) => {
         team2:team2_id(id, availability, institution:institutions(id, name, logo_url)),
         winner:winner_id(id, institution:institutions(id, name, logo_url)),
         venue:venue_id(*)
-      `).eq("tournament_id", req.params.id).order("round", { ascending: true }).order("match_index", { ascending: true });
+      `).eq("tournament_id", tData.id).order("round", { ascending: true }).order("match_index", { ascending: true });
     if (error) {
       if (error.message.includes("relation") || error.message.includes("cache")) return res.json([]);
       throw error;
@@ -1847,8 +1871,10 @@ router2.get("/:id/matches", async (req, res) => {
 });
 router2.get("/:id/categories", async (req, res) => {
   try {
+    const tData2 = await findTournamentByIdOrSlug(req.params.id);
+    if (!tData2) return res.json([]);
     const supabase = getSupabaseAdmin();
-    const tournamentId = req.params.id;
+    const tournamentId = tData2.id;
     const { data: categories, error: catError } = await supabase.from("tournament_categories").select("*").eq("tournament_id", tournamentId);
     if (catError) {
       if (catError.message.includes('relation "tournament_categories" does not exist') || catError.message.includes("schema cache")) {
@@ -3427,15 +3453,15 @@ router2.get("/:id/athlete-subscriptions/institution/:instId", async (req, res) =
 router2.get("/:id/public-settings", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const tournamentId = req.params.id;
-    const [tResult, settingsResult, categoriesResult, registrationsResult] = await Promise.all([
-      supabase.from("tournaments").select("id, name, logo_url, start_date, end_date, owner_id, status").eq("id", tournamentId).maybeSingle(),
+    const tData2 = await findTournamentByIdOrSlug(req.params.id);
+    if (!tData2) return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
+    const tournamentId = tData2.id;
+    const [settingsResult, categoriesResult, registrationsResult] = await Promise.all([
       getSubscriptionSettings(tournamentId),
       supabase.from("tournament_categories").select("id, name, gender, age_group, birth_year_min, birth_year_max, max_teams, rules_config").eq("tournament_id", tournamentId).order("name"),
       supabase.from("tournament_registrations").select("institution_id, institutions(id, name, logo_url)").eq("tournament_id", tournamentId)
     ]);
-    if (!tResult.data) return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
-    const tournament = tResult.data;
+    const tournament = tData2;
     const settings = settingsResult;
     if (settings?.feeType !== "by_individual_self") {
       return res.status(403).json({ error: "Este torneio n\xE3o aceita inscri\xE7\xF5es individuais pelo portal." });
@@ -3476,7 +3502,9 @@ router2.get("/:id/public-settings", async (req, res) => {
 router2.post("/:id/self-register", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const tournamentId = req.params.id;
+    const tData2 = await findTournamentByIdOrSlug(req.params.id);
+    if (!tData2) return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
+    const tournamentId = tData2.id;
     const {
       athleteName,
       birthDate,
@@ -3919,8 +3947,8 @@ router2.post("/public/athlete-subscription/:subId/complete", async (req, res) =>
       const { data: subData } = await supabase.from("athlete_subscriptions").select("*").eq("id", subId).maybeSingle();
       if (subData) {
         const settings = await getSubscriptionSettings(subData.tournament_id);
-        const { data: tData } = await supabase.from("tournaments").select("owner_id, start_date").eq("id", subData.tournament_id).maybeSingle();
-        if (settings?.requireMembership && tData) {
+        const { data: tData2 } = await supabase.from("tournaments").select("owner_id, start_date").eq("id", subData.tournament_id).maybeSingle();
+        if (settings?.requireMembership && tData2) {
           const { data: existingMember } = await supabase.from("members").select("id").eq("document_number", subData.document).maybeSingle();
           let athleteId = existingMember?.id;
           if (!athleteId) {
@@ -3934,10 +3962,10 @@ router2.post("/public/athlete-subscription/:subId/complete", async (req, res) =>
             if (newMember) athleteId = newMember.id;
           }
           if (athleteId) {
-            const year = new Date(tData.start_date).getFullYear();
+            const year = new Date(tData2.start_date).getFullYear();
             await supabase.from("memberships").upsert({
               member_id: athleteId,
-              organization_id: tData.owner_id,
+              organization_id: tData2.owner_id,
               year,
               status: "active",
               payment_status: "paid",
@@ -4036,22 +4064,22 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
     if (sub.paymentStatus === "paid") {
       return res.status(400).json({ error: "Esta inscri\xE7\xE3o j\xE1 foi paga." });
     }
-    const { data: tData } = await supabase.from("tournaments").select("name, owner_id, start_date").eq("id", sub.tournamentId).single();
+    const { data: tData2 } = await supabase.from("tournaments").select("name, owner_id, start_date").eq("id", sub.tournamentId).single();
     const settings = await getSubscriptionSettings(sub.tournamentId);
     const isIndividualFee = settings?.feeType === "by_team_and_athlete_parent" || settings?.feeType === "by_individual_self";
     const athleteFee = isIndividualFee ? settings?.athleteFee || 0 : 0;
     let membershipFee = 0;
     let membershipStatus = "active";
     let orgName = "Liga";
-    if (settings?.requireMembership && tData) {
+    if (settings?.requireMembership && tData2) {
       membershipStatus = "pending";
-      const { data: org } = await supabase.from("organizations").select("name, requires_membership_fee, membership_fee_amount").eq("id", tData.owner_id).maybeSingle();
+      const { data: org } = await supabase.from("organizations").select("name, requires_membership_fee, membership_fee_amount").eq("id", tData2.owner_id).maybeSingle();
       orgName = org?.name || "Liga";
       membershipFee = org?.membership_fee_amount || 50;
       const { data: member } = await supabase.from("members").select("id").eq("document_number", sub.document).maybeSingle();
       if (member) {
-        const year = new Date(tData.start_date).getFullYear();
-        const { data: ms } = await supabase.from("memberships").select("status, payment_status").eq("member_id", member.id).eq("organization_id", tData.owner_id).eq("year", year).maybeSingle();
+        const year = new Date(tData2.start_date).getFullYear();
+        const { data: ms } = await supabase.from("memberships").select("status, payment_status").eq("member_id", member.id).eq("organization_id", tData2.owner_id).eq("year", year).maybeSingle();
         if (ms && ms.status === "active" && ms.payment_status === "paid") {
           membershipStatus = "active";
           membershipFee = 0;
@@ -4065,7 +4093,7 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
     }
     const hasSecretKey = !!process.env.PAGARME_SECRET_KEY;
     if (simulateSuccess) {
-      await updateSubscriptionPaymentStatus(subId, "paid", sub, tData, settings);
+      await updateSubscriptionPaymentStatus(subId, "paid", sub, tData2, settings);
       return res.json({ success: true, method, paid: true });
     }
     if (!hasSecretKey) {
@@ -4079,7 +4107,7 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
           qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixPayload)}`
         });
       }
-      await updateSubscriptionPaymentStatus(subId, "paid", sub, tData, settings);
+      await updateSubscriptionPaymentStatus(subId, "paid", sub, tData2, settings);
       return res.json({ success: true, method: "card", paid: true });
     }
     const cleanDoc = (sub.document || "00000000000").replace(/\D/g, "");
@@ -4173,7 +4201,7 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
           pagarmeChargeId: charge.id
         };
         await updateSubscriptionAdditionalData(sub.id, updatedAdditional, sub);
-        await updateSubscriptionPaymentStatus(subId, "paid", sub, tData, settings);
+        await updateSubscriptionPaymentStatus(subId, "paid", sub, tData2, settings);
         return res.json({ success: true, method: "card", paid: true });
       } else {
         return res.status(400).json({ error: `Pagamento via cart\xE3o n\xE3o aprovado. Status: ${charge?.status || "desconhecido"}` });
@@ -4202,11 +4230,11 @@ async function updateSubscriptionAdditionalData(subId, additionalData, sub) {
     saveDb(db);
   }
 }
-async function updateSubscriptionPaymentStatus(subId, status, sub, tData, settings) {
+async function updateSubscriptionPaymentStatus(subId, status, sub, tData2, settings) {
   try {
     const supabase = getSupabaseAdmin();
     await supabase.from("athlete_subscriptions").update({ payment_status: status }).eq("id", subId);
-    if (settings?.requireMembership && tData) {
+    if (settings?.requireMembership && tData2) {
       const { data: existingMember } = await supabase.from("members").select("id").eq("document_number", sub.document).maybeSingle();
       let athleteId = existingMember?.id;
       if (!athleteId) {
@@ -4220,10 +4248,10 @@ async function updateSubscriptionPaymentStatus(subId, status, sub, tData, settin
         if (newMember) athleteId = newMember.id;
       }
       if (athleteId) {
-        const year = new Date(tData.start_date).getFullYear();
+        const year = new Date(tData2.start_date).getFullYear();
         await supabase.from("memberships").upsert({
           member_id: athleteId,
-          organization_id: tData.owner_id,
+          organization_id: tData2.owner_id,
           year,
           status: "active",
           payment_status: "paid",

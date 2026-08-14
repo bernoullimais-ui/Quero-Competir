@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { slugify } from "../utils/slugify.ts";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Trophy, 
@@ -1228,18 +1229,19 @@ export default function TournamentDashboard() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/public/tournament/${id}`);
+                const publicSlug = tournament?.name ? slugify(tournament.name) : id;
+                navigator.clipboard.writeText(`${window.location.origin}/public/torneio/${publicSlug}`);
                 setCopiedLink(true);
                 setTimeout(() => setCopiedLink(false), 2000);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-sm font-bold transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-sm font-bold transition-colors cursor-pointer"
               title="Copiar link público do torneio"
             >
               {copiedLink ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Copy size={16} />}
               <span className="hidden sm:inline">{copiedLink ? "Copiado!" : "Link Público"}</span>
             </button>
             <a 
-              href={`/public/tournament/${id}`} 
+              href={`/public/torneio/${tournament?.name ? slugify(tournament.name) : id}`} 
               target="_blank" 
               rel="noopener noreferrer"
               className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full transition-colors"

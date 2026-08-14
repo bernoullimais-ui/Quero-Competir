@@ -705,17 +705,59 @@ router.patch("/matches/bulk-update", requireAuth, async (req, res) => {
   }
 });
 
-// Buscar um torneio específico
+export function slugify(text: string): string {
+  if (!text) return "";
+  return text
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^\w\-]+/g, "")
+    .replace(/\-\-+/g, "-");
+}
+
+async function findTournamentByIdOrSlug(idOrSlug: string) {
+  const supabase = getSupabaseAdmin();
+  const decoded = decodeURIComponent(idOrSlug).trim();
+
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decoded);
+  if (isUuid) {
+    const { data } = await supabase
+      .from('tournaments')
+      .select('*')
+      .eq('id', decoded)
+      .maybeSingle();
+    if (data) return data;
+  }
+
+  const { data: allTournaments } = await supabase
+    .from('tournaments')
+    .select('*');
+
+  if (allTournaments && allTournaments.length > 0) {
+    const targetSlug = slugify(decoded);
+    const matched = allTournaments.find(t =>
+      t.id === decoded ||
+      slugify(t.name) === targetSlug ||
+      t.name.toLowerCase() === decoded.toLowerCase()
+    );
+    if (matched) return matched;
+  }
+
+  return null;
+}
+
+// Buscar um torneio específico por ID ou por Slug (Nome Amigável)
 router.get("/:id", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
-      .from('tournaments')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
+    const data = await findTournamentByIdOrSlug(req.params.id);
 
-    if (error) throw error;
+    if (!data) {
+      return res.status(404).json({ error: "Torneio não encontrado" });
+    }
     
     // Buscar organização associada usando o owner_id
     let organization = null;
@@ -797,7 +839,7 @@ router.get("/:id/matches", async (req, res) => {
         winner:winner_id(id, institution:institutions(id, name, logo_url)),
         venue:venue_id(*)
       `)
-      .eq('tournament_id', req.params.id)
+      .eq('tournament_id', tData.id)
       .order('round', { ascending: true })
       .order('match_index', { ascending: true });
 
@@ -814,8 +856,11 @@ router.get("/:id/matches", async (req, res) => {
 // Listar categorias de um torneio
 router.get("/:id/categories", async (req, res) => {
   try {
+    const tData = await findTournamentByIdOrSlug(req.params.id);
+    if (!tData) return res.json([]);
+
     const supabase = getSupabaseAdmin();
-    const tournamentId = req.params.id;
+    const tournamentId = tData.id;
 
     // 1. Buscar categorias
     const { data: categories, error: catError } = await supabase
@@ -3094,18 +3139,18 @@ router.get("/:id/athlete-subscriptions/institution/:instId", async (req, res) =>
 router.get("/:id/public-settings", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const tournamentId = req.params.id;
+    const tData = await findTournamentByIdOrSlug(req.params.id);
 
-    const [tResult, settingsResult, categoriesResult, registrationsResult] = await Promise.all([
-      supabase.from("tournaments").select("id, name, logo_url, start_date, end_date, owner_id, status").eq("id", tournamentId).maybeSingle(),
+    if (!tData) return res.status(404).json({ error: "Torneio não encontrado" });
+    const tournamentId = tData.id;
+
+    const [settingsResult, categoriesResult, registrationsResult] = await Promise.all([
       getSubscriptionSettings(tournamentId),
       supabase.from("tournament_categories").select("id, name, gender, age_group, birth_year_min, birth_year_max, max_teams, rules_config").eq("tournament_id", tournamentId).order("name"),
       supabase.from("tournament_registrations").select("institution_id, institutions(id, name, logo_url)").eq("tournament_id", tournamentId)
     ]);
 
-    if (!tResult.data) return res.status(404).json({ error: "Torneio não encontrado" });
-
-    const tournament = tResult.data;
+    const tournament = tData;
     const settings = settingsResult;
 
     // Only expose public-settings for tournaments with self-registration enabled
@@ -3158,7 +3203,9 @@ router.get("/:id/public-settings", async (req, res) => {
 router.post("/:id/self-register", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const tournamentId = req.params.id;
+    const tData = await findTournamentByIdOrSlug(req.params.id);
+    if (!tData) return res.status(404).json({ error: "Torneio não encontrado" });
+    const tournamentId = tData.id;
 
     const {
       athleteName, birthDate, document: docNum, gender,
