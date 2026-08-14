@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { Plus, ListChecks, X, Edit2, Trash2, Waves, CheckSquare, Square } from "lucide-react";
+import { Plus, ListChecks, X, Edit2, Trash2, Waves, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { getSportIcon, getSportBgClass } from "./TournamentDashboard.tsx";
 import { useToast } from "./ui/Toast.tsx";
 
@@ -75,9 +75,36 @@ function getSwimAgeClasses(currentYear: number) {
 
 export default function CategoriesTab({ categories, refreshCategories, tournamentId }: CategoriesTabProps) {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showReorderModal, setShowReorderModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<any | null>(null);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
   const { success: toastSuccess, error: toastError } = useToast();
+
+  const handleMoveCategory = async (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= categories.length) return;
+    const newCategories = [...categories];
+    const [moved] = newCategories.splice(fromIndex, 1);
+    newCategories.splice(toIndex, 0, moved);
+
+    const orderedIds = newCategories.map(c => c.id);
+    setIsSavingOrder(true);
+
+    try {
+      const res = await fetch(`/api/tournaments/${tournamentId}/categories/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+      if (!res.ok) throw new Error("Erro ao reordenar provas");
+      toastSuccess("Ordem das provas atualizada!");
+      refreshCategories();
+    } catch (err: any) {
+      toastError(err.message || "Falha ao reordenar");
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
 
   // Natação: provas e faixas selecionadas para criação em lote
   const [selectedSwimEvents, setSelectedSwimEvents] = useState<string[]>([]);
@@ -330,35 +357,69 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold">Categorias do Torneio</h3>
-          <p className="text-slate-500 text-sm">Defina quais modalidades serão disputadas.</p>
+          <h3 className="text-xl font-bold">Categorias & Provas do Torneio</h3>
+          <p className="text-slate-500 text-sm">Defina as modalidades e a sequência oficial de provas do evento.</p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Nova Categoria
-        </button>
+        <div className="flex items-center gap-3">
+          {categories.length > 1 && (
+            <button
+              onClick={() => setShowReorderModal(true)}
+              className="bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 text-sm cursor-pointer shadow-xs"
+            >
+              <ArrowUpDown size={16} />
+              Reordenar Provas 🔢
+            </button>
+          )}
+          <button
+            onClick={openAddModal}
+            className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2 cursor-pointer shadow-md shadow-indigo-200 text-sm"
+          >
+            <Plus size={18} />
+            Nova Categoria
+          </button>
+        </div>
       </div>
 
       {categories.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {categories.map((cat, i) => (
-            <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all relative group">
+            <div key={cat.id || i} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all relative group">
               <div className="flex items-center justify-between mb-4">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${getSportBgClass(cat.name)}`}>
-                  {isNatacao(cat.name)
-                    ? <Waves size={24} className="text-cyan-600" />
-                    : getSportIcon(cat.name, 24)
-                  }
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${getSportBgClass(cat.name)}`}>
+                    {isNatacao(cat.name)
+                      ? <Waves size={24} className="text-cyan-600" />
+                      : getSportIcon(cat.name, 24)
+                    }
+                  </div>
+                  <span className="text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-xl uppercase">
+                    Prova #{i + 1}
+                  </span>
                 </div>
+
                 <div className="flex items-center gap-1">
                   <span className="text-[10px] font-bold text-slate-400 border border-slate-100 px-2 py-0.5 rounded-full uppercase mr-1">
                     {cat.gender}
                   </span>
+                  {/* Up / Down Order Buttons */}
+                  <button
+                    disabled={i === 0 || isSavingOrder}
+                    onClick={() => handleMoveCategory(i, i - 1)}
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Mover Prova para Cima"
+                  >
+                    <ArrowUp size={14} />
+                  </button>
+                  <button
+                    disabled={i === categories.length - 1 || isSavingOrder}
+                    onClick={() => handleMoveCategory(i, i + 1)}
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Mover Prova para Baixo"
+                  >
+                    <ArrowDown size={14} />
+                  </button>
                   <button
                     onClick={() => openEditModal(cat)}
                     className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
@@ -867,6 +928,85 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
                 className="flex-1 bg-rose-600 text-white px-5 py-3 rounded-xl font-bold hover:bg-rose-700 transition-colors text-sm"
               >
                 Confirmar Exclusão
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Modal de Reordenar Sequência de Provas */}
+      {showReorderModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-xl relative max-h-[85vh] flex flex-col"
+          >
+            <button
+              type="button"
+              onClick={() => setShowReorderModal(false)}
+              className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="mb-5">
+              <div className="flex items-center gap-2 text-indigo-600 font-black text-xs uppercase tracking-wider mb-1">
+                <ArrowUpDown size={16} /> Programação & Sequência
+              </div>
+              <h3 className="text-2xl font-bold text-slate-800">Ordem Oficial das Provas</h3>
+              <p className="text-slate-500 text-xs mt-1">
+                Ajuste a ordem sequencial das provas. Essa ordem será refletida no balizamento geral e nas súmulas impressas.
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+              {categories.map((cat, idx) => (
+                <div
+                  key={cat.id || idx}
+                  className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-slate-100/80 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                      #{idx + 1}
+                    </span>
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-800">{cat.name}</h4>
+                      <p className="text-xs text-slate-500 font-medium">{cat.gender} • {cat.age_group}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={idx === 0 || isSavingOrder}
+                      onClick={() => handleMoveCategory(idx, idx - 1)}
+                      className="p-2 bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 rounded-xl transition-all disabled:opacity-30 cursor-pointer shadow-2xs"
+                      title="Mover para cima"
+                    >
+                      <ArrowUp size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === categories.length - 1 || isSavingOrder}
+                      onClick={() => handleMoveCategory(idx, idx + 1)}
+                      className="p-2 bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 rounded-xl transition-all disabled:opacity-30 cursor-pointer shadow-2xs"
+                      title="Mover para baixo"
+                    >
+                      <ArrowDown size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-5 mt-4 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowReorderModal(false)}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-indigo-200 cursor-pointer"
+              >
+                Concluído
               </button>
             </div>
           </motion.div>

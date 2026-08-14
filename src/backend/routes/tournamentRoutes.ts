@@ -1014,6 +1014,13 @@ router.get("/:id/categories", async (req, res) => {
       };
     });
 
+    result.sort((a, b) => {
+      const orderA = a.rules_config?.display_order ?? a.display_order ?? 999;
+      const orderB = b.rules_config?.display_order ?? b.display_order ?? 999;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.created_at || "").localeCompare(b.created_at || "");
+    });
+
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -1044,6 +1051,46 @@ router.post("/:id/categories", async (req, res) => {
     res.status(201).json(data);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Reordenar categorias de um torneio
+router.post("/:id/categories/reorder", async (req, res) => {
+  const { orderedIds } = req.body;
+  if (!Array.isArray(orderedIds)) {
+    return res.status(400).json({ error: "orderedIds must be an array of category IDs" });
+  }
+
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: cats, error: fetchErr } = await supabase
+      .from('tournament_categories')
+      .select('*')
+      .eq('tournament_id', req.params.id);
+
+    if (fetchErr) throw fetchErr;
+
+    if (cats && cats.length > 0) {
+      for (let i = 0; i < orderedIds.length; i++) {
+        const catId = orderedIds[i];
+        const existingCat = cats.find(c => c.id === catId);
+        if (existingCat) {
+          const updatedConfig = {
+            ...(existingCat.rules_config || {}),
+            display_order: i + 1
+          };
+          await supabase
+            .from('tournament_categories')
+            .update({ rules_config: updatedConfig })
+            .eq('id', catId);
+        }
+      }
+    }
+
+    return res.json({ success: true, message: "Ordem das provas atualizada com sucesso!" });
+  } catch (error: any) {
+    console.error("Erro ao reordenar categorias:", error);
+    return res.status(500).json({ error: error.message });
   }
 });
 
