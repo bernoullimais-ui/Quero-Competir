@@ -128,10 +128,11 @@ interface ParsedDesc {
   eventTime: string;
   location: string;
   sponsors: Sponsor[];
+  collectSeedTime: boolean;
 }
 
 function parseDescription(raw?: string): ParsedDesc {
-  if (!raw) return { description: "", photos: [], bannerUrl: "", eventTime: "", location: "", sponsors: [] };
+  if (!raw) return { description: "", photos: [], bannerUrl: "", eventTime: "", location: "", sponsors: [], collectSeedTime: true };
   let description = raw;
   let photos: string[] = [];
   let bannerUrl = "";
@@ -171,12 +172,19 @@ function parseDescription(raw?: string): ParsedDesc {
     } catch(e){}
   }
 
+  const seedTimeRegex = /<!--COLLECT_SEED_TIME:(.*?)-->/;
+  const seedTimeMatch = raw.match(seedTimeRegex);
+  let collectSeedTime = true;
+  if (seedTimeMatch) {
+    collectSeedTime = seedTimeMatch[1].trim() === "true";
+  }
+
   const cleanDescription = description.replace(/<!--[\s\S]*?-->/g, "").trim();
 
-  return { description: cleanDescription, photos, bannerUrl, eventTime, location, sponsors };
+  return { description: cleanDescription, photos, bannerUrl, eventTime, location, sponsors, collectSeedTime };
 }
 
-function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string, eventTime?: string, location?: string, sponsors?: Sponsor[]): string {
+function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string, eventTime?: string, location?: string, sponsors?: Sponsor[], collectSeedTime: boolean = true): string {
   let result = (cleanDesc || "").replace(/<!--[\s\S]*?-->/g, "").trim();
   const filtered = photos.map(p => p.trim()).filter(Boolean);
   if (filtered.length > 0) {
@@ -193,6 +201,9 @@ function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string
   }
   if (sponsors && sponsors.length > 0) {
     result += `\n\n<!--SPONSORS:${JSON.stringify(sponsors)}-->`;
+  }
+  if (collectSeedTime !== undefined) {
+    result += `\n\n<!--COLLECT_SEED_TIME:${collectSeedTime ? "true" : "false"}-->`;
   }
   return result;
 }
@@ -337,7 +348,8 @@ export default function TournamentDashboard() {
         location: tournament.location || "",
         event_time: tournament.event_time || parsed.eventTime || "",
         photos: initialPhotos,
-        sponsors: parsed.sponsors || []
+        sponsors: parsed.sponsors || [],
+        collect_seed_time: parsed.collectSeedTime ?? true
       });
     }
   }, [tournament]);
@@ -376,7 +388,8 @@ export default function TournamentDashboard() {
         editForm.banner_url, 
         editForm.event_time,
         editForm.location,
-        editForm.sponsors
+        editForm.sponsors,
+        editForm.collect_seed_time
       );
       const res = await fetch(`/api/tournaments/${id}`, {
         method: "PATCH",
@@ -1639,6 +1652,25 @@ export default function TournamentDashboard() {
                           onChange={(e) => setEditForm({ ...editForm, event_time: e.target.value })}
                           className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900 font-medium text-sm"
                         />
+                      </div>
+
+                      <div className="flex items-center gap-3 p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100 sm:col-span-2">
+                        <input
+                          type="checkbox"
+                          id="collect_seed_time"
+                          name="collect_seed_time"
+                          checked={editForm.collect_seed_time ?? true}
+                          onChange={(e) => setEditForm({ ...editForm, collect_seed_time: e.target.checked })}
+                          className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 rounded border-slate-300 cursor-pointer"
+                        />
+                        <div>
+                          <label htmlFor="collect_seed_time" className="text-xs font-bold text-indigo-950 cursor-pointer block">
+                            ⏱️ Solicitar Tempo de Inscrição / Balizamento dos participantes
+                          </label>
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            Quando ativado, exibe o campo opcional de "Tempo de Inscrição" no formulário para atletas e equipes informarem seu tempo estimado.
+                          </p>
+                        </div>
                       </div>
 
                       <div>
