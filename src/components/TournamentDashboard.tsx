@@ -139,47 +139,44 @@ function parseDescription(raw?: string): ParsedDesc {
   let sponsors: Sponsor[] = [];
 
   const photosRegex = /<!--OFFICIAL_PHOTOS:(.*?)-->/;
-  const photosMatch = description.match(photosRegex);
+  const photosMatch = raw.match(photosRegex);
   if (photosMatch) {
-    description = description.replace(photosRegex, "").trim();
     photos = photosMatch[1].split(",").map(u => u.trim()).filter(Boolean);
   }
 
   const bannerRegex = /<!--BANNER_URL:(.*?)-->/;
-  const bannerMatch = description.match(bannerRegex);
+  const bannerMatch = raw.match(bannerRegex);
   if (bannerMatch) {
-    description = description.replace(bannerRegex, "").trim();
     bannerUrl = bannerMatch[1].trim();
   }
 
   const timeRegex = /<!--EVENT_TIME:(.*?)-->/;
-  const timeMatch = description.match(timeRegex);
+  const timeMatch = raw.match(timeRegex);
   if (timeMatch) {
-    description = description.replace(timeRegex, "").trim();
     eventTime = timeMatch[1].trim();
   }
 
   const locationRegex = /<!--EVENT_LOCATION:(.*?)-->/;
-  const locationMatch = description.match(locationRegex);
+  const locationMatch = raw.match(locationRegex);
   if (locationMatch) {
-    description = description.replace(locationRegex, "").trim();
     location = locationMatch[1].trim();
   }
 
   const sponsorsRegex = /<!--SPONSORS:(.*?)-->/;
-  const sponsorsMatch = description.match(sponsorsRegex);
+  const sponsorsMatch = raw.match(sponsorsRegex);
   if (sponsorsMatch) {
-    description = description.replace(sponsorsRegex, "").trim();
     try {
       sponsors = JSON.parse(sponsorsMatch[1]);
     } catch(e){}
   }
 
-  return { description, photos, bannerUrl, eventTime, location, sponsors };
+  const cleanDescription = description.replace(/<!--[\s\S]*?-->/g, "").trim();
+
+  return { description: cleanDescription, photos, bannerUrl, eventTime, location, sponsors };
 }
 
 function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string, eventTime?: string, location?: string, sponsors?: Sponsor[]): string {
-  let result = cleanDesc.trim();
+  let result = (cleanDesc || "").replace(/<!--[\s\S]*?-->/g, "").trim();
   const filtered = photos.map(p => p.trim()).filter(Boolean);
   if (filtered.length > 0) {
     result += `\n\n<!--OFFICIAL_PHOTOS:${filtered.join(",")}-->`;

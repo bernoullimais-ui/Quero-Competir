@@ -1838,12 +1838,14 @@ router2.patch("/:id", async (req, res) => {
     const { name, description, start_date, end_date, logo_url, location, event_time, eventTime } = req.body;
     let finalDesc = description || "";
     const timeVal = event_time || eventTime;
-    if (location && location.trim() && !finalDesc.includes("<!--EVENT_LOCATION:")) {
+    if (location && location.trim() && !finalDesc.includes(`<!--EVENT_LOCATION:${location.trim()}-->`)) {
+      finalDesc = finalDesc.replace(/<!--EVENT_LOCATION:[\s\S]*?-->/g, "").trim();
       finalDesc += `
 
 <!--EVENT_LOCATION:${location.trim()}-->`;
     }
-    if (timeVal && timeVal.trim() && !finalDesc.includes("<!--EVENT_TIME:")) {
+    if (timeVal && timeVal.trim() && !finalDesc.includes(`<!--EVENT_TIME:${timeVal.trim()}-->`)) {
+      finalDesc = finalDesc.replace(/<!--EVENT_TIME:[\s\S]*?-->/g, "").trim();
       finalDesc += `
 
 <!--EVENT_TIME:${timeVal.trim()}-->`;

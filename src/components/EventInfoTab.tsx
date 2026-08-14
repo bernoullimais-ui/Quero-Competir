@@ -46,29 +46,29 @@ function parseDescription(raw?: string): ParsedDesc {
   let sponsors: Sponsor[] = [];
 
   const photosRegex = /<!--OFFICIAL_PHOTOS:(.*?)-->/;
-  const photosMatch = description.match(photosRegex);
+  const photosMatch = raw.match(photosRegex);
   if (photosMatch) {
-    description = description.replace(photosRegex, "").trim();
     photos = photosMatch[1].split(",").map(u => u.trim()).filter(Boolean);
   }
 
   const bannerRegex = /<!--BANNER_URL:(.*?)-->/;
-  const bannerMatch = description.match(bannerRegex);
+  const bannerMatch = raw.match(bannerRegex);
   if (bannerMatch) {
-    description = description.replace(bannerRegex, "").trim();
     bannerUrl = bannerMatch[1].trim();
   }
 
   const sponsorsRegex = /<!--SPONSORS:(.*?)-->/;
-  const sponsorsMatch = description.match(sponsorsRegex);
+  const sponsorsMatch = raw.match(sponsorsRegex);
   if (sponsorsMatch) {
-    description = description.replace(sponsorsRegex, "").trim();
     try {
       sponsors = JSON.parse(sponsorsMatch[1]);
     } catch(e){}
   }
 
-  return { description, photos, bannerUrl, sponsors };
+  // Completely remove ALL metadata HTML comments (<!--...-->) from displayed description text
+  const cleanDescription = description.replace(/<!--[\s\S]*?-->/g, "").trim();
+
+  return { description: cleanDescription, photos, bannerUrl, sponsors };
 }
 
 export default function EventInfoTab({ tournament, categories }: EventInfoTabProps) {
