@@ -6120,14 +6120,19 @@ app.use(
     // Disable CSP in development for easier debugging
   })
 );
-var allowedOrigins = process.env.APP_URL ? [process.env.APP_URL, "http://localhost:3000", "http://localhost:5173"] : null;
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      if (!allowedOrigins) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error(`CORS: origin '${origin}' not allowed`));
+      if (origin.includes("localhost") || origin.includes("127.0.0.1")) return callback(null, true);
+      if (origin.endsWith("querocompetir.com.br") || origin.endsWith("vercel.app")) return callback(null, true);
+      if (process.env.APP_URL) {
+        const appUrl = process.env.APP_URL;
+        if (origin === appUrl || origin === appUrl.replace("https://", "https://www.") || origin === appUrl.replace("https://www.", "https://")) {
+          return callback(null, true);
+        }
+      }
+      return callback(null, true);
     },
     credentials: true
   })
