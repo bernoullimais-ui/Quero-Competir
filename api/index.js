@@ -1472,7 +1472,8 @@ router2.get("/public/org/:subdomainOrId", async (req, res) => {
     if (!org) {
       return res.status(404).json({ error: "Organiza\xE7\xE3o n\xE3o encontrada" });
     }
-    const { data: allTournaments } = await supabase.from("tournaments").select("id, name, description, start_date, end_date, location, logo_url, status, owner_id").order("start_date", { ascending: false });
+    const { data: allTournaments, error: tErr } = await supabase.from("tournaments").select("*").order("start_date", { ascending: false });
+    if (tErr) console.error("Error fetching tournaments for org portal:", tErr);
     const { data: portalAccounts } = await supabase.from("portal_accounts").select("id").eq("reference_id", org.id);
     const linkedAccountIds = new Set((portalAccounts || []).map((a) => a.id));
     let orgTournaments = (allTournaments || []).filter((t) => {

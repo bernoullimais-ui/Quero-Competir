@@ -188,6 +188,8 @@ export default function PublicOrganizationPortal({ overrideSubdomain }: PublicOr
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {tournaments.map((t) => {
               const friendlyUrl = `/public/torneio/${slugify(t.name || t.id)}`;
+              const locationMatch = (t.description || "").match(/<!--EVENT_LOCATION:(.*?)-->/);
+              const eventLocation = t.location || (locationMatch ? locationMatch[1].trim() : "");
               return (
                 <div
                   key={t.id}
@@ -215,9 +217,9 @@ export default function PublicOrganizationPortal({ overrideSubdomain }: PublicOr
                       <h3 className="text-lg font-bold text-white group-hover:text-indigo-300 transition-colors line-clamp-2">
                         {t.name}
                       </h3>
-                      {t.location && (
+                      {eventLocation && (
                         <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-2 font-medium">
-                          <MapPin size={14} className="text-rose-400" /> {t.location}
+                          <MapPin size={14} className="text-rose-400" /> {eventLocation}
                         </p>
                       )}
                     </div>

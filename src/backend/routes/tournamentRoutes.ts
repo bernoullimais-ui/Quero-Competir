@@ -265,10 +265,12 @@ router.get("/public/org/:subdomainOrId", async (req, res) => {
     }
 
     // 2. Fetch tournaments associated with this organization
-    const { data: allTournaments } = await supabase
+    const { data: allTournaments, error: tErr } = await supabase
       .from('tournaments')
-      .select('id, name, description, start_date, end_date, location, logo_url, status, owner_id')
+      .select('*')
       .order('start_date', { ascending: false });
+
+    if (tErr) console.error("Error fetching tournaments for org portal:", tErr);
 
     // Fetch account IDs linked to this organization in portal_accounts
     const { data: portalAccounts } = await supabase
