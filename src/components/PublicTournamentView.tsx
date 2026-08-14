@@ -64,25 +64,36 @@ export default function PublicTournamentView() {
       console.error("Error reading currentUser session:", e);
     }
 
-    Promise.all([
-      fetch(`/api/tournaments/${id}`).then(r => r.json()),
-      fetch(`/api/tournaments/${id}/categories`).then(r => r.json()),
-      fetch(`/api/tournaments/${id}/athlete-subscriptions`).then(r => r.ok ? r.json() : []),
-      fetch(`/api/tournaments/${id}/public-settings`).then(r => r.ok ? r.json() : null),
-    ]).then(([tData, cData, subsData, pubSettings]) => {
-      setTournament(tData);
-      if (tData.organization) applyBrandColors(tData.organization);
-      const catsList = Array.isArray(cData) ? cData : [];
-      setCategories(catsList);
-      setAthleteSubs(Array.isArray(subsData) ? subsData : []);
-      if (pubSettings && !pubSettings.error) {
-        setSelfRegEnabled(true);
-      }
-      setLoading(false);
-    }).catch(err => {
-      console.error(err);
-      setLoading(false);
-    });
+    fetch(`/api/tournaments/${id}`)
+      .then(r => r.json())
+      .then(async (tData) => {
+        if (!tData || tData.error) {
+          setLoading(false);
+          return;
+        }
+        setTournament(tData);
+        if (tData.organization) applyBrandColors(tData.organization);
+
+        const realId = tData.id || id;
+
+        const [cData, subsData, pubSettings] = await Promise.all([
+          fetch(`/api/tournaments/${realId}/categories`).then(r => r.json()),
+          fetch(`/api/tournaments/${realId}/athlete-subscriptions`).then(r => r.ok ? r.json() : []),
+          fetch(`/api/tournaments/${realId}/public-settings`).then(r => r.ok ? r.json() : null),
+        ]);
+
+        const catsList = Array.isArray(cData) ? cData : [];
+        setCategories(catsList);
+        setAthleteSubs(Array.isArray(subsData) ? subsData : []);
+        if (pubSettings && !pubSettings.error) {
+          setSelfRegEnabled(true);
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
   }, [id]);
 
   if (loading) {
@@ -254,7 +265,7 @@ export default function PublicTournamentView() {
                           if (!onlyWithAthletes) return true;
                           const count = athleteSubs.filter((sub: any) => 
                             (sub.categoryId === cat.id || sub.category_id === cat.id) &&
-                            (sub.validationStatus === "approved" || sub.validation_status === "approved")
+                            (sub.validationStatus === "approved" || sub.validation_status === "approved" || sub.isCompleted || sub.is_completed || !sub.validationStatus)
                           ).length;
                           return count > 0;
                         });
@@ -271,7 +282,7 @@ export default function PublicTournamentView() {
                             {displayCategories.map((cat, idx) => {
                               const count = athleteSubs.filter((sub: any) => 
                                 (sub.categoryId === cat.id || sub.category_id === cat.id) &&
-                                (sub.validationStatus === "approved" || sub.validation_status === "approved")
+                                (sub.validationStatus === "approved" || sub.validation_status === "approved" || sub.isCompleted || sub.is_completed || !sub.validationStatus)
                               ).length;
                               return (
                                 <option key={cat.id} value={cat.id}>
@@ -315,7 +326,7 @@ export default function PublicTournamentView() {
                         if (!onlyWithAthletes) return true;
                         return athleteSubs.some((s: any) => 
                           (s.categoryId === cat.id || s.category_id === cat.id) && 
-                          (s.validationStatus === "approved" || s.validation_status === "approved")
+                          (s.validationStatus === "approved" || s.validation_status === "approved" || s.isCompleted || s.is_completed || !s.validationStatus)
                         );
                       });
 

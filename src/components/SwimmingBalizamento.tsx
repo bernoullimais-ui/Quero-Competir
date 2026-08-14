@@ -31,7 +31,8 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
 
   // Filter approved athletes for this category
   const categoryAthletes = athleteSubs.filter(
-    (sub: any) => sub.categoryId === category.id && sub.validationStatus === "approved"
+    (sub: any) => (sub.categoryId === category.id || sub.category_id === category.id) &&
+      (sub.validationStatus === "approved" || sub.validation_status === "approved" || sub.isCompleted || sub.is_completed || !sub.validationStatus)
   );
 
   // Helper to get lane seeding order (FINA / CBDA standard)
