@@ -406,18 +406,14 @@ export default function SubscriptionsTab({
                   </div>
                 </div>
 
-            if (filtered.length === 0) {
-              return (
-                <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
-                  <Users size={32} className="mx-auto text-slate-300 mb-2" />
-                  <p className="text-sm font-bold text-slate-500">Nenhum atleta localizado para os filtros declarados.</p>
-                </div>
-              );
-            }
-
-            return (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filtered.map((sub) => {
+                {filtered.length === 0 ? (
+                  <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
+                    <Users size={32} className="mx-auto text-slate-300 mb-2" />
+                    <p className="text-sm font-bold text-slate-500">Nenhum atleta localizado para os filtros declarados.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {filtered.map((sub) => {
                   const inst = institutions.find(i => i.id === sub.institutionId);
                   const cat = categories.find(c => c.id === sub.categoryId);
 
@@ -568,9 +564,10 @@ export default function SubscriptionsTab({
                   );
                 })}
               </div>
-            </>
-            );
-          })()}
+            )}
+          </>
+        );
+      })()}
         </div>
       )}
 
