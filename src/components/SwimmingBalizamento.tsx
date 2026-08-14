@@ -28,6 +28,7 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
   const [lanesCount, setLanesCount] = useState<number>(6);
   const [heats, setHeats] = useState<Heat[]>([]);
   const [editingResults, setEditingResults] = useState<Record<string, string>>({});
+  const [isSavingResults, setIsSavingResults] = useState(false);
   const { success, error: toastError } = useToast();
 
   // Filter approved athletes for this category
@@ -101,15 +102,65 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
   };
 
   useEffect(() => {
-    generateBalizamento();
-  }, [category.id, lanesCount, categoryAthletes.length]);
+    // Carregar tempos obtidos já salvos no banco
+    const savedTimes: Record<string, string> = {};
+    categoryAthletes.forEach((ath: any) => {
+      const resTime = ath.additionalData?.result_time || ath.additional_data?.result_time;
+      if (resTime) {
+        savedTimes[ath.id] = resTime;
+      }
+    });
+    if (Object.keys(savedTimes).length > 0) {
+      setEditingResults(prev => ({ ...savedTimes, ...prev }));
+    }
+  }, [category.id, categoryAthletes.length]);
 
-  // Handle time result input
-  const handleTimeChange = (athleteId: string, value: string) => {
+  useEffect(() => {
+    generateBalizamento();
+  }, [category.id, lanesCount, categoryAthletes.length, JSON.stringify(editingResults)]);
+
+  // Handle time result input (soluciona o erro de handleResultChange)
+  const handleResultChange = (athleteId: string, value: string) => {
     setEditingResults(prev => ({
       ...prev,
       [athleteId]: value
     }));
+  };
+
+  const handleTimeChange = handleResultChange;
+
+  // Persistir tempos obtidos no Supabase / backend
+  const handleSaveResults = async () => {
+    const entries = Object.entries(editingResults);
+    if (entries.length === 0) {
+      toastError("Nenhum resultado informado para salvar.");
+      return;
+    }
+
+    setIsSavingResults(true);
+    try {
+      for (const [athleteId, resultTime] of entries) {
+        const ath = categoryAthletes.find((s: any) => s.id === athleteId);
+        if (ath && resultTime !== undefined) {
+          const currentAdd = ath.additionalData || ath.additional_data || {};
+          const updatedAdditionalData = {
+            ...currentAdd,
+            result_time: resultTime.trim()
+          };
+
+          await fetch(`/api/tournaments/athlete-subscriptions/${athleteId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ additionalData: updatedAdditionalData }),
+          });
+        }
+      }
+      success("Resultados da prova salvos com sucesso!");
+    } catch (err: any) {
+      toastError("Erro ao salvar resultados: " + err.message);
+    } finally {
+      setIsSavingResults(false);
+    }
   };
 
   // Calculate overall proof rankings across ALL heats (Final Direta)
@@ -249,15 +300,24 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
               <Printer size={16} /> Imprimir Súmula
             </button>
             {!readOnly && (
-              <button
-                onClick={() => {
-                  generateBalizamento();
-                  success("Balizamento atualizado!");
-                }}
-                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow-sm cursor-pointer"
-              >
-                <RefreshCw size={16} /> Recalcular Balizamento
-              </button>
+              <>
+                <button
+                  onClick={handleSaveResults}
+                  disabled={isSavingResults}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  <Save size={16} /> {isSavingResults ? "Salvando..." : "Salvar Resultados 💾"}
+                </button>
+                <button
+                  onClick={() => {
+                    generateBalizamento();
+                    success("Balizamento atualizado!");
+                  }}
+                  className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow-sm cursor-pointer"
+                >
+                  <RefreshCw size={16} /> Recalcular Balizamento
+                </button>
+              </>
             )}
           </div>
         </div>

@@ -3720,6 +3720,31 @@ router.post("/:id/athlete-subscriptions", async (req, res) => {
   }
 });
 
+// Atualizar dados da inscrição de atleta (ex: result_time / tempo obtido)
+router.patch("/athlete-subscriptions/:subId", async (req, res) => {
+  const { subId } = req.params;
+  const { additionalData, validationStatus } = req.body;
+
+  try {
+    const supabase = getSupabaseAdmin();
+    const updatePayload: any = {};
+    if (additionalData !== undefined) updatePayload.additional_data = additionalData;
+    if (validationStatus !== undefined) updatePayload.validation_status = validationStatus;
+
+    const { data, error } = await supabase
+      .from('athlete_subscriptions')
+      .update(updatePayload)
+      .eq('id', subId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Remover atleta pré-autorizado
 router.delete("/:id/athlete-subscriptions/:subId", async (req, res) => {
   try {

@@ -3868,6 +3868,21 @@ router2.post("/:id/athlete-subscriptions", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+router2.patch("/athlete-subscriptions/:subId", async (req, res) => {
+  const { subId } = req.params;
+  const { additionalData, validationStatus } = req.body;
+  try {
+    const supabase = getSupabaseAdmin();
+    const updatePayload = {};
+    if (additionalData !== void 0) updatePayload.additional_data = additionalData;
+    if (validationStatus !== void 0) updatePayload.validation_status = validationStatus;
+    const { data, error } = await supabase.from("athlete_subscriptions").update(updatePayload).eq("id", subId).select().single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 router2.delete("/:id/athlete-subscriptions/:subId", async (req, res) => {
   try {
     const { subId } = req.params;
