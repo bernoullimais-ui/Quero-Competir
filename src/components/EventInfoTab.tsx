@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Calendar, MapPin, Trophy, Users, Image as ImageIcon, Sparkles, User, Shield, ArrowRight } from "lucide-react";
+import { Calendar, MapPin, Trophy, Users, Image as ImageIcon, Sparkles, User, Shield, ArrowRight, Award } from "lucide-react";
 import { motion } from "motion/react";
 
 interface Category {
@@ -25,18 +25,25 @@ interface EventInfoTabProps {
   categories: Category[];
 }
 
-// Simple description parse helper to extract official gallery photos and banner url
+export interface Sponsor {
+  name: string;
+  logoUrl: string;
+  title: string;
+}
+
 interface ParsedDesc {
   description: string;
   photos: string[];
   bannerUrl: string;
+  sponsors: Sponsor[];
 }
 
 function parseDescription(raw?: string): ParsedDesc {
-  if (!raw) return { description: "", photos: [], bannerUrl: "" };
+  if (!raw) return { description: "", photos: [], bannerUrl: "", sponsors: [] };
   let description = raw;
   let photos: string[] = [];
   let bannerUrl = "";
+  let sponsors: Sponsor[] = [];
 
   const photosRegex = /<!--OFFICIAL_PHOTOS:(.*?)-->/;
   const photosMatch = description.match(photosRegex);
@@ -52,7 +59,16 @@ function parseDescription(raw?: string): ParsedDesc {
     bannerUrl = bannerMatch[1].trim();
   }
 
-  return { description, photos, bannerUrl };
+  const sponsorsRegex = /<!--SPONSORS:(.*?)-->/;
+  const sponsorsMatch = description.match(sponsorsRegex);
+  if (sponsorsMatch) {
+    description = description.replace(sponsorsRegex, "").trim();
+    try {
+      sponsors = JSON.parse(sponsorsMatch[1]);
+    } catch(e){}
+  }
+
+  return { description, photos, bannerUrl, sponsors };
 }
 
 export default function EventInfoTab({ tournament, categories }: EventInfoTabProps) {
@@ -229,8 +245,44 @@ export default function EventInfoTab({ tournament, categories }: EventInfoTabPro
           </div>
         </div>
 
-        {/* Right Column - Media / Photos Image Gallery */}
+        {/* Right Column - Patrocinadores, Apoio & Media / Photos Image Gallery */}
         <div className="space-y-6">
+          {/* Patrocinadores & Apoio (Exibido acima das imagens do evento) */}
+          {parsedDesc.sponsors && parsedDesc.sponsors.length > 0 && (
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+              <div>
+                <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                  <Shield className="text-amber-500" size={18} /> Patrocinadores & Apoio
+                </h2>
+                <p className="text-xs text-slate-500 font-bold mt-0.5">Parceiros e realizadores oficiais deste evento</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {parsedDesc.sponsors.map((sp, idx) => (
+                  <div key={idx} className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-2 group hover:border-indigo-200 hover:bg-indigo-50/20 transition-all">
+                    <span className="text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-150 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                      {sp.title || "Apoio"}
+                    </span>
+                    {sp.logoUrl ? (
+                      <img
+                        src={sp.logoUrl}
+                        alt={sp.name}
+                        className="h-10 max-w-full object-contain filter group-hover:scale-105 transition-transform"
+                        referrerPolicy="no-referrer"
+                        onError={(e: any) => e.target.style.display = 'none'}
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center font-bold text-slate-500 text-xs uppercase">
+                        {sp.name ? sp.name.slice(0, 2) : "PA"}
+                      </div>
+                    )}
+                    <span className="text-xs font-bold text-slate-700 truncate w-full">{sp.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
             <div>
               <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">

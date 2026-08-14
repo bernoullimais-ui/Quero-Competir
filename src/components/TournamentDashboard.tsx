@@ -114,19 +114,29 @@ import TournamentSettingsTab from "./TournamentSettingsTab.tsx";
 import MatchModal from "./MatchModal.tsx";
 
 // Description comment parser for saving customizable image gallery and banner without schema changes
+export interface Sponsor {
+  name: string;
+  logoUrl: string;
+  title: string;
+}
+
 interface ParsedDesc {
   description: string;
   photos: string[];
   bannerUrl: string;
   eventTime: string;
+  location: string;
+  sponsors: Sponsor[];
 }
 
 function parseDescription(raw?: string): ParsedDesc {
-  if (!raw) return { description: "", photos: [], bannerUrl: "", eventTime: "" };
+  if (!raw) return { description: "", photos: [], bannerUrl: "", eventTime: "", location: "", sponsors: [] };
   let description = raw;
   let photos: string[] = [];
   let bannerUrl = "";
   let eventTime = "";
+  let location = "";
+  let sponsors: Sponsor[] = [];
 
   const photosRegex = /<!--OFFICIAL_PHOTOS:(.*?)-->/;
   const photosMatch = description.match(photosRegex);
@@ -149,20 +159,42 @@ function parseDescription(raw?: string): ParsedDesc {
     eventTime = timeMatch[1].trim();
   }
 
-  return { description, photos, bannerUrl, eventTime };
+  const locationRegex = /<!--EVENT_LOCATION:(.*?)-->/;
+  const locationMatch = description.match(locationRegex);
+  if (locationMatch) {
+    description = description.replace(locationRegex, "").trim();
+    location = locationMatch[1].trim();
+  }
+
+  const sponsorsRegex = /<!--SPONSORS:(.*?)-->/;
+  const sponsorsMatch = description.match(sponsorsRegex);
+  if (sponsorsMatch) {
+    description = description.replace(sponsorsRegex, "").trim();
+    try {
+      sponsors = JSON.parse(sponsorsMatch[1]);
+    } catch(e){}
+  }
+
+  return { description, photos, bannerUrl, eventTime, location, sponsors };
 }
 
-function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string, eventTime?: string): string {
+function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string, eventTime?: string, location?: string, sponsors?: Sponsor[]): string {
   let result = cleanDesc.trim();
   const filtered = photos.map(p => p.trim()).filter(Boolean);
   if (filtered.length > 0) {
     result += `\n\n<!--OFFICIAL_PHOTOS:${filtered.join(",")}-->`;
   }
-  if (bannerUrl.trim()) {
+  if (bannerUrl && bannerUrl.trim()) {
     result += `\n\n<!--BANNER_URL:${bannerUrl.trim()}-->`;
   }
   if (eventTime && eventTime.trim()) {
     result += `\n\n<!--EVENT_TIME:${eventTime.trim()}-->`;
+  }
+  if (location && location.trim()) {
+    result += `\n\n<!--EVENT_LOCATION:${location.trim()}-->`;
+  }
+  if (sponsors && sponsors.length > 0) {
+    result += `\n\n<!--SPONSORS:${JSON.stringify(sponsors)}-->`;
   }
   return result;
 }
@@ -288,7 +320,8 @@ export default function TournamentDashboard() {
     banner_url: "",
     location: "",
     event_time: "",
-    photos: [] as string[]
+    photos: [] as string[],
+    sponsors: [] as Sponsor[]
   });
   const [savingTournament, setSavingTournament] = useState(false);
 
@@ -305,7 +338,8 @@ export default function TournamentDashboard() {
         banner_url: parsed.bannerUrl || "",
         location: tournament.location || "",
         event_time: tournament.event_time || parsed.eventTime || "",
-        photos: initialPhotos
+        photos: initialPhotos,
+        sponsors: parsed.sponsors || []
       });
     }
   }, [tournament]);
@@ -316,11 +350,36 @@ export default function TournamentDashboard() {
     setEditForm({ ...editForm, photos: updated });
   };
 
+  const handleAddSponsor = () => {
+    setEditForm({
+      ...editForm,
+      sponsors: [...editForm.sponsors, { name: "", logoUrl: "", title: "Patrocinador" }]
+    });
+  };
+
+  const handleRemoveSponsor = (index: number) => {
+    const updated = editForm.sponsors.filter((_, i) => i !== index);
+    setEditForm({ ...editForm, sponsors: updated });
+  };
+
+  const handleSponsorChange = (index: number, field: keyof Sponsor, value: string) => {
+    const updated = [...editForm.sponsors];
+    updated[index] = { ...updated[index], [field]: value };
+    setEditForm({ ...editForm, sponsors: updated });
+  };
+
   const handleSaveTournamentDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingTournament(true);
     try {
-      const finalDesc = buildDescription(editForm.description, editForm.photos, editForm.banner_url, editForm.event_time);
+      const finalDesc = buildDescription(
+        editForm.description, 
+        editForm.photos, 
+        editForm.banner_url, 
+        editForm.event_time,
+        editForm.location,
+        editForm.sponsors
+      );
       const res = await fetch(`/api/tournaments/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1458,6 +1517,88 @@ export default function TournamentDashboard() {
                       </div>
                     </div>
 
+                    {/* Seção Patrocinadores e Apoio */}
+                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/60 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="block text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                            <Shield size={16} className="text-amber-500" /> 🤝 Patrocinadores, Apoio e Parcerias
+                          </span>
+                          <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                            Insira a logo, nome e título de cada apoiador/patrocinador do evento.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAddSponsor}
+                          className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-ultra-sm"
+                        >
+                          <Plus size={14} /> Adicionar
+                        </button>
+                      </div>
+
+                      {editForm.sponsors.length === 0 ? (
+                        <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center">
+                          <p className="text-xs text-slate-400 font-medium">Nenhum patrocinador cadastrado ainda. Clique em "+ Adicionar".</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {editForm.sponsors.map((sp, idx) => (
+                            <div key={idx} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-ultra-sm space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black text-indigo-600 uppercase tracking-wider">
+                                  #{idx + 1} Patrocinador / Apoio
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSponsor(idx)}
+                                  className="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                                  title="Remover patrocinador"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nome do Parceiro</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Ex: Banco X / Prefeitura"
+                                    value={sp.name}
+                                    onChange={(e) => handleSponsorChange(idx, "name", e.target.value)}
+                                    className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Título / Papel</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Ex: Patrocinador Master, Apoio, Realização"
+                                    value={sp.title}
+                                    onChange={(e) => handleSponsorChange(idx, "title", e.target.value)}
+                                    className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">URL da Logotipo</label>
+                                  <input
+                                    type="url"
+                                    placeholder="https://exemplo.com/logo.png"
+                                    value={sp.logoUrl}
+                                    onChange={(e) => handleSponsorChange(idx, "logoUrl", e.target.value)}
+                                    className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -1594,6 +1735,30 @@ export default function TournamentDashboard() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Exibição dos Patrocinadores no Painel Geral */}
+                    {parseDescription(tournament.description).sponsors.length > 0 && (
+                      <div className="pt-2">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">🤝 Patrocinadores e Apoio Cadastrados</span>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {parseDescription(tournament.description).sponsors.map((sp, idx) => (
+                            <div key={idx} className="bg-slate-50/70 p-3 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-1.5">
+                              <span className="text-[9px] font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md uppercase tracking-wider border border-indigo-100">
+                                {sp.title || "Apoio"}
+                              </span>
+                              {sp.logoUrl ? (
+                                <img src={sp.logoUrl} alt={sp.name} className="h-8 max-w-full object-contain" onError={(e: any) => e.target.style.display = 'none'} />
+                              ) : (
+                                <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center font-bold text-slate-500 text-[10px] uppercase">
+                                  {sp.name ? sp.name.slice(0, 2) : "PA"}
+                                </div>
+                              )}
+                              <span className="text-xs font-bold text-slate-700 truncate w-full">{sp.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
