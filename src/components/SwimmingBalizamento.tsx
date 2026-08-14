@@ -112,23 +112,51 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
     }));
   };
 
-  // Calculate ranks for each heat or overall
-  const getRankBadge = (athleteId: string, heat: Heat) => {
-    // Collect all athletes with times in this heat
-    const lanesWithTimes = heat.lanes
-      .filter(l => l.athleteId && editingResults[l.athleteId])
-      .map(l => ({
-        athleteId: l.athleteId!,
-        time: editingResults[l.athleteId!]
-      }))
-      .sort((a, b) => a.time.localeCompare(b.time));
+  // Calculate overall proof rankings across ALL heats (Final Direta)
+  const getOverallRankings = () => {
+    const list: {
+      athleteId: string;
+      athleteName: string;
+      institutionName: string;
+      seedTime: string;
+      resultTime: string;
+      heatNumber: number;
+      laneNumber: number;
+    }[] = [];
 
-    const idx = lanesWithTimes.findIndex(item => item.athleteId === athleteId);
-    if (idx === 0) return <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[11px] border border-amber-200">1º 🥇</span>;
-    if (idx === 1) return <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 font-bold text-[11px] border border-slate-300">2º 🥈</span>;
-    if (idx === 2) return <span className="px-2 py-0.5 rounded-md bg-amber-700/20 text-amber-900 font-bold text-[11px] border border-amber-700/30">3º 🥉</span>;
-    if (idx > 2) return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium text-[11px]">{idx + 1}º</span>;
-    return null;
+    heats.forEach((h) => {
+      h.lanes.forEach((l) => {
+        if (l.athleteId) {
+          const time = editingResults[l.athleteId] || l.resultTime;
+          if (time && time.trim() !== "" && time !== "--:--.--") {
+            list.push({
+              athleteId: l.athleteId,
+              athleteName: l.athleteName || "",
+              institutionName: l.institutionName || "Avulso",
+              seedTime: l.seedTime || "--:--.--",
+              resultTime: time.trim(),
+              heatNumber: h.heatNumber,
+              laneNumber: l.laneNumber,
+            });
+          }
+        }
+      });
+    });
+
+    // Sort by resultTime ascending (fastest time first)
+    list.sort((a, b) => a.resultTime.localeCompare(b.resultTime));
+    return list;
+  };
+
+  // Calculate rank badge across ALL heats of the proof
+  const getRankBadge = (athleteId: string) => {
+    const overall = getOverallRankings();
+    const idx = overall.findIndex((item) => item.athleteId === athleteId);
+    if (idx === -1) return null;
+    if (idx === 0) return <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[11px] border border-amber-200 shadow-2xs">1º 🥇 Geral</span>;
+    if (idx === 1) return <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 font-bold text-[11px] border border-slate-300 shadow-2xs">2º 🥈 Geral</span>;
+    if (idx === 2) return <span className="px-2 py-0.5 rounded-md bg-amber-700/20 text-amber-900 font-bold text-[11px] border border-amber-700/30 shadow-2xs">3º 🥉 Geral</span>;
+    return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium text-[11px]">{idx + 1}º Geral</span>;
   };
 
   // Print Heat Sheet (Súmula)
@@ -302,6 +330,63 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
       </div>
 
       {/* Display Heats / Séries */}
+      {(() => {
+        const overallRankings = getOverallRankings();
+
+        return (
+          <div className="space-y-6">
+            {/* Overall Race Classification Table (when results exist) */}
+            {overallRankings.length > 0 && (
+              <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl border border-indigo-900 space-y-4 animate-in fade-in duration-300">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-800/60 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-amber-400 font-black text-xs uppercase tracking-widest mb-1">
+                      <Trophy size={16} /> Resultado Geral da Prova • Final Direta
+                    </div>
+                    <h4 className="text-xl font-bold text-white">{category.name}</h4>
+                    <p className="text-xs text-slate-300">Classificação final oficial por tempo combinando todas as séries.</p>
+                  </div>
+                  <div className="px-3.5 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold w-fit">
+                    {overallRankings.length} {overallRankings.length === 1 ? "Atleta com resultado" : "Atletas com resultados"}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="text-indigo-200 border-b border-indigo-800/50 uppercase font-black tracking-wider text-[10px]">
+                        <th className="py-2.5 px-3 w-16 text-center">Posição</th>
+                        <th className="py-2.5 px-3">Atleta</th>
+                        <th className="py-2.5 px-3">Clube / Entidade</th>
+                        <th className="py-2.5 px-3 w-28 text-center">Tempo Final</th>
+                        <th className="py-2.5 px-3 w-36 text-center">Origem</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-indigo-900/40">
+                      {overallRankings.map((res, i) => (
+                        <tr key={res.athleteId} className={i < 3 ? "bg-white/5 font-bold" : "text-slate-300"}>
+                          <td className="py-2.5 px-3 text-center">
+                            {i === 0 && <span className="px-2.5 py-1 rounded-lg bg-amber-400 text-indigo-950 font-black text-xs shadow-sm">1º 🥇</span>}
+                            {i === 1 && <span className="px-2.5 py-1 rounded-lg bg-slate-300 text-indigo-950 font-black text-xs shadow-sm">2º 🥈</span>}
+                            {i === 2 && <span className="px-2.5 py-1 rounded-lg bg-amber-600/60 text-amber-100 font-black text-xs shadow-sm">3º 🥉</span>}
+                            {i > 2 && <span className="font-bold text-slate-400">{i + 1}º</span>}
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-white">{res.athleteName}</td>
+                          <td className="py-2.5 px-3 text-slate-300">{res.institutionName}</td>
+                          <td className="py-2.5 px-3 text-center font-mono font-black text-amber-300 text-sm">{res.resultTime}</td>
+                          <td className="py-2.5 px-3 text-center text-slate-400 text-[11px]">Série {res.heatNumber}, Raia {res.laneNumber}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Display Heats / Séries */}
       {categoryAthletes.length === 0 ? (
         <div className="bg-white p-12 text-center rounded-3xl border-2 border-dashed border-slate-200 space-y-3">
           <Users size={40} className="mx-auto text-slate-300" />
@@ -409,7 +494,7 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
 
                           {/* Rank Badge */}
                           <td className="py-3 px-4 text-center">
-                            {isOccupied && lane.athleteId && getRankBadge(lane.athleteId, heat)}
+                            {isOccupied && lane.athleteId && getRankBadge(lane.athleteId)}
                           </td>
                         </tr>
                       );
