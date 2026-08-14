@@ -1,0 +1,414 @@
+import React, { useState, useEffect } from "react";
+import { Waves, Printer, Save, RefreshCw, Trophy, Users, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useToast } from "./ui/Toast.tsx";
+
+interface SwimmingBalizamentoProps {
+  category: any;
+  athleteSubs: any[];
+  tournamentId: string;
+}
+
+interface LaneAssignment {
+  laneNumber: number;
+  athleteId?: string;
+  athleteName?: string;
+  institutionName?: string;
+  seedTime?: string;
+  resultTime?: string;
+  rank?: number;
+}
+
+interface Heat {
+  heatNumber: number;
+  lanes: LaneAssignment[];
+}
+
+export default function SwimmingBalizamento({ category, athleteSubs, tournamentId }: SwimmingBalizamentoProps) {
+  const [lanesCount, setLanesCount] = useState<number>(6);
+  const [heats, setHeats] = useState<Heat[]>([]);
+  const [editingResults, setEditingResults] = useState<Record<string, string>>({});
+  const { success, error: toastError } = useToast();
+
+  // Filter approved athletes for this category
+  const categoryAthletes = athleteSubs.filter(
+    (sub: any) => sub.categoryId === category.id && sub.validationStatus === "approved"
+  );
+
+  // Helper to get lane seeding order (FINA / CBDA standard)
+  const getLaneOrder = (numLanes: number): number[] => {
+    switch (numLanes) {
+      case 8: return [4, 5, 3, 6, 2, 7, 1, 8];
+      case 7: return [4, 5, 3, 6, 2, 7, 1];
+      case 6: return [3, 4, 2, 5, 1, 6];
+      case 5: return [3, 4, 2, 5, 1];
+      case 4: return [2, 3, 1, 4];
+      case 3: return [2, 3, 1];
+      case 2: return [1, 2];
+      default: return Array.from({ length: numLanes }, (_, i) => i + 1);
+    }
+  };
+
+  // Generate Heats (Balizamento)
+  const generateBalizamento = () => {
+    if (categoryAthletes.length === 0) {
+      setHeats([]);
+      return;
+    }
+
+    const laneOrder = getLaneOrder(lanesCount);
+    const totalAthletes = categoryAthletes.length;
+    const numHeats = Math.max(1, Math.ceil(totalAthletes / lanesCount));
+
+    // Copy and sort athletes (by seed time if available, or name)
+    const sortedAthletes = [...categoryAthletes].sort((a, b) => {
+      const timeA = a.additionalData?.seed_time || "99:99.99";
+      const timeB = b.additionalData?.seed_time || "99:99.99";
+      return timeA.localeCompare(timeB);
+    });
+
+    const newHeats: Heat[] = [];
+
+    for (let h = 0; h < numHeats; h++) {
+      const heatAthletes = sortedAthletes.slice(h * lanesCount, (h + 1) * lanesCount);
+      
+      // Initialize lanes 1..lanesCount
+      const laneAssignments: LaneAssignment[] = Array.from({ length: lanesCount }, (_, i) => ({
+        laneNumber: i + 1,
+      }));
+
+      // Distribute athletes into lanes based on FINA seeding order
+      heatAthletes.forEach((ath, index) => {
+        const targetLaneNum = laneOrder[index] || (index + 1);
+        const laneObj = laneAssignments.find(l => l.laneNumber === targetLaneNum);
+        if (laneObj) {
+          laneObj.athleteId = ath.id;
+          laneObj.athleteName = ath.athleteName;
+          laneObj.institutionName = ath.institutionName || "Avulso";
+          laneObj.seedTime = ath.additionalData?.seed_time || "--:--.--";
+          laneObj.resultTime = editingResults[ath.id] || "";
+        }
+      });
+
+      newHeats.push({
+        heatNumber: h + 1,
+        lanes: laneAssignments,
+      });
+    }
+
+    setHeats(newHeats);
+  };
+
+  useEffect(() => {
+    generateBalizamento();
+  }, [category.id, lanesCount, categoryAthletes.length]);
+
+  // Handle time result input
+  const handleTimeChange = (athleteId: string, value: string) => {
+    setEditingResults(prev => ({
+      ...prev,
+      [athleteId]: value
+    }));
+  };
+
+  // Calculate ranks for each heat or overall
+  const getRankBadge = (athleteId: string, heat: Heat) => {
+    // Collect all athletes with times in this heat
+    const lanesWithTimes = heat.lanes
+      .filter(l => l.athleteId && editingResults[l.athleteId])
+      .map(l => ({
+        athleteId: l.athleteId!,
+        time: editingResults[l.athleteId!]
+      }))
+      .sort((a, b) => a.time.localeCompare(b.time));
+
+    const idx = lanesWithTimes.findIndex(item => item.athleteId === athleteId);
+    if (idx === 0) return <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[11px] border border-amber-200">1º 🥇</span>;
+    if (idx === 1) return <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 font-bold text-[11px] border border-slate-300">2º 🥈</span>;
+    if (idx === 2) return <span className="px-2 py-0.5 rounded-md bg-amber-700/20 text-amber-900 font-bold text-[11px] border border-amber-700/30">3º 🥉</span>;
+    if (idx > 2) return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium text-[11px]">{idx + 1}º</span>;
+    return null;
+  };
+
+  // Print Heat Sheet (Súmula)
+  const handlePrintSumula = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Súmula de Balizamento - ${category.name}</title>
+
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #1e293b; }
+            h1 { font-size: 20px; margin-bottom: 4px; }
+            h2 { font-size: 14px; color: #64748b; margin-top: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; font-size: 12px; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
+            th { background-color: #f1f5f9; font-weight: bold; uppercase; }
+            .lane-num { font-weight: bold; text-align: center; width: 50px; background-color: #f8fafc; }
+            .heat-header { background-color: #1e293b; color: white; padding: 8px 12px; font-weight: bold; border-radius: 4px; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <h1>SÚMULA DE BALIZAMENTO - NATAÇÃO</h1>
+          <h2>Prova/Categoria: ${category.name} (${category.gender || ""} ${category.age_group || ""}) • Raias: ${lanesCount}</h2>
+
+          ${heats.map(h => `
+            <div class="heat-header">SÉRLE ${h.heatNumber} de ${heats.length}</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 50px; text-align: center;">Raia</th>
+                  <th>Atleta</th>
+                  <th>Clube / Entidade</th>
+                  <th style="width: 120px;">Tempo Inscrição</th>
+                  <th style="width: 120px;">Tempo Final</th>
+                  <th style="width: 80px;">Classif.</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${h.lanes.map(l => `
+                  <tr>
+                    <td class="lane-num">${l.laneNumber}</td>
+                    <td><strong>${l.athleteName || "—"}</strong></td>
+                    <td>${l.institutionName || "—"}</td>
+                    <td>${l.seedTime || "--:--.--"}</td>
+                    <td>${(l.athleteId && editingResults[l.athleteId]) || "___:___.___"}</td>
+                    <td></td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          `).join("")}
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Control Header & Lane Selection */}
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider">
+              <Waves size={16} /> Balizamento Automático de Natação
+            </div>
+            <h3 className="text-xl font-black text-slate-800">
+              {category.name} <span className="text-slate-400 font-normal">({category.gender} {category.age_group})</span>
+            </h3>
+            <p className="text-xs text-slate-500">
+              Configure o número de raias da piscina para distribuir os atletas automaticamente em Séries (Baterias).
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handlePrintSumula}
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-2 border border-slate-200 cursor-pointer"
+            >
+              <Printer size={16} /> Imprimir Súmula
+            </button>
+            <button
+              onClick={() => {
+                generateBalizamento();
+                success("Balizamento atualizado!");
+              }}
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow-sm cursor-pointer"
+            >
+              <RefreshCw size={16} /> Recalcular Balizamento
+            </button>
+          </div>
+        </div>
+
+        {/* Number of Lanes Selector (2 to 8) */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-150">
+          <div className="space-y-0.5">
+            <span className="text-xs font-black text-slate-700 uppercase tracking-wider block">
+              Quantidade de Raias da Piscina
+            </span>
+            <span className="text-xs text-slate-500">
+              Selecione o número de raias disponíveis (2 a 8)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {[2, 3, 4, 5, 6, 7, 8].map((num) => (
+              <button
+                key={num}
+                type="button"
+                onClick={() => setLanesCount(num)}
+                className={`w-10 h-10 rounded-xl font-black text-sm transition-all border cursor-pointer flex items-center justify-center ${
+                  lanesCount === num
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100 scale-105"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
+                }`}
+              >
+                {num}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Summary Statistics Badges */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-bold">
+          <div className="p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100 flex items-center gap-3">
+            <Users size={18} className="text-indigo-600 shrink-0" />
+            <div>
+              <span className="text-slate-400 font-medium block text-[10px] uppercase">Atletas Inscritos</span>
+              <span className="text-indigo-950 text-sm font-black">{categoryAthletes.length} Atletas</span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-sky-50/50 border border-sky-100 flex items-center gap-3">
+            <Waves size={18} className="text-sky-600 shrink-0" />
+            <div>
+              <span className="text-slate-400 font-medium block text-[10px] uppercase">Raias por Disputa</span>
+              <span className="text-sky-950 text-sm font-black">{lanesCount} Raias</span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-emerald-50/50 border border-emerald-100 flex items-center gap-3">
+            <Trophy size={18} className="text-emerald-600 shrink-0" />
+            <div>
+              <span className="text-slate-400 font-medium block text-[10px] uppercase">Total de Séries</span>
+              <span className="text-emerald-950 text-sm font-black">{heats.length} {heats.length === 1 ? "Série" : "Séries"}</span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-amber-50/50 border border-amber-100 flex items-center gap-3">
+            <Clock size={18} className="text-amber-600 shrink-0" />
+            <div>
+              <span className="text-slate-400 font-medium block text-[10px] uppercase">Ordem de Balizamento</span>
+              <span className="text-amber-950 text-xs font-bold truncate">Regra FINA/CBDA</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Display Heats / Séries */}
+      {categoryAthletes.length === 0 ? (
+        <div className="bg-white p-12 text-center rounded-3xl border-2 border-dashed border-slate-200 space-y-3">
+          <Users size={40} className="mx-auto text-slate-300" />
+          <h4 className="text-base font-bold text-slate-700">Nenhum atleta confirmado nesta prova</h4>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            Assim que os atletas forem inscritos e aprovados nesta categoria, o balizamento de raias será gerado automaticamente.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {heats.map((heat) => (
+            <div key={heat.heatNumber} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              {/* Heat Header */}
+              <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500 flex items-center justify-center font-black text-white text-xs">
+                    #{heat.heatNumber}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm">Série {heat.heatNumber} de {heats.length}</h4>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      Balizamento Oficial • {heat.lanes.filter(l => l.athleteId).length} Atletas em disputa
+                    </span>
+                  </div>
+                </div>
+
+                <span className="text-xs text-slate-400 font-mono">
+                  {lanesCount} Raias
+                </span>
+              </div>
+
+              {/* Lanes Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                      <th className="py-3 px-4 w-16 text-center">Raia</th>
+                      <th className="py-3 px-4">Atleta</th>
+                      <th className="py-3 px-4">Clube / Entidade</th>
+                      <th className="py-3 px-4 w-32">Tempo Inscrição</th>
+                      <th className="py-3 px-4 w-36">Tempo Final (Obtido)</th>
+                      <th className="py-3 px-4 w-28 text-center">Classificação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {heat.lanes.map((lane) => {
+                      const isOccupied = !!lane.athleteId;
+                      return (
+                        <tr
+                          key={lane.laneNumber}
+                          className={`transition-colors ${
+                            isOccupied ? "hover:bg-indigo-50/20" : "bg-slate-50/40 text-slate-300"
+                          }`}
+                        >
+                          {/* Lane Number Badge */}
+                          <td className="py-3 px-4 text-center font-black">
+                            <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs ${
+                              lane.laneNumber === 3 || lane.laneNumber === 4
+                                ? "bg-indigo-600 text-white shadow-sm"
+                                : "bg-slate-100 text-slate-700"
+                            }`}>
+                              {lane.laneNumber}
+                            </span>
+                          </td>
+
+                          {/* Athlete Name */}
+                          <td className="py-3 px-4 font-bold text-slate-800">
+                            {lane.athleteName ? (
+                              <span className="text-sm">{lane.athleteName}</span>
+                            ) : (
+                              <span className="text-slate-300 italic font-normal text-xs">Vazia</span>
+                            )}
+                          </td>
+
+                          {/* Institution */}
+                          <td className="py-3 px-4 text-slate-600 font-medium">
+                            {lane.institutionName || "—"}
+                          </td>
+
+                          {/* Seed Time */}
+                          <td className="py-3 px-4 font-mono text-slate-500 font-medium">
+                            {lane.seedTime || "--:--.--"}
+                          </td>
+
+                          {/* Result Time Input */}
+                          <td className="py-3 px-4">
+                            {isOccupied ? (
+                              <input
+                                type="text"
+                                placeholder="00:32.50"
+                                value={editingResults[lane.athleteId!] || ""}
+                                onChange={(e) => handleTimeChange(lane.athleteId!, e.target.value)}
+                                className="w-28 px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                              />
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
+
+                          {/* Rank Badge */}
+                          <td className="py-3 px-4 text-center">
+                            {isOccupied && lane.athleteId && getRankBadge(lane.athleteId, heat)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

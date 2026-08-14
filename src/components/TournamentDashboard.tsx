@@ -27,6 +27,7 @@ import {
   DollarSign, CreditCard, QrCode, ArrowRight, Loader2
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient.ts";
+import SwimmingBalizamento from "./SwimmingBalizamento.tsx";
 
 export const getSportIcon = (sportName: string, size = 24) => {
   const name = (sportName || "").toLowerCase();
@@ -2116,52 +2117,78 @@ export default function TournamentDashboard() {
 
         {activeTab === "tabela" && (
           <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div>
-                <h3 className="text-xl font-bold">Chaveamento do Torneio</h3>
-                <p className="text-slate-500 text-sm">Visualize e gerencie os jogos das categorias.</p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+              <div className="space-y-1">
+                <h3 className="text-xl font-bold text-slate-800">Chaveamento e Balizamento do Torneio</h3>
+                <p className="text-slate-500 text-xs">Selecione a categoria ou prova para visualizar os confrontos e raias.</p>
               </div>
               
-              <div className="flex gap-4 overflow-x-auto pb-2">
-                {categories.map(cat => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedCatForBracket(cat)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
-                      selectedCatForBracket?.id === cat.id 
-                        ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100" 
-                        : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
-                    }`}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                {/* Lista Selecionável de Categorias (Select Dropdown) */}
+                <div className="min-w-[280px]">
+                  <select
+                    value={selectedCatForBracket?.id || ""}
+                    onChange={(e) => {
+                      const cat = categories.find(c => c.id === e.target.value);
+                      if (cat) setSelectedCatForBracket(cat);
+                    }}
+                    className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-250 rounded-2xl font-bold text-sm text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors shadow-sm cursor-pointer"
                   >
-                    {cat.name} ({cat.gender} {cat.age_group})
-                  </button>
-                ))}
-              </div>
-
-              {selectedCatForBracket && bracketMatches.length > 0 && (
-                <div className="flex gap-2">
-                  <Link
-                    to={`/public/tournament/${id}/categories/${selectedCatForBracket.id}/draw`}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-100 rounded-xl text-xs font-bold transition-colors"
-                  >
-                    <Sparkles size={14} />
-                    Ver Sorteio Animado 🎬
-                  </Link>
-                  <button
-                    onClick={resetBracket}
-                    disabled={loadingMatches}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-xs font-bold border border-red-100 hover:bg-red-100 transition-colors disabled:opacity-50"
-                  >
-                    <Trash2 size={14} />
-                    Resetar Chaveamento
-                  </button>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name} ({cat.gender || ""} {cat.age_group || ""})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
+
+                {selectedCatForBracket && bracketMatches.length > 0 && !(
+                  selectedCatForBracket?.rules_config?.sport_type === "swimming" ||
+                  selectedCatForBracket?.name?.toLowerCase().includes("natação") ||
+                  selectedCatForBracket?.name?.toLowerCase().includes("natacao") ||
+                  tournament?.name?.toLowerCase().includes("natação") ||
+                  tournament?.name?.toLowerCase().includes("natacao")
+                ) && (
+                  <div className="flex items-center gap-2">
+                    <Link
+                      to={`/public/tournament/${id}/categories/${selectedCatForBracket.id}/draw`}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-100 rounded-2xl text-xs font-bold transition-colors"
+                    >
+                      <Sparkles size={14} />
+                      Sorteio Animado 🎬
+                    </Link>
+                    <button
+                      onClick={resetBracket}
+                      disabled={loadingMatches}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-2xl text-xs font-bold border border-red-100 hover:bg-red-100 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      <Trash2 size={14} />
+                      Resetar
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {selectedCatForBracket && (
               <div className="space-y-6">
-                {selectedCatForBracket.rules_config?.sport_type === "combat" && (
+                {/* SE FOR NATAÇÃO: Renderiza Balizamento por Prova e Raias (2 a 8) */}
+                {(
+                  selectedCatForBracket?.rules_config?.sport_type === "swimming" ||
+                  selectedCatForBracket?.name?.toLowerCase().includes("natação") ||
+                  selectedCatForBracket?.name?.toLowerCase().includes("natacao") ||
+                  tournament?.name?.toLowerCase().includes("natação") ||
+                  tournament?.name?.toLowerCase().includes("natacao")
+                ) ? (
+                  <SwimmingBalizamento
+                    category={selectedCatForBracket}
+                    athleteSubs={athleteSubs}
+                    tournamentId={id!}
+                  />
+                ) : (
+                  /* MODALIDADES TRADICIONAIS (Combate, Esportes Coletivos, etc.) */
+                  <div className="space-y-6">
+                    {selectedCatForBracket.rules_config?.sport_type === "combat" && (
                   <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-300">
                     <div className="space-y-1">
                       <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Subdivisão de Combate</h4>
@@ -2968,6 +2995,8 @@ export default function TournamentDashboard() {
             })()}
                   </div>
                 )}
+              </div>
+            )}
 
             <MatchModal
               isOpen={showMatchModal}
