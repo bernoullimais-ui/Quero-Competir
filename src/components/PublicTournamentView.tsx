@@ -100,11 +100,13 @@ export default function PublicTournamentView() {
     );
   }
 
-  // Extrair bannerUrl e eventTime da descrição se houver
+  // Extrair bannerUrl, eventTime e location da descrição se houver
   const bannerMatch = (tournament.description || "").match(/<!--BANNER_URL:(.*?)-->/);
   const bannerUrl = bannerMatch ? bannerMatch[1].trim() : "";
   const timeMatch = (tournament.description || "").match(/<!--EVENT_TIME:(.*?)-->/);
   const eventTime = tournament.event_time || (timeMatch ? timeMatch[1].trim() : "");
+  const locationMatch = (tournament.description || "").match(/<!--EVENT_LOCATION:(.*?)-->/);
+  const eventLocation = tournament.location || (locationMatch ? locationMatch[1].trim() : "");
   const defaultBannerUrl = "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&q=80&w=1600";
 
   return (
@@ -148,9 +150,9 @@ export default function PublicTournamentView() {
                     </span>
                   )}
 
-                  {tournament.location && (
+                  {eventLocation && (
                     <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-xl border border-white/10 shadow-ultra-sm">
-                      <MapPin size={14} className="text-rose-300" /> {tournament.location}
+                      <MapPin size={14} className="text-rose-300" /> {eventLocation}
                     </span>
                   )}
                 </div>

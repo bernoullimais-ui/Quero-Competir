@@ -804,35 +804,42 @@ router.patch("/:id", async (req, res) => {
     const supabase = getSupabaseAdmin();
     const { name, description, start_date, end_date, logo_url, location, event_time, eventTime } = req.body;
     
+    let finalDesc = description || "";
+    const timeVal = event_time || eventTime;
+    if (location && location.trim() && !finalDesc.includes("<!--EVENT_LOCATION:")) {
+      finalDesc += `\n\n<!--EVENT_LOCATION:${location.trim()}-->`;
+    }
+    if (timeVal && timeVal.trim() && !finalDesc.includes("<!--EVENT_TIME:")) {
+      finalDesc += `\n\n<!--EVENT_TIME:${timeVal.trim()}-->`;
+    }
+
     const updateObj: any = {};
     if (name !== undefined) updateObj.name = name;
-    if (description !== undefined) updateObj.description = description;
+    if (finalDesc !== undefined) updateObj.description = finalDesc;
     if (start_date !== undefined) updateObj.start_date = start_date;
     if (end_date !== undefined) updateObj.end_date = end_date;
     if (logo_url !== undefined) updateObj.logo_url = logo_url;
     if (location !== undefined) updateObj.location = location;
-    if (event_time !== undefined || eventTime !== undefined) updateObj.event_time = event_time || eventTime;
+    if (timeVal !== undefined) updateObj.event_time = timeVal;
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('tournaments')
       .update(updateObj)
       .eq('id', req.params.id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
-      if (error.message.includes('event_time') || error.message.includes('column')) {
-        delete updateObj.event_time;
-        const { data: retryData, error: retryErr } = await supabase
-          .from('tournaments')
-          .update(updateObj)
-          .eq('id', req.params.id)
-          .select()
-          .single();
-        if (retryErr) throw retryErr;
-        return res.json(retryData);
-      }
-      throw error;
+      delete updateObj.location;
+      delete updateObj.event_time;
+      const { data: retryData, error: retryErr } = await supabase
+        .from('tournaments')
+        .update(updateObj)
+        .eq('id', req.params.id)
+        .select()
+        .maybeSingle();
+      if (retryErr) throw retryErr;
+      data = retryData;
     }
     res.json(data);
   } catch (error: any) {
