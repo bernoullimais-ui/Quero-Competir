@@ -43,6 +43,7 @@ export default function SubscriptionsTab({
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
   const [selectedInstitutionFilter, setSelectedInstitutionFilter] = useState("all");
   const [selectedGenderFilter, setSelectedGenderFilter] = useState("all");
+  const [selectedAgeGroupFilter, setSelectedAgeGroupFilter] = useState("all");
   
   const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
   const [validationFeedback, setValidationFeedback] = useState("");
@@ -280,6 +281,13 @@ export default function SubscriptionsTab({
                 return (cat.gender || "").toLowerCase() === selectedGenderFilter.toLowerCase();
               });
             }
+            if (selectedAgeGroupFilter !== "all") {
+              filtered = filtered.filter(s => {
+                const cat = categories.find(c => c.id === s.categoryId);
+                const ageGroupStr = s.additionalData?.age_group || cat?.age_group || "";
+                return ageGroupStr === selectedAgeGroupFilter;
+              });
+            }
 
             const exportToCSV = () => {
               if (filtered.length === 0) {
@@ -287,15 +295,17 @@ export default function SubscriptionsTab({
                 return;
               }
 
-              const headers = ["Nome do Atleta", "CPF", "Instituição", "Prova / Categoria", "Gênero", "Status Validação", "Status Pagamento", "Responsável", "Telefone Resp."];
+              const headers = ["Nome do Atleta", "CPF", "Instituição", "Prova / Categoria", "Classe de Idade", "Gênero", "Status Validação", "Status Pagamento", "Responsável", "Telefone Resp."];
               const rows = filtered.map(sub => {
                 const inst = institutions.find(i => i.id === sub.institutionId);
                 const cat = categories.find(c => c.id === sub.categoryId);
+                const ageGroupStr = sub.additionalData?.age_group || cat?.age_group || (cat?.rules_config?.ages?.join(", ")) || "Livre";
                 return [
                   `"${sub.athleteName || ''}"`,
                   `"${sub.document || ''}"`,
                   `"${inst?.name || 'Independente'}"`,
                   `"${cat?.name || 'Mista'}"`,
+                  `"${ageGroupStr}"`,
                   `"${cat?.gender || 'Geral'}"`,
                   `"${sub.validationStatus === 'approved' ? 'Aprovado' : sub.validationStatus === 'rejected' ? 'Recusado' : 'Pendente'}"`,
                   `"${sub.paymentStatus === 'paid' ? 'Pago' : 'Pendente'}"`,
@@ -349,8 +359,8 @@ export default function SubscriptionsTab({
                     </button>
                   </div>
 
-                  {/* Linha de Filtros Avançados: Busca, Categoria/Prova, Instituição, Gênero */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-slate-200/60">
+                  {/* Linha de Filtros Avançados */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-200/60">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Buscar por Nome</label>
                       <input 
@@ -358,32 +368,51 @@ export default function SubscriptionsTab({
                         placeholder="Nome do atleta..."
                         value={subSearch}
                         onChange={e => setSubSearch(e.target.value)}
-                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white focus:border-indigo-500 shadow-sm"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white focus:border-indigo-500 shadow-sm"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Filtrar por Prova / Categoria</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Prova / Categoria</label>
                       <select
                         value={selectedCategoryFilter}
                         onChange={e => setSelectedCategoryFilter(e.target.value)}
-                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white text-slate-700 focus:border-indigo-500 shadow-sm cursor-pointer"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white text-slate-700 focus:border-indigo-500 shadow-sm cursor-pointer"
                       >
-                        <option value="all">Todas as Provas / Categorias</option>
+                        <option value="all">Todas as Provas</option>
                         {categories.map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
+                          <option key={c.id} value={c.id}>
+                            {c.name} {c.age_group ? `(${c.age_group})` : ''}
+                          </option>
                         ))}
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Filtrar por Clube / Instituição</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Classe de Idade</label>
+                      <select
+                        value={selectedAgeGroupFilter}
+                        onChange={e => setSelectedAgeGroupFilter(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white text-slate-700 focus:border-indigo-500 shadow-sm cursor-pointer"
+                      >
+                        <option value="all">Todas as Classes</option>
+                        {Array.from(new Set([
+                          ...categories.map(c => c.age_group).filter(Boolean),
+                          ...athleteSubs.map(s => s.additionalData?.age_group).filter(Boolean)
+                        ])).map(ag => (
+                          <option key={ag} value={ag}>{ag}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Clube / Instituição</label>
                       <select
                         value={selectedInstitutionFilter}
                         onChange={e => setSelectedInstitutionFilter(e.target.value)}
-                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white text-slate-700 focus:border-indigo-500 shadow-sm cursor-pointer"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white text-slate-700 focus:border-indigo-500 shadow-sm cursor-pointer"
                       >
-                        <option value="all">Todas as Instituições / Clubes</option>
+                        <option value="all">Todas as Instituições</option>
                         {institutions.map(i => (
                           <option key={i.id} value={i.id}>{i.name}</option>
                         ))}
@@ -391,11 +420,11 @@ export default function SubscriptionsTab({
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Filtrar por Gênero</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Gênero</label>
                       <select
                         value={selectedGenderFilter}
                         onChange={e => setSelectedGenderFilter(e.target.value)}
-                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white text-slate-700 focus:border-indigo-500 shadow-sm cursor-pointer"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 outline-none text-xs font-semibold bg-white text-slate-700 focus:border-indigo-500 shadow-sm cursor-pointer"
                       >
                         <option value="all">Todos os Gêneros</option>
                         <option value="Feminino">Feminino</option>
@@ -421,7 +450,7 @@ export default function SubscriptionsTab({
                     <div key={sub.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
                       
                       {/* Header do Card Atleta */}
-                      <div className="flex items-start justify-between border-b border-slate-55 pb-3">
+                      <div className="flex items-start justify-between border-b border-slate-100 pb-3">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="font-bold text-slate-800 text-md">{sub.athleteName}</h4>
@@ -430,8 +459,13 @@ export default function SubscriptionsTab({
                             )}
                           </div>
                           <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">
-                            {inst?.name} • Cat: {cat?.name || "Mista"}
+                            {inst?.name || "Independente"} • Cat: {cat?.name || "Mista"}
                           </p>
+                          {(sub.additionalData?.age_group || cat?.age_group) && (
+                            <span className="inline-block mt-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-150 text-[10px] font-extrabold rounded-md uppercase">
+                              Classe de Idade: {sub.additionalData?.age_group || cat?.age_group}
+                            </span>
+                          )}
                         </div>
                         <span className={`px-2.5 py-1 rounded-md text-[10px] uppercase font-black border ${
                           sub.validationStatus === "approved" ? "bg-emerald-50 border-emerald-250 text-emerald-600" :
