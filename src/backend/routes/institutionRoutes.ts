@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { generatePixEMV } from '../utils/pix.ts';
 import { getSupabaseAdmin } from "../lib/supabase.ts";
 import fs from "fs";
 import path from "path";
@@ -1196,11 +1197,12 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
       console.warn("PAGARME_SECRET_KEY não detectada. Executando pagamento em modo SIMULADO.");
       
       if (method === "pix") {
+        const pixPayload = generatePixEMV("+5571991414913", pay.amount);
         return res.json({
           success: true,
           method: "pix",
-          qrCode: `00020126360014br.gov.bcb.pix0114+55719914149135204000053039865407${pay.amount.toFixed(2)}5802BR5914QUEROCOMPETIR6009SALVADOR62070503***6304FC7D`,
-          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=mock-pix-payload-value`
+          qrCode: pixPayload,
+          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixPayload)}`
         });
       }
 

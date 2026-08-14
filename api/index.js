@@ -86,6 +86,42 @@ import morgan from "morgan";
 // src/backend/routes/institutionRoutes.ts
 import { Router } from "express";
 
+// src/backend/utils/pix.ts
+function generatePixEMV(pixKey, amount, merchantName = "QUEROCOMPETIR", merchantCity = "SALVADOR", txid = "***") {
+  const cleanKey = pixKey.trim();
+  const gui = "0014br.gov.bcb.pix";
+  const keyTag = "01" + String(cleanKey.length).padStart(2, "0") + cleanKey;
+  const merchantAccountInfo = gui + keyTag;
+  const field26 = "26" + String(merchantAccountInfo.length).padStart(2, "0") + merchantAccountInfo;
+  const field52 = "52040000";
+  const field53 = "5303986";
+  const amountStr = amount.toFixed(2);
+  const field54 = "54" + String(amountStr.length).padStart(2, "0") + amountStr;
+  const field58 = "5802BR";
+  const cleanName = merchantName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9 ]/g, "").slice(0, 25).trim() || "QUEROCOMPETIR";
+  const field59 = "59" + String(cleanName.length).padStart(2, "0") + cleanName;
+  const cleanCity = merchantCity.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9 ]/g, "").slice(0, 15).trim() || "SALVADOR";
+  const field60 = "60" + String(cleanCity.length).padStart(2, "0") + cleanCity;
+  const cleanTxid = txid.replace(/[^a-zA-Z0-9]/g, "").slice(0, 25) || "***";
+  const txidSubtag = "05" + String(cleanTxid.length).padStart(2, "0") + cleanTxid;
+  const field62 = "62" + String(txidSubtag.length).padStart(2, "0") + txidSubtag;
+  const payloadWithoutCRC = "000201" + field26 + field52 + field53 + field54 + field58 + field59 + field60 + field62 + "6304";
+  let crc = 65535;
+  for (let i = 0; i < payloadWithoutCRC.length; i++) {
+    crc ^= payloadWithoutCRC.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 32768) !== 0) {
+        crc = crc << 1 ^ 4129;
+      } else {
+        crc = crc << 1;
+      }
+      crc &= 65535;
+    }
+  }
+  const crcHex = crc.toString(16).toUpperCase().padStart(4, "0");
+  return payloadWithoutCRC + crcHex;
+}
+
 // src/backend/lib/supabase.ts
 import { createClient } from "@supabase/supabase-js";
 var supabaseAdmin = null;
@@ -995,11 +1031,12 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     if (!hasSecretKey) {
       console.warn("PAGARME_SECRET_KEY n\xE3o detectada. Executando pagamento em modo SIMULADO.");
       if (method === "pix") {
+        const pixPayload = generatePixEMV("+5571991414913", pay.amount);
         return res.json({
           success: true,
           method: "pix",
-          qrCode: `00020126360014br.gov.bcb.pix0114+55719914149135204000053039865407${pay.amount.toFixed(2)}5802BR5914QUEROCOMPETIR6009SALVADOR62070503***6304FC7D`,
-          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=mock-pix-payload-value`
+          qrCode: pixPayload,
+          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixPayload)}`
         });
       }
       if (method === "boleto") {
@@ -4034,11 +4071,12 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
     if (!hasSecretKey) {
       console.warn("PAGARME_SECRET_KEY n\xE3o detectada. Executando pagamento individual em modo SIMULADO.");
       if (method === "pix") {
+        const pixPayload = generatePixEMV("+5571991414913", totalAmount);
         return res.json({
           success: true,
           method: "pix",
-          qrCode: `00020126360014br.gov.bcb.pix0114+55719914149135204000053039865407${totalAmount.toFixed(2)}5802BR5914QUEROCOMPETIR6009SALVADOR62070503***6304FC7D`,
-          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=mock-pix-payload-athlete-value`
+          qrCode: pixPayload,
+          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixPayload)}`
         });
       }
       await updateSubscriptionPaymentStatus(subId, "paid", sub, tData, settings);

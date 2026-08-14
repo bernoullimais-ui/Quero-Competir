@@ -250,7 +250,9 @@ export default function PublicAthleteRegistration() {
   };
 
   const copyPixKey = () => {
-    navigator.clipboard.writeText("00020101021126580014br.gov.bcb.pix0136e4f3a9e6-7b9c-4f11-8fc2-1f3ef4d4f61f520400005303986540510.005802BR5915ARENASUBSCRIBED6009SAO PAULO62070503***6304CA30");
+    if (pixData?.qrCode) {
+      navigator.clipboard.writeText(pixData.qrCode);
+    }
     setCopiedPix(true);
     setTimeout(() => setCopiedPix(false), 2000);
   };
