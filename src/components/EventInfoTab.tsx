@@ -259,24 +259,28 @@ export default function EventInfoTab({ tournament, categories }: EventInfoTabPro
 
               <div className="grid grid-cols-2 gap-3">
                 {parsedDesc.sponsors.map((sp, idx) => (
-                  <div key={idx} className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-2 group hover:border-indigo-200 hover:bg-indigo-50/20 transition-all">
-                    <span className="text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-150 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                      {sp.title || "Apoio"}
-                    </span>
-                    {sp.logoUrl ? (
-                      <img
-                        src={sp.logoUrl}
-                        alt={sp.name}
-                        className="h-10 max-w-full object-contain filter group-hover:scale-105 transition-transform"
-                        referrerPolicy="no-referrer"
-                        onError={(e: any) => e.target.style.display = 'none'}
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center font-bold text-slate-500 text-xs uppercase">
-                        {sp.name ? sp.name.slice(0, 2) : "PA"}
-                      </div>
-                    )}
-                    <span className="text-xs font-bold text-slate-700 truncate w-full">{sp.name}</span>
+                  <div key={idx} className="bg-slate-50/70 p-3 rounded-2xl border border-slate-100 flex flex-col items-center justify-between text-center min-h-[100px] group hover:border-indigo-200 hover:bg-indigo-50/20 transition-all">
+                    <div className="flex-1 flex items-center justify-center w-full py-1">
+                      {sp.logoUrl ? (
+                        <img
+                          src={sp.logoUrl}
+                          alt={sp.name}
+                          className="h-12 max-w-full object-contain filter group-hover:scale-105 transition-transform"
+                          referrerPolicy="no-referrer"
+                          onError={(e: any) => e.target.style.display = 'none'}
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center font-bold text-slate-500 text-xs uppercase">
+                          {sp.name ? sp.name.slice(0, 2) : "PA"}
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-1.5 flex flex-col items-center gap-1 w-full">
+                      {sp.name && <span className="text-[11px] font-bold text-slate-700 truncate w-full">{sp.name}</span>}
+                      <span className="text-[8px] font-bold text-slate-500 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        {sp.title || "Apoio"}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>

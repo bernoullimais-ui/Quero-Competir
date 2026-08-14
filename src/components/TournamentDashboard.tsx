@@ -1739,18 +1739,22 @@ export default function TournamentDashboard() {
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">🤝 Patrocinadores e Apoio Cadastrados</span>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           {parseDescription(tournament.description).sponsors.map((sp, idx) => (
-                            <div key={idx} className="bg-slate-50/70 p-3 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-1.5">
-                              <span className="text-[9px] font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md uppercase tracking-wider border border-indigo-100">
-                                {sp.title || "Apoio"}
-                              </span>
-                              {sp.logoUrl ? (
-                                <img src={sp.logoUrl} alt={sp.name} className="h-8 max-w-full object-contain" onError={(e: any) => e.target.style.display = 'none'} />
-                              ) : (
-                                <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center font-bold text-slate-500 text-[10px] uppercase">
-                                  {sp.name ? sp.name.slice(0, 2) : "PA"}
-                                </div>
-                              )}
-                              <span className="text-xs font-bold text-slate-700 truncate w-full">{sp.name}</span>
+                            <div key={idx} className="bg-slate-50/70 p-3 rounded-2xl border border-slate-100 flex flex-col items-center justify-between text-center min-h-[96px]">
+                              <div className="flex-1 flex items-center justify-center w-full py-1">
+                                {sp.logoUrl ? (
+                                  <img src={sp.logoUrl} alt={sp.name} className="h-10 max-w-full object-contain" onError={(e: any) => e.target.style.display = 'none'} />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center font-bold text-slate-500 text-[10px] uppercase">
+                                    {sp.name ? sp.name.slice(0, 2) : "PA"}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="mt-1 flex flex-col items-center gap-0.5 w-full">
+                                {sp.name && <span className="text-xs font-bold text-slate-700 truncate w-full">{sp.name}</span>}
+                                <span className="text-[8px] font-bold text-slate-500 bg-slate-100 border border-slate-200/80 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                                  {sp.title || "Apoio"}
+                                </span>
+                              </div>
                             </div>
                           ))}
                         </div>
