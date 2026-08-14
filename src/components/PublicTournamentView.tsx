@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Trophy, Calendar, MapPin, Users, LayoutGrid, Timer, TrendingUp, MessageSquare, Info, Sparkles } from "lucide-react";
+import { Trophy, Calendar, MapPin, Users, LayoutGrid, Timer, TrendingUp, MessageSquare, Info, Sparkles, Clock } from "lucide-react";
 import { motion } from "motion/react";
 import TournamentBracket from "./TournamentBracket.tsx";
 import TournamentStats from "./TournamentStats.tsx";
@@ -100,9 +100,11 @@ export default function PublicTournamentView() {
     );
   }
 
-  // Extrair bannerUrl da descrição se houver
+  // Extrair bannerUrl e eventTime da descrição se houver
   const bannerMatch = (tournament.description || "").match(/<!--BANNER_URL:(.*?)-->/);
   const bannerUrl = bannerMatch ? bannerMatch[1].trim() : "";
+  const timeMatch = (tournament.description || "").match(/<!--EVENT_TIME:(.*?)-->/);
+  const eventTime = tournament.event_time || (timeMatch ? timeMatch[1].trim() : "");
   const defaultBannerUrl = "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&q=80&w=1600";
 
   return (
@@ -135,13 +137,20 @@ export default function PublicTournamentView() {
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{tournament.name}</h1>
-                <div className="flex flex-wrap items-center gap-4 mt-1.5 text-indigo-100 text-sm font-medium">
-                  <span className="flex items-center gap-1">
-                    <Calendar size={14} /> {new Date(tournament.start_date).toLocaleDateString("pt-BR")}
+                <div className="flex flex-wrap items-center gap-2.5 mt-2 text-indigo-100 text-xs sm:text-sm font-semibold">
+                  <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-xl border border-white/10 shadow-ultra-sm">
+                    <Calendar size={14} className="text-indigo-200" /> {new Date(tournament.start_date).toLocaleDateString("pt-BR")}
                   </span>
+                  
+                  {eventTime && (
+                    <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-xl border border-white/10 shadow-ultra-sm">
+                      <Clock size={14} className="text-amber-300" /> {eventTime}
+                    </span>
+                  )}
+
                   {tournament.location && (
-                    <span className="flex items-center gap-1">
-                      <MapPin size={14} /> {tournament.location}
+                    <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-xl border border-white/10 shadow-ultra-sm">
+                      <MapPin size={14} className="text-rose-300" /> {tournament.location}
                     </span>
                   )}
                 </div>

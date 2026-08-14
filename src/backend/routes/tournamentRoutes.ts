@@ -798,11 +798,11 @@ router.patch("/:id/status", async (req, res) => {
   }
 });
 
-// Atualizar detalhes do torneio (Name, description, start_date, end_date)
+// Atualizar detalhes do torneio (Name, description, start_date, end_date, location, event_time)
 router.patch("/:id", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const { name, description, start_date, end_date, logo_url } = req.body;
+    const { name, description, start_date, end_date, logo_url, location, event_time, eventTime } = req.body;
     
     const updateObj: any = {};
     if (name !== undefined) updateObj.name = name;
@@ -810,6 +810,8 @@ router.patch("/:id", async (req, res) => {
     if (start_date !== undefined) updateObj.start_date = start_date;
     if (end_date !== undefined) updateObj.end_date = end_date;
     if (logo_url !== undefined) updateObj.logo_url = logo_url;
+    if (location !== undefined) updateObj.location = location;
+    if (event_time !== undefined || eventTime !== undefined) updateObj.event_time = event_time || eventTime;
 
     const { data, error } = await supabase
       .from('tournaments')
@@ -818,7 +820,20 @@ router.patch("/:id", async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (error.message.includes('event_time') || error.message.includes('column')) {
+        delete updateObj.event_time;
+        const { data: retryData, error: retryErr } = await supabase
+          .from('tournaments')
+          .update(updateObj)
+          .eq('id', req.params.id)
+          .select()
+          .single();
+        if (retryErr) throw retryErr;
+        return res.json(retryData);
+      }
+      throw error;
+    }
     res.json(data);
   } catch (error: any) {
     res.status(500).json({ error: error.message });

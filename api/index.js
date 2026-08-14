@@ -1835,15 +1835,25 @@ router2.patch("/:id/status", async (req, res) => {
 router2.patch("/:id", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const { name, description, start_date, end_date, logo_url } = req.body;
+    const { name, description, start_date, end_date, logo_url, location, event_time, eventTime } = req.body;
     const updateObj = {};
     if (name !== void 0) updateObj.name = name;
     if (description !== void 0) updateObj.description = description;
     if (start_date !== void 0) updateObj.start_date = start_date;
     if (end_date !== void 0) updateObj.end_date = end_date;
     if (logo_url !== void 0) updateObj.logo_url = logo_url;
+    if (location !== void 0) updateObj.location = location;
+    if (event_time !== void 0 || eventTime !== void 0) updateObj.event_time = event_time || eventTime;
     const { data, error } = await supabase.from("tournaments").update(updateObj).eq("id", req.params.id).select().single();
-    if (error) throw error;
+    if (error) {
+      if (error.message.includes("event_time") || error.message.includes("column")) {
+        delete updateObj.event_time;
+        const { data: retryData, error: retryErr } = await supabase.from("tournaments").update(updateObj).eq("id", req.params.id).select().single();
+        if (retryErr) throw retryErr;
+        return res.json(retryData);
+      }
+      throw error;
+    }
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -118,13 +118,15 @@ interface ParsedDesc {
   description: string;
   photos: string[];
   bannerUrl: string;
+  eventTime: string;
 }
 
 function parseDescription(raw?: string): ParsedDesc {
-  if (!raw) return { description: "", photos: [], bannerUrl: "" };
+  if (!raw) return { description: "", photos: [], bannerUrl: "", eventTime: "" };
   let description = raw;
   let photos: string[] = [];
   let bannerUrl = "";
+  let eventTime = "";
 
   const photosRegex = /<!--OFFICIAL_PHOTOS:(.*?)-->/;
   const photosMatch = description.match(photosRegex);
@@ -140,10 +142,17 @@ function parseDescription(raw?: string): ParsedDesc {
     bannerUrl = bannerMatch[1].trim();
   }
 
-  return { description, photos, bannerUrl };
+  const timeRegex = /<!--EVENT_TIME:(.*?)-->/;
+  const timeMatch = description.match(timeRegex);
+  if (timeMatch) {
+    description = description.replace(timeRegex, "").trim();
+    eventTime = timeMatch[1].trim();
+  }
+
+  return { description, photos, bannerUrl, eventTime };
 }
 
-function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string): string {
+function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string, eventTime?: string): string {
   let result = cleanDesc.trim();
   const filtered = photos.map(p => p.trim()).filter(Boolean);
   if (filtered.length > 0) {
@@ -151,6 +160,9 @@ function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string
   }
   if (bannerUrl.trim()) {
     result += `\n\n<!--BANNER_URL:${bannerUrl.trim()}-->`;
+  }
+  if (eventTime && eventTime.trim()) {
+    result += `\n\n<!--EVENT_TIME:${eventTime.trim()}-->`;
   }
   return result;
 }
@@ -274,6 +286,8 @@ export default function TournamentDashboard() {
     end_date: "", 
     logo_url: "",
     banner_url: "",
+    location: "",
+    event_time: "",
     photos: [] as string[]
   });
   const [savingTournament, setSavingTournament] = useState(false);
@@ -281,7 +295,6 @@ export default function TournamentDashboard() {
   useEffect(() => {
     if (tournament) {
       const parsed = parseDescription(tournament.description || "");
-      // Always pre-populate 5 empty photo fields
       const initialPhotos = [...parsed.photos, "", "", "", "", ""].slice(0, 5);
       setEditForm({
         name: tournament.name || "",
@@ -290,6 +303,8 @@ export default function TournamentDashboard() {
         end_date: tournament.end_date ? tournament.end_date.split("T")[0] : "",
         logo_url: tournament.logo_url || "",
         banner_url: parsed.bannerUrl || "",
+        location: tournament.location || "",
+        event_time: tournament.event_time || parsed.eventTime || "",
         photos: initialPhotos
       });
     }
@@ -305,7 +320,7 @@ export default function TournamentDashboard() {
     e.preventDefault();
     setSavingTournament(true);
     try {
-      const finalDesc = buildDescription(editForm.description, editForm.photos, editForm.banner_url);
+      const finalDesc = buildDescription(editForm.description, editForm.photos, editForm.banner_url, editForm.event_time);
       const res = await fetch(`/api/tournaments/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -314,7 +329,9 @@ export default function TournamentDashboard() {
           description: finalDesc,
           start_date: editForm.start_date,
           end_date: editForm.end_date,
-          logo_url: editForm.logo_url
+          logo_url: editForm.logo_url,
+          location: editForm.location,
+          event_time: editForm.event_time
         })
       });
       if (res.ok) {
@@ -1444,6 +1461,32 @@ export default function TournamentDashboard() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          📍 Local do Evento
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Piscina Olímpica da Pituba, Salvador - BA"
+                          value={editForm.location}
+                          onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900 font-medium text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          ⏰ Horário do Evento
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 08:00h às 18:00h"
+                          value={editForm.event_time}
+                          onChange={(e) => setEditForm({ ...editForm, event_time: e.target.value })}
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900 font-medium text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                           Data de Início
                         </label>
                         <input
@@ -1520,23 +1563,33 @@ export default function TournamentDashboard() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                      <div className="bg-slate-50/30 p-4 rounded-2xl border border-slate-100 flex items-center gap-3">
-                        <Calendar size={18} className="text-indigo-500" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                      <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3">
+                        <Calendar size={18} className="text-indigo-500 shrink-0" />
                         <div>
-                          <span className="text-xs font-bold text-slate-400 block uppercase">Data de Início</span>
-                          <span className="text-sm font-semibold text-slate-700">
-                            {tournament.start_date ? new Date(tournament.start_date).toLocaleDateString() : "-"}
+                          <span className="text-[10px] font-bold text-slate-400 block uppercase">Data do Evento</span>
+                          <span className="text-xs font-bold text-slate-700">
+                            {tournament.start_date ? new Date(tournament.start_date).toLocaleDateString("pt-BR") : "-"}
                           </span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-50/30 p-4 rounded-2xl border border-slate-100 flex items-center gap-3">
-                        <Calendar size={18} className="text-violet-500" />
+                      <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3">
+                        <Timer size={18} className="text-amber-500 shrink-0" />
                         <div>
-                          <span className="text-xs font-bold text-slate-400 block uppercase">Data de Fim</span>
-                          <span className="text-sm font-semibold text-slate-700">
-                            {tournament.end_date ? new Date(tournament.end_date).toLocaleDateString() : "-"}
+                          <span className="text-[10px] font-bold text-slate-400 block uppercase">Horário</span>
+                          <span className="text-xs font-bold text-slate-700">
+                            {tournament.event_time || parseDescription(tournament.description).eventTime || "Não informado"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3 sm:col-span-2">
+                        <MapPin size={18} className="text-rose-500 shrink-0" />
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 block uppercase">Local do Evento</span>
+                          <span className="text-xs font-bold text-slate-700">
+                            {tournament.location || "Não informado"}
                           </span>
                         </div>
                       </div>
