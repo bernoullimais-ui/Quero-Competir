@@ -152,41 +152,6 @@ export default function EventInfoTab({ tournament, categories }: EventInfoTabPro
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Hero Poster Banner */}
-      <div className="relative rounded-3xl overflow-hidden bg-slate-950 border border-slate-800 shadow-xl min-h-[220px] sm:min-h-[320px] flex flex-col justify-end p-6 sm:p-10">
-        <div className="absolute inset-0 bg-cover bg-center transition-all duration-700" style={{ backgroundImage: `url(${heroBgImage})` }}></div>
-        <div className="absolute inset-0 bg-slate-950/60"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/20 to-transparent"></div>
-        
-        {/* Banner Content */}
-        <div className="relative z-10 space-y-4 max-w-3xl">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="px-3.5 py-1 text-xs font-black bg-indigo-600/95 text-white uppercase tracking-wider rounded-full shadow-lg border border-indigo-400/30 flex items-center gap-1.5 animate-pulse">
-              <Sparkles size={12} /> Live / Oficial
-            </span>
-            {tournament.location && (
-              <span className="px-3.5 py-1 text-xs font-bold bg-slate-800/90 text-slate-200 tracking-wide rounded-full border border-slate-700/50 flex items-center gap-1">
-                <MapPin size={12} className="text-rose-400" /> {tournament.location}
-              </span>
-            )}
-          </div>
-
-          <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">{tournament.name}</h1>
-          
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5 text-slate-300 text-sm font-semibold">
-            <span className="flex items-center gap-2 bg-slate-950/40 px-3 py-1.5 rounded-xl border border-white/5">
-              <Calendar size={16} className="text-indigo-400" />
-              <span>
-                {formatDate(tournament.start_date)}
-                {tournament.end_date && tournament.end_date !== tournament.start_date && (
-                  <> <span className="text-slate-500">até</span> {formatDate(tournament.end_date)}</>
-                )}
-              </span>
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* Bento Grid layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         

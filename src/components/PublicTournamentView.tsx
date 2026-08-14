@@ -100,84 +100,107 @@ export default function PublicTournamentView() {
     );
   }
 
+  // Extrair bannerUrl da descrição se houver
+  const bannerMatch = (tournament.description || "").match(/<!--BANNER_URL:(.*?)-->/);
+  const bannerUrl = bannerMatch ? bannerMatch[1].trim() : "";
+  const defaultBannerUrl = "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&q=80&w=1600";
+
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
+      {/* 1. Full-width Top Banner (edge-to-edge, preenchendo toda a dimensão da página) */}
+      <div className="w-full h-48 sm:h-64 md:h-80 lg:h-96 relative overflow-hidden bg-slate-900 shadow-inner">
+        <img
+          src={bannerUrl || defaultBannerUrl}
+          alt={tournament.name}
+          className="w-full h-full object-cover"
+        />
+      </div>
+
+      {/* 2. Header abaixo do banner: Nome, Data, Botão de Inscrição e Menu */}
       <header className="bg-indigo-600 text-white sticky top-0 z-40 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden border border-white/10">
-              {tournament.logo_url ? (
-                <img 
-                  src={tournament.logo_url} 
-                  alt={tournament.name} 
-                  className="w-full h-full object-cover" 
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <Trophy size={32} className="text-white" />
-              )}
-            </div>
-            <div className="flex-1">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{tournament.name}</h1>
-              <div className="flex flex-wrap items-center gap-4 mt-2 text-indigo-100 text-sm font-medium">
-                <span className="flex items-center gap-1"><Calendar size={14} /> {new Date(tournament.start_date).toLocaleDateString()}</span>
-                {tournament.location && <span className="flex items-center gap-1"><MapPin size={14} /> {tournament.location}</span>}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white/10 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden border border-white/10">
+                {tournament.logo_url ? (
+                  <img 
+                    src={tournament.logo_url} 
+                    alt={tournament.name} 
+                    className="w-full h-full object-cover" 
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <Trophy size={32} className="text-white" />
+                )}
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{tournament.name}</h1>
+                <div className="flex flex-wrap items-center gap-4 mt-1.5 text-indigo-100 text-sm font-medium">
+                  <span className="flex items-center gap-1">
+                    <Calendar size={14} /> {new Date(tournament.start_date).toLocaleDateString("pt-BR")}
+                  </span>
+                  {tournament.location && (
+                    <span className="flex items-center gap-1">
+                      <MapPin size={14} /> {tournament.location}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
+
             {selfRegEnabled && (
               <Link
                 to={`/public/tournament/${id}/inscricao`}
-                className="shrink-0 bg-white text-indigo-700 px-5 py-3 rounded-2xl font-black text-sm hover:bg-indigo-50 transition shadow-lg shadow-indigo-900/20 flex items-center gap-2"
+                className="shrink-0 bg-white text-indigo-700 px-6 py-3.5 rounded-2xl font-black text-sm hover:bg-indigo-50 transition shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2"
               >
                 <Sparkles size={16} /> Inscrever-se
               </Link>
             )}
           </div>
-        </div>
-        
-        {/* Tabs */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 flex gap-4 overflow-x-auto custom-scrollbar pb-2">
-          <button
-            onClick={() => setActiveTab("evento")}
-            className={`flex items-center gap-2 px-6 py-3 rounded-t-xl font-bold transition-all whitespace-nowrap ${
-              activeTab === "evento" ? "bg-slate-50 text-indigo-700" : "text-indigo-100 hover:text-white hover:bg-white/10"
-            }`}
-          >
-            <Info size={18} /> EVENTO
-          </button>
-          <button
-            onClick={() => setActiveTab("tabela")}
-            className={`flex items-center gap-2 px-6 py-3 rounded-t-xl font-bold transition-all whitespace-nowrap ${
-              activeTab === "tabela" ? "bg-slate-50 text-indigo-700" : "text-indigo-100 hover:text-white hover:bg-white/10"
-            }`}
-          >
-            <LayoutGrid size={18} /> Tabela de Jogos
-          </button>
-          <button
-            onClick={() => setActiveTab("classificacao")}
-            className={`flex items-center gap-2 px-6 py-3 rounded-t-xl font-bold transition-all whitespace-nowrap ${
-              activeTab === "classificacao" ? "bg-slate-50 text-indigo-700" : "text-indigo-100 hover:text-white hover:bg-white/10"
-            }`}
-          >
-            <TrendingUp size={18} /> Classificação
-          </button>
-          <button
-            onClick={() => setActiveTab("estatisticas")}
-            className={`flex items-center gap-2 px-6 py-3 rounded-t-xl font-bold transition-all whitespace-nowrap ${
-              activeTab === "estatisticas" ? "bg-slate-50 text-indigo-700" : "text-indigo-100 hover:text-white hover:bg-white/10"
-            }`}
-          >
-            <Trophy size={18} /> Estatísticas gerais
-          </button>
-          <button
-            onClick={() => setActiveTab("comunidade")}
-            className={`flex items-center gap-2 px-6 py-3 rounded-t-xl font-bold transition-all whitespace-nowrap ${
-              activeTab === "comunidade" ? "bg-slate-50 text-indigo-700" : "text-indigo-100 hover:text-white hover:bg-white/10"
-            }`}
-          >
-            <MessageSquare size={18} /> Comunidade & Mural
-          </button>
+
+          {/* Menu / Tabs abaixo do header */}
+          <div className="mt-5 flex gap-3 sm:gap-4 overflow-x-auto custom-scrollbar pb-1">
+            <button
+              onClick={() => setActiveTab("evento")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                activeTab === "evento" ? "bg-white text-indigo-700 shadow-sm" : "text-indigo-100 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <Info size={16} /> EVENTO
+            </button>
+            <button
+              onClick={() => setActiveTab("tabela")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                activeTab === "tabela" ? "bg-white text-indigo-700 shadow-sm" : "text-indigo-100 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <LayoutGrid size={16} /> Tabela de Jogos
+            </button>
+            <button
+              onClick={() => setActiveTab("classificacao")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                activeTab === "classificacao" ? "bg-white text-indigo-700 shadow-sm" : "text-indigo-100 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <TrendingUp size={16} /> Classificação
+            </button>
+            <button
+              onClick={() => setActiveTab("estatisticas")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                activeTab === "estatisticas" ? "bg-white text-indigo-700 shadow-sm" : "text-indigo-100 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <Trophy size={16} /> Estatísticas gerais
+            </button>
+            <button
+              onClick={() => setActiveTab("comunidade")}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                activeTab === "comunidade" ? "bg-white text-indigo-700 shadow-sm" : "text-indigo-100 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <MessageSquare size={16} /> Comunidade & Mural
+            </button>
+          </div>
         </div>
       </header>
 
