@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { Plus, ListChecks, X, Edit2, Trash2, Waves, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Plus, ListChecks, X, Edit2, Trash2, Waves, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, GripVertical } from "lucide-react";
 import { getSportIcon, getSportBgClass } from "./TournamentDashboard.tsx";
 import { useToast } from "./ui/Toast.tsx";
 
@@ -79,7 +79,41 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
   const [editingCategory, setEditingCategory] = useState<any | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<any | null>(null);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const { success: toastSuccess, error: toastError } = useToast();
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+    const fromIdx = draggedIndex;
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    handleMoveCategory(fromIdx, dropIndex);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
 
   const handleMoveCategory = async (fromIndex: number, toIndex: number) => {
     if (toIndex < 0 || toIndex >= categories.length) return;
@@ -384,58 +418,77 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
 
       {categories.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {categories.map((cat, i) => (
-            <div key={cat.id || i} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all relative group">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${getSportBgClass(cat.name)}`}>
-                    {isNatacao(cat.name)
-                      ? <Waves size={24} className="text-cyan-600" />
-                      : getSportIcon(cat.name, 24)
-                    }
-                  </div>
-                  <span className="text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-xl uppercase">
-                    Prova #{i + 1}
-                  </span>
-                </div>
+          {categories.map((cat, i) => {
+            const isDragging = draggedIndex === i;
+            const isDragOver = dragOverIndex === i;
 
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-bold text-slate-400 border border-slate-100 px-2 py-0.5 rounded-full uppercase mr-1">
-                    {cat.gender}
-                  </span>
-                  {/* Up / Down Order Buttons */}
-                  <button
-                    disabled={i === 0 || isSavingOrder}
-                    onClick={() => handleMoveCategory(i, i - 1)}
-                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="Mover Prova para Cima"
-                  >
-                    <ArrowUp size={14} />
-                  </button>
-                  <button
-                    disabled={i === categories.length - 1 || isSavingOrder}
-                    onClick={() => handleMoveCategory(i, i + 1)}
-                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="Mover Prova para Baixo"
-                  >
-                    <ArrowDown size={14} />
-                  </button>
-                  <button
-                    onClick={() => openEditModal(cat)}
-                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                    title="Editar Modalidade"
-                  >
-                    <Edit2 size={13} />
-                  </button>
-                  <button
-                    onClick={() => setDeletingCategory(cat)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                    title="Excluir Modalidade"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+            return (
+              <div
+                key={cat.id || i}
+                draggable={!isSavingOrder}
+                onDragStart={(e) => handleDragStart(e, i)}
+                onDragOver={(e) => handleDragOver(e, i)}
+                onDrop={(e) => handleDrop(e, i)}
+                onDragEnd={handleDragEnd}
+                className={`bg-white p-6 rounded-3xl border transition-all relative group cursor-grab active:cursor-grabbing ${
+                  isDragging
+                    ? "opacity-30 scale-95 border-dashed border-2 border-indigo-400 shadow-none"
+                    : isDragOver
+                    ? "border-2 border-indigo-500 bg-indigo-50/40 shadow-lg ring-4 ring-indigo-100 scale-[1.02]"
+                    : "border-slate-200 shadow-sm hover:shadow-md"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <GripVertical className="text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0 cursor-grab active:cursor-grabbing" size={20} />
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${getSportBgClass(cat.name)}`}>
+                      {isNatacao(cat.name)
+                        ? <Waves size={20} className="text-cyan-600" />
+                        : getSportIcon(cat.name, 20)
+                      }
+                    </div>
+                    <span className="text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-xl uppercase">
+                      Prova #{i + 1}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold text-slate-400 border border-slate-100 px-2 py-0.5 rounded-full uppercase mr-1">
+                      {cat.gender}
+                    </span>
+                    {/* Up / Down Order Buttons */}
+                    <button
+                      disabled={i === 0 || isSavingOrder}
+                      onClick={(e) => { e.stopPropagation(); handleMoveCategory(i, i - 1); }}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                      title="Mover Prova para Cima"
+                    >
+                      <ArrowUp size={14} />
+                    </button>
+                    <button
+                      disabled={i === categories.length - 1 || isSavingOrder}
+                      onClick={(e) => { e.stopPropagation(); handleMoveCategory(i, i + 1); }}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                      title="Mover Prova para Baixo"
+                    >
+                      <ArrowDown size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openEditModal(cat); }}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                      title="Editar Modalidade"
+                    >
+                      <Edit2 size={13} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeletingCategory(cat); }}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                      title="Excluir Modalidade"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
-              </div>
               <h4 className="font-bold text-lg mb-1">{cat.name}</h4>
               <p className="text-sm text-slate-500 mb-1">{cat.age_group}</p>
               {(cat.birth_year_min || cat.birth_year_max) && (
@@ -460,8 +513,9 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
                 <span>Atletas: {cat.registered_count || 0} / {cat.max_teams || 16}</span>
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
+      </div>
       ) : (
         <div className="bg-white p-8 rounded-3xl border border-slate-200 border-dashed text-center py-20">
           <ListChecks size={48} className="mx-auto text-slate-300 mb-4" />
@@ -961,43 +1015,60 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-              {categories.map((cat, idx) => (
-                <div
-                  key={cat.id || idx}
-                  className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-slate-100/80 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
-                      #{idx + 1}
-                    </span>
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-800">{cat.name}</h4>
-                      <p className="text-xs text-slate-500 font-medium">{cat.gender} • {cat.age_group}</p>
+              {categories.map((cat, idx) => {
+                const isDragging = draggedIndex === idx;
+                const isDragOver = dragOverIndex === idx;
+
+                return (
+                  <div
+                    key={cat.id || idx}
+                    draggable={!isSavingOrder}
+                    onDragStart={(e) => handleDragStart(e, idx)}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    onDrop={(e) => handleDrop(e, idx)}
+                    onDragEnd={handleDragEnd}
+                    className={`flex items-center justify-between p-3.5 border rounded-2xl transition-all cursor-grab active:cursor-grabbing ${
+                      isDragging
+                        ? "opacity-30 scale-95 border-dashed border-2 border-indigo-400 bg-indigo-50/20"
+                        : isDragOver
+                        ? "border-2 border-indigo-500 bg-indigo-50/60 shadow-md scale-[1.01]"
+                        : "bg-slate-50 border-slate-200 hover:bg-slate-100/80"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <GripVertical className="text-slate-400 hover:text-indigo-600 transition-colors shrink-0" size={20} />
+                      <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        #{idx + 1}
+                      </span>
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-800">{cat.name}</h4>
+                        <p className="text-xs text-slate-500 font-medium">{cat.gender} • {cat.age_group}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={idx === 0 || isSavingOrder}
+                        onClick={(e) => { e.stopPropagation(); handleMoveCategory(idx, idx - 1); }}
+                        className="p-2 bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 rounded-xl transition-all disabled:opacity-30 cursor-pointer shadow-2xs"
+                        title="Mover para cima"
+                      >
+                        <ArrowUp size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === categories.length - 1 || isSavingOrder}
+                        onClick={(e) => { e.stopPropagation(); handleMoveCategory(idx, idx + 1); }}
+                        className="p-2 bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 rounded-xl transition-all disabled:opacity-30 cursor-pointer shadow-2xs"
+                        title="Mover para baixo"
+                      >
+                        <ArrowDown size={16} />
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      disabled={idx === 0 || isSavingOrder}
-                      onClick={() => handleMoveCategory(idx, idx - 1)}
-                      className="p-2 bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 rounded-xl transition-all disabled:opacity-30 cursor-pointer shadow-2xs"
-                      title="Mover para cima"
-                    >
-                      <ArrowUp size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={idx === categories.length - 1 || isSavingOrder}
-                      onClick={() => handleMoveCategory(idx, idx + 1)}
-                      className="p-2 bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 rounded-xl transition-all disabled:opacity-30 cursor-pointer shadow-2xs"
-                      title="Mover para baixo"
-                    >
-                      <ArrowDown size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="pt-5 mt-4 border-t border-slate-100 flex justify-end">
