@@ -9,6 +9,7 @@ import memberRoutes from "./routes/memberRoutes.ts";
 import authRoutes from "./routes/authRoutes.ts";
 import membershipRoutes from "./routes/membershipRoutes.ts";
 import paymentRoutes from "./routes/paymentRoutes.ts";
+import whatsappRoutes from "./routes/whatsappRoutes.ts";
 import { optionalAuth } from "./middleware/auth.ts";
 
 // ─── Load env vars first (ESM-safe: called in module body, not hoisted) ────────
@@ -90,7 +91,7 @@ app.get("/api/health", (_req, res) => {
 // ─── Env Diagnostic (shows which vars are SET vs MISSING, never exposes values)
 app.get("/api/health/env", (_req, res) => {
   const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "JWT_SECRET"];
-  const optional = ["APP_URL", "PAGARME_PUBLIC_KEY", "PAGARME_SECRET_KEY", "NODE_ENV"];
+  const optional = ["APP_URL", "PAGARME_PUBLIC_KEY", "PAGARME_SECRET_KEY", "NODE_ENV", "UTALK_TOKEN", "UTALK_FROM_PHONE", "UTALK_ORGANIZATION_ID"];
   const report: Record<string, string> = {};
 
   for (const key of required) {
@@ -116,6 +117,7 @@ app.use("/api/members", memberRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/memberships", membershipRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/whatsapp", whatsappRoutes);
 
 // ─── Global Error Handler (must be last) ─────────────────────────────────────
 // Catches any unhandled errors and returns JSON instead of HTML/plain-text.

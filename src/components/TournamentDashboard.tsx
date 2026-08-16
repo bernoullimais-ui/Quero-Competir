@@ -113,6 +113,8 @@ import CategoriesTab from "./CategoriesTab.tsx";
 import SubscriptionsTab from "./SubscriptionsTab.tsx";
 import TournamentSettingsTab from "./TournamentSettingsTab.tsx";
 import MatchModal from "./MatchModal.tsx";
+import WhatsAppBroadcastTab from "./WhatsAppBroadcastTab.tsx";
+
 
 // Description comment parser for saving customizable image gallery and banner without schema changes
 export interface Sponsor {
@@ -212,7 +214,7 @@ const formatCurrency = (val: number) => {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
 };
 
-type Tab = "geral" | "modalidades" | "inscricoes" | "financeiro" | "configuracoes" | "tabela" | "escala" | "arbitragem" | "estatisticas" | "classificacao" | "comunidade";
+type Tab = "geral" | "modalidades" | "inscricoes" | "financeiro" | "configuracoes" | "tabela" | "escala" | "arbitragem" | "estatisticas" | "classificacao" | "comunidade" | "comunicacao";
 
 const parseLocalTime = (scheduledTime: string) => {
   const regexMatch = scheduledTime.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
@@ -1388,7 +1390,8 @@ export default function TournamentDashboard() {
           { id: "classificacao", label: "Classificação", icon: TrendingUp },
           { id: "estatisticas", label: "Estatísticas", icon: BarChart3 },
           { id: "arbitragem", label: "Arbitragem", icon: Shield },
-          { id: "comunidade", label: "Comunidade & Mural", icon: MessageSquare }
+          { id: "comunidade", label: "Comunidade & Mural", icon: MessageSquare },
+          { id: "comunicacao", label: "💬 Comunicação", icon: MessageSquare }
         ].map(tab => (
           <button
             key={tab.id}
@@ -3346,6 +3349,19 @@ export default function TournamentDashboard() {
           <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar a comunidade deste torneio.</div>}>
             <TournamentCommunity tournamentId={id!} isOrganizer={true} />
           </ErrorBoundary>
+        )}
+
+        {activeTab === "comunicacao" && (
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+            <WhatsAppBroadcastTab
+              tournamentId={id!}
+              tournamentName={tournament?.name || ""}
+              categories={categories}
+              institutions={institutions}
+              authToken={currentUser?.token}
+              orgId={tournament?.organization_id || tournament?.organizationId}
+            />
+          </div>
         )}
 
         {/* Modal Gerar Link de Pagamento */}

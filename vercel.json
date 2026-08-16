@@ -30,5 +30,11 @@
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/whatsapp/cron-cart-recovery",
+      "schedule": "0 * * * *"
+    }
   ]
 }

@@ -8,6 +8,36 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
+// src/backend/lib/supabase.ts
+import { createClient } from "@supabase/supabase-js";
+function getSupabaseAdmin() {
+  if (!supabaseAdmin) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("CRITICAL: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY n\xE3o configurados!");
+      throw new Error("Missing Supabase credentials");
+    }
+    if (supabaseServiceKey.length < 50) {
+      console.warn("AVISO: A chave service_role parece curta demais. Verifique nos Segredos.");
+    }
+    const cleanUrl = supabaseUrl.replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
+    supabaseAdmin = createClient(cleanUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+  }
+  return supabaseAdmin;
+}
+var supabaseAdmin;
+var init_supabase = __esm({
+  "src/backend/lib/supabase.ts"() {
+    supabaseAdmin = null;
+  }
+});
+
 // src/backend/middleware/auth.ts
 var auth_exports = {};
 __export(auth_exports, {
@@ -76,6 +106,237 @@ var init_auth = __esm({
   }
 });
 
+// src/backend/services/utalkService.ts
+var utalkService_exports = {};
+__export(utalkService_exports, {
+  DEFAULT_TPL_CART_RECOVERY: () => DEFAULT_TPL_CART_RECOVERY,
+  DEFAULT_TPL_CONFIRMED: () => DEFAULT_TPL_CONFIRMED,
+  DEFAULT_TPL_PRE_REGISTRATION: () => DEFAULT_TPL_PRE_REGISTRATION,
+  formatPhoneBR: () => formatPhoneBR,
+  replaceTemplateVars: () => replaceTemplateVars,
+  sendCartRecoveryMessage: () => sendCartRecoveryMessage,
+  sendConfirmedMessage: () => sendConfirmedMessage,
+  sendPreRegistrationMessage: () => sendPreRegistrationMessage,
+  sendWhatsAppMessage: () => sendWhatsAppMessage
+});
+function formatPhoneBR(phone) {
+  let clean = (phone || "").replace(/\D/g, "");
+  if (clean.length >= 10 && !clean.startsWith("55")) clean = "55" + clean;
+  return clean;
+}
+function replaceTemplateVars(template, vars) {
+  let result = template;
+  for (const [key, value] of Object.entries(vars)) {
+    result = result.replace(new RegExp(`\\{${key}\\}`, "g"), value || "");
+  }
+  return result;
+}
+async function resolveCredentials(orgId) {
+  const globalToken = process.env.UTALK_TOKEN?.trim() || null;
+  const globalFrom = process.env.UTALK_FROM_PHONE?.trim() || null;
+  const globalOrgId = process.env.UTALK_ORGANIZATION_ID?.trim() || null;
+  const apiUrl = process.env.UTALK_API_URL || "https://app-utalk.umbler.com/api/v1/messages/simplified/";
+  if (orgId) {
+    try {
+      const supabase = getSupabaseAdmin();
+      const { data: org } = await supabase.from("organizations").select("utalk_token, utalk_from_phone, utalk_organization_id").eq("id", orgId).maybeSingle();
+      if (org?.utalk_token && org?.utalk_from_phone && org?.utalk_organization_id) {
+        return {
+          token: org.utalk_token,
+          fromPhone: org.utalk_from_phone,
+          organizationId: org.utalk_organization_id,
+          apiUrl
+        };
+      }
+    } catch (e) {
+      console.warn("[uTalk] Failed to resolve org credentials, using global:", e);
+    }
+  }
+  return { token: globalToken, fromPhone: globalFrom, organizationId: globalOrgId, apiUrl };
+}
+async function logMessage(params) {
+  try {
+    const supabase = getSupabaseAdmin();
+    await supabase.from("whatsapp_logs").insert({
+      tournament_id: params.tournamentId || null,
+      phone: params.phone,
+      message_type: params.messageType,
+      athlete_name: params.athleteName || null,
+      status: params.status,
+      error_detail: params.errorDetail || null,
+      sent_by: params.sentBy || "system"
+    });
+  } catch (e) {
+    console.warn("[uTalk] Failed to log message:", e);
+  }
+}
+async function sendWhatsAppMessage(params) {
+  const { token, fromPhone, organizationId, apiUrl } = await resolveCredentials(params.orgId);
+  if (!token || !fromPhone || !organizationId) {
+    console.warn("[uTalk] Credenciais n\xE3o configuradas \u2014 mensagem n\xE3o enviada.");
+    return { success: false, error: "uTalk n\xE3o configurado" };
+  }
+  const formattedTo = formatPhoneBR(params.phone);
+  if (!formattedTo || formattedTo.length < 12) {
+    return { success: false, error: "Telefone inv\xE1lido" };
+  }
+  const payload = {
+    toPhone: formattedTo,
+    fromPhone: fromPhone.replace(/\D/g, ""),
+    organizationId,
+    message: params.message
+  };
+  if (params.media) {
+    payload.media = params.media;
+    payload.mediaUrl = params.media;
+    payload.mediaName = params.mediaName || "arquivo";
+    payload.fileName = params.mediaName || "arquivo";
+  }
+  try {
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        token,
+        "x-token": token
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("[uTalk] API error:", res.status, text);
+      await logMessage({
+        tournamentId: params.tournamentId,
+        phone: formattedTo,
+        messageType: params.messageType || "unknown",
+        athleteName: params.athleteName,
+        status: "error",
+        errorDetail: `${res.status}: ${text}`,
+        sentBy: params.sentBy
+      });
+      return { success: false, error: text };
+    }
+    await logMessage({
+      tournamentId: params.tournamentId,
+      phone: formattedTo,
+      messageType: params.messageType || "unknown",
+      athleteName: params.athleteName,
+      status: "sent",
+      sentBy: params.sentBy
+    });
+    return { success: true };
+  } catch (e) {
+    console.error("[uTalk] Exception:", e.message);
+    await logMessage({
+      tournamentId: params.tournamentId,
+      phone: formattedTo,
+      messageType: params.messageType || "unknown",
+      athleteName: params.athleteName,
+      status: "error",
+      errorDetail: e.message,
+      sentBy: params.sentBy
+    });
+    return { success: false, error: e.message };
+  }
+}
+async function sendPreRegistrationMessage(params) {
+  const pixBlock = params.pixCopyPaste ? `\u{1F511} *PIX Copia e Cola:*
+\`${params.pixCopyPaste}\`` : params.paymentLink ? `\u{1F517} *Link de pagamento:* ${params.paymentLink}` : "";
+  const template = params.orgTemplate || DEFAULT_TPL_PRE_REGISTRATION;
+  const message = replaceTemplateVars(template, {
+    torneio: params.tournamentName,
+    nome_atleta: params.athleteName,
+    provas: params.categoryNames.join(", "),
+    valor: params.totalFee > 0 ? `R$ ${params.totalFee.toFixed(2)}` : "Gratuita",
+    pix_block: pixBlock,
+    link: params.paymentLink || "",
+    pix: params.pixCopyPaste || ""
+  });
+  return sendWhatsAppMessage({
+    phone: params.phone,
+    message,
+    orgId: params.orgId,
+    tournamentId: params.tournamentId,
+    messageType: "pre_registration",
+    athleteName: params.athleteName
+  });
+}
+async function sendConfirmedMessage(params) {
+  const template = params.orgTemplate || DEFAULT_TPL_CONFIRMED;
+  const message = replaceTemplateVars(template, {
+    torneio: params.tournamentName,
+    nome_atleta: params.athleteName,
+    provas: params.categoryNames.join(", "),
+    protocolo: params.subId.slice(0, 8).toUpperCase()
+  });
+  return sendWhatsAppMessage({
+    phone: params.phone,
+    message,
+    orgId: params.orgId,
+    tournamentId: params.tournamentId,
+    messageType: "confirmed",
+    athleteName: params.athleteName
+  });
+}
+async function sendCartRecoveryMessage(params) {
+  const pixBlock = params.pixCopyPaste ? `\u{1F511} *PIX Copia e Cola:*
+\`${params.pixCopyPaste}\`` : params.paymentLink ? `\u{1F517} *Link de pagamento:* ${params.paymentLink}` : "";
+  const template = params.orgTemplate || DEFAULT_TPL_CART_RECOVERY;
+  const message = replaceTemplateVars(template, {
+    torneio: params.tournamentName,
+    nome_atleta: params.athleteName,
+    provas: params.categoryNames.join(", "),
+    valor: params.totalFee > 0 ? `R$ ${params.totalFee.toFixed(2)}` : "Gratuita",
+    pix_block: pixBlock,
+    link: params.paymentLink || "",
+    pix: params.pixCopyPaste || ""
+  });
+  return sendWhatsAppMessage({
+    phone: params.phone,
+    message,
+    orgId: params.orgId,
+    tournamentId: params.tournamentId,
+    messageType: "cart_recovery",
+    athleteName: params.athleteName,
+    sentBy: params.sentBy || "system"
+  });
+}
+var DEFAULT_TPL_PRE_REGISTRATION, DEFAULT_TPL_CONFIRMED, DEFAULT_TPL_CART_RECOVERY;
+var init_utalkService = __esm({
+  "src/backend/services/utalkService.ts"() {
+    init_supabase();
+    DEFAULT_TPL_PRE_REGISTRATION = `\u{1F3C6} *{torneio}*
+
+Ol\xE1, *{nome_atleta}*! Sua pr\xE9-inscri\xE7\xE3o foi recebida com sucesso. \u2705
+
+\u{1F4CB} *Prova(s):* {provas}
+\u{1F4B0} *Taxa:* {valor}
+
+{pix_block}
+
+Ap\xF3s a confirma\xE7\xE3o do pagamento, sua inscri\xE7\xE3o ser\xE1 efetivada. Qualquer d\xFAvida, entre em contato com o organizador. \u{1F3CA}`;
+    DEFAULT_TPL_CONFIRMED = `\u2705 *Inscri\xE7\xE3o Confirmada!*
+
+*{nome_atleta}* est\xE1 confirmado(a) em *{torneio}*! \u{1F389}
+
+\u{1F4CB} *Prova(s):* {provas}
+\u{1F194} *Protocolo:* {protocolo}
+
+Boa sorte e bom treino! \u{1F4AA}\u{1F3CA}`;
+    DEFAULT_TPL_CART_RECOVERY = `\u23F3 *Lembrete de Inscri\xE7\xE3o Pendente*
+
+Ol\xE1! Identificamos que a inscri\xE7\xE3o de *{nome_atleta}* em *{torneio}* ainda n\xE3o foi paga.
+
+\u{1F4CB} *Prova(s):* {provas}
+\u{1F4B0} *Valor:* {valor}
+
+{pix_block}
+
+Garanta sua vaga! As inscri\xE7\xF5es s\xE3o por ordem de pagamento. \u{1F3C6}`;
+  }
+});
+
 // src/backend/app.ts
 import dotenv from "dotenv";
 import express from "express";
@@ -84,35 +345,9 @@ import helmet from "helmet";
 import morgan from "morgan";
 
 // src/backend/routes/institutionRoutes.ts
-import { Router } from "express";
-
-// src/backend/lib/supabase.ts
-import { createClient } from "@supabase/supabase-js";
-var supabaseAdmin = null;
-function getSupabaseAdmin() {
-  if (!supabaseAdmin) {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error("CRITICAL: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY n\xE3o configurados!");
-      throw new Error("Missing Supabase credentials");
-    }
-    if (supabaseServiceKey.length < 50) {
-      console.warn("AVISO: A chave service_role parece curta demais. Verifique nos Segredos.");
-    }
-    const cleanUrl = supabaseUrl.replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
-    supabaseAdmin = createClient(cleanUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-  }
-  return supabaseAdmin;
-}
-
-// src/backend/routes/institutionRoutes.ts
+init_supabase();
 init_auth();
+import { Router } from "express";
 import fs from "fs";
 import path from "path";
 var router = Router();
@@ -1302,8 +1537,9 @@ router.post("/payments/webhook", async (req, res) => {
 var institutionRoutes_default = router;
 
 // src/backend/routes/tournamentRoutes.ts
-import { Router as Router2 } from "express";
+init_supabase();
 init_auth();
+import { Router as Router2 } from "express";
 import fs2 from "fs";
 import path2 from "path";
 import bcrypt from "bcryptjs";
@@ -3919,6 +4155,29 @@ router2.post("/:id/self-register", async (req, res) => {
       feePricingModel,
       message: "Inscri\xE7\xE3o realizada com sucesso!"
     });
+    const phone = parentPhone || additionalData?.phone;
+    if (phone && createdSubIds.length > 0) {
+      try {
+        const { sendPreRegistrationMessage: sendPreRegistrationMessage2 } = await Promise.resolve().then(() => (init_utalkService(), utalkService_exports));
+        const { data: org } = await supabase.from("organizations").select("whatsapp_tpl_pre_registration, utalk_token, utalk_from_phone").eq("id", tData2.organization_id).maybeSingle();
+        const { data: cats } = await supabase.from("tournament_categories").select("name").in("id", targetCategoryIds);
+        const categoryNames = cats?.map((c) => c.name) || targetCategoryIds;
+        const pixLink = totalFee > 0 ? `${process.env.APP_URL || "https://querocompetir.com.br"}/public/register-athlete/${createdSubIds[0]}` : void 0;
+        await sendPreRegistrationMessage2({
+          phone,
+          athleteName,
+          tournamentName: tData2.name,
+          tournamentId,
+          orgId: tData2.organization_id,
+          categoryNames,
+          totalFee,
+          paymentLink: pixLink,
+          orgTemplate: org?.whatsapp_tpl_pre_registration
+        });
+      } catch (wErr) {
+        console.warn("[WhatsApp] Falha ao enviar mensagem de pr\xE9-inscri\xE7\xE3o:", wErr);
+      }
+    }
   } catch (err) {
     console.error("[self-register]", err);
     res.status(500).json({ error: err.message });
@@ -4731,6 +4990,34 @@ async function updateSubscriptionPaymentStatus(subId, status, sub, tData2, setti
   if (index !== -1) {
     db.athleteSubscriptions[index].paymentStatus = status;
     saveDb(db);
+  }
+  if (status === "paid") {
+    try {
+      const { sendConfirmedMessage: sendConfirmedMessage2 } = await Promise.resolve().then(() => (init_utalkService(), utalkService_exports));
+      const supabase = getSupabaseAdmin();
+      const tournamentId = sub?.tournament_id || sub?.tournamentId;
+      const phone = sub?.parent_phone || sub?.parentPhone || sub?.additional_data?.phone;
+      const athleteName = sub?.athlete_name || sub?.athleteName;
+      if (phone && tournamentId) {
+        const { data: tournament } = await supabase.from("tournaments").select("id, name, organization_id").eq("id", tournamentId).maybeSingle();
+        const { data: org } = tournament?.organization_id ? await supabase.from("organizations").select("whatsapp_tpl_confirmed").eq("id", tournament.organization_id).maybeSingle() : { data: null };
+        const { data: allSubs } = await supabase.from("athlete_subscriptions").select("category_id").eq("tournament_id", tournamentId).or(`document.eq.${sub?.document || ""},athlete_name.eq.${athleteName || ""}`);
+        const catIds = [...new Set((allSubs || []).map((s) => s.category_id).filter(Boolean))];
+        const { data: cats } = catIds.length > 0 ? await supabase.from("tournament_categories").select("name").in("id", catIds) : { data: [] };
+        await sendConfirmedMessage2({
+          phone,
+          athleteName: athleteName || "Atleta",
+          tournamentName: tournament?.name || "Torneio",
+          tournamentId,
+          orgId: tournament?.organization_id,
+          categoryNames: cats?.map((c) => c.name) || [],
+          subId,
+          orgTemplate: org?.whatsapp_tpl_confirmed
+        });
+      }
+    } catch (wErr) {
+      console.warn("[WhatsApp] Falha ao enviar mensagem de confirma\xE7\xE3o:", wErr);
+    }
   }
 }
 router2.post("/:id/athlete-subscriptions/:subId/validate", async (req, res) => {
@@ -5839,8 +6126,9 @@ router2.post("/public/athlete-subscription/match/:matchId/athlete/:athleteId/vis
 var tournamentRoutes_default = router2;
 
 // src/backend/routes/memberRoutes.ts
-import { Router as Router3 } from "express";
+init_supabase();
 init_auth();
+import { Router as Router3 } from "express";
 import fs3 from "fs";
 import path3 from "path";
 var router3 = Router3();
@@ -5954,11 +6242,12 @@ router3.get("/:id/stats", async (req, res) => {
 var memberRoutes_default = router3;
 
 // src/backend/routes/authRoutes.ts
+init_supabase();
+init_auth();
 import { Router as Router4 } from "express";
 import * as fs4 from "fs";
 import * as path4 from "path";
 import bcrypt2 from "bcryptjs";
-init_auth();
 var router4 = Router4();
 var ACCOUNTS_FILE4 = path4.join(process.cwd(), "src/backend/data/accounts.json");
 var BCRYPT_ROUNDS = 10;
@@ -6415,8 +6704,9 @@ router4.get("/guardian/:email/athletes", requireAuth, async (req, res) => {
 var authRoutes_default = router4;
 
 // src/backend/routes/membershipRoutes.ts
-import { Router as Router5 } from "express";
+init_supabase();
 init_auth();
+import { Router as Router5 } from "express";
 var router5 = Router5();
 router5.get("/status", async (req, res) => {
   const { memberId, organizationId, year } = req.query;
@@ -6532,8 +6822,9 @@ router5.post("/status-bulk", async (req, res) => {
 var membershipRoutes_default = router5;
 
 // src/backend/routes/paymentRoutes.ts
-import { Router as Router6 } from "express";
+init_supabase();
 init_auth();
+import { Router as Router6 } from "express";
 import fs5 from "fs";
 import path5 from "path";
 var router6 = Router6();
@@ -7323,6 +7614,181 @@ router6.post("/tokenize-card", async (req, res) => {
 });
 var paymentRoutes_default = router6;
 
+// src/backend/routes/whatsappRoutes.ts
+init_auth();
+init_supabase();
+init_utalkService();
+import { Router as Router7 } from "express";
+var router7 = Router7();
+router7.post("/send-test", requireAuth, async (req, res) => {
+  const { phone, message } = req.body;
+  if (!phone || !message) {
+    return res.status(400).json({ error: "phone e message s\xE3o obrigat\xF3rios" });
+  }
+  const result = await sendWhatsAppMessage({
+    phone,
+    message,
+    messageType: "test",
+    sentBy: "admin_test"
+  });
+  if (!result.success) {
+    return res.status(500).json({ error: result.error });
+  }
+  res.json({ success: true });
+});
+router7.post("/broadcast", requireAuth, async (req, res) => {
+  const {
+    tournamentId,
+    filter,
+    // 'all' | 'confirmed' | 'pending' | 'by_category' | 'by_institution'
+    categoryId,
+    institutionId,
+    message,
+    mediaUrl,
+    mediaName
+  } = req.body;
+  if (!tournamentId || !message) {
+    return res.status(400).json({ error: "tournamentId e message s\xE3o obrigat\xF3rios" });
+  }
+  const supabase = getSupabaseAdmin();
+  const { data: tournament } = await supabase.from("tournaments").select("id, name, organization_id").eq("id", tournamentId).maybeSingle();
+  if (!tournament) {
+    return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
+  }
+  let query = supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, payment_status, category_id, institution_id").eq("tournament_id", tournamentId);
+  if (filter === "confirmed") {
+    query = query.eq("payment_status", "paid");
+  } else if (filter === "pending") {
+    query = query.neq("payment_status", "paid");
+  } else if (filter === "by_category" && categoryId) {
+    query = query.eq("category_id", categoryId);
+  } else if (filter === "by_institution" && institutionId) {
+    query = query.eq("institution_id", institutionId);
+  }
+  const { data: subscriptions, error } = await query;
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  if (!subscriptions || subscriptions.length === 0) {
+    return res.json({ success: true, sent: 0, errors: 0, total: 0 });
+  }
+  const seenPhones = /* @__PURE__ */ new Set();
+  const targets = subscriptions.filter((s) => {
+    const phone = s.parent_phone || s.additional_data?.phone;
+    if (!phone) return false;
+    const fmt = formatPhoneBR(phone);
+    if (seenPhones.has(fmt)) return false;
+    seenPhones.add(fmt);
+    return true;
+  });
+  let sent = 0;
+  let errors = 0;
+  for (const sub of targets) {
+    const phone = sub.parent_phone || sub.additional_data?.phone;
+    const personalizedMessage = message.replace(/\{nome_atleta\}/g, sub.athlete_name || "Atleta").replace(/\{torneio\}/g, tournament.name || "");
+    const result = await sendWhatsAppMessage({
+      phone,
+      message: personalizedMessage,
+      media: mediaUrl,
+      mediaName,
+      orgId: tournament.organization_id,
+      tournamentId,
+      messageType: "broadcast",
+      athleteName: sub.athlete_name,
+      sentBy: "organizer"
+    });
+    if (result.success) sent++;
+    else errors++;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  res.json({ success: true, sent, errors, total: targets.length });
+});
+router7.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
+  const { tournamentId } = req.params;
+  const { subId } = req.body;
+  const supabase = getSupabaseAdmin();
+  const { data: tournament } = await supabase.from("tournaments").select("id, name, organization_id").eq("id", tournamentId).maybeSingle();
+  if (!tournament) return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
+  const { data: org } = await supabase.from("organizations").select("whatsapp_tpl_pre_registration").eq("id", tournament.organization_id).maybeSingle();
+  let query = supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, payment_status, category_id").eq("tournament_id", tournamentId).neq("payment_status", "paid");
+  if (subId) query = query.eq("id", subId);
+  const { data: subs } = await query;
+  if (!subs || subs.length === 0) return res.json({ success: true, sent: 0 });
+  let sent = 0;
+  for (const sub of subs) {
+    const phone = sub.parent_phone || sub.additional_data?.phone;
+    if (!phone) continue;
+    await sendCartRecoveryMessage({
+      phone,
+      athleteName: sub.athlete_name,
+      tournamentName: tournament.name,
+      tournamentId,
+      orgId: tournament.organization_id,
+      categoryNames: [sub.category_id],
+      // simplificado; enriched em produção
+      totalFee: 0,
+      orgTemplate: org?.whatsapp_tpl_pre_registration,
+      sentBy: "organizer_manual"
+    });
+    await supabase.from("athlete_subscriptions").update({
+      whatsapp_cart_recovery_sent: true,
+      whatsapp_cart_recovery_sent_at: (/* @__PURE__ */ new Date()).toISOString()
+    }).eq("id", sub.id);
+    sent++;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  res.json({ success: true, sent });
+});
+router7.get("/logs/:tournamentId", requireAuth, async (req, res) => {
+  const { tournamentId } = req.params;
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.from("whatsapp_logs").select("*").eq("tournament_id", tournamentId).order("created_at", { ascending: false }).limit(200);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+router7.post("/cron-cart-recovery", async (req, res) => {
+  const cronSecret = req.headers["x-cron-secret"] || req.headers.authorization;
+  if (process.env.CRON_SECRET && cronSecret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const supabase = getSupabaseAdmin();
+  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1e3).toISOString();
+  const twoHalfHoursAgo = new Date(Date.now() - 2.5 * 60 * 60 * 1e3).toISOString();
+  const { data: subs } = await supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, tournament_id, category_id").neq("payment_status", "paid").eq("whatsapp_cart_recovery_sent", false).gte("created_at", twoHalfHoursAgo).lte("created_at", twoHoursAgo);
+  if (!subs || subs.length === 0) {
+    return res.json({ success: true, processed: 0 });
+  }
+  const tournamentIds = [...new Set(subs.map((s) => s.tournament_id))];
+  const { data: tournaments } = await supabase.from("tournaments").select("id, name, organization_id").in("id", tournamentIds);
+  const tMap = {};
+  for (const t of tournaments || []) tMap[t.id] = t;
+  let processed = 0;
+  for (const sub of subs) {
+    const phone = sub.parent_phone || sub.additional_data?.phone;
+    if (!phone) continue;
+    const tournament = tMap[sub.tournament_id];
+    if (!tournament) continue;
+    await sendCartRecoveryMessage({
+      phone,
+      athleteName: sub.athlete_name,
+      tournamentName: tournament.name,
+      tournamentId: sub.tournament_id,
+      orgId: tournament.organization_id,
+      categoryNames: [],
+      totalFee: 0,
+      sentBy: "cron"
+    });
+    await supabase.from("athlete_subscriptions").update({
+      whatsapp_cart_recovery_sent: true,
+      whatsapp_cart_recovery_sent_at: (/* @__PURE__ */ new Date()).toISOString()
+    }).eq("id", sub.id);
+    processed++;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  res.json({ success: true, processed });
+});
+var whatsappRoutes_default = router7;
+
 // src/backend/app.ts
 init_auth();
 dotenv.config();
@@ -7376,7 +7842,7 @@ app.get("/api/health", (_req, res) => {
 });
 app.get("/api/health/env", (_req, res) => {
   const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "JWT_SECRET"];
-  const optional = ["APP_URL", "PAGARME_PUBLIC_KEY", "PAGARME_SECRET_KEY", "NODE_ENV"];
+  const optional = ["APP_URL", "PAGARME_PUBLIC_KEY", "PAGARME_SECRET_KEY", "NODE_ENV", "UTALK_TOKEN", "UTALK_FROM_PHONE", "UTALK_ORGANIZATION_ID"];
   const report = {};
   for (const key of required) {
     const val = process.env[key];
@@ -7397,6 +7863,7 @@ app.use("/api/members", memberRoutes_default);
 app.use("/api/auth", authRoutes_default);
 app.use("/api/memberships", membershipRoutes_default);
 app.use("/api/payments", paymentRoutes_default);
+app.use("/api/whatsapp", whatsappRoutes_default);
 app.use((err, _req, res, _next) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Erro interno do servidor.";

@@ -3718,6 +3718,43 @@ router.post("/:id/self-register", async (req, res) => {
       feePricingModel,
       message: "Inscrição realizada com sucesso!",
     });
+
+    // ── WhatsApp: Pré-Inscrição ───────────────────────────────────────────────
+    const phone = parentPhone || additionalData?.phone;
+    if (phone && createdSubIds.length > 0) {
+      try {
+        const { sendPreRegistrationMessage } = await import("../services/utalkService.ts");
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("whatsapp_tpl_pre_registration, utalk_token, utalk_from_phone")
+          .eq("id", tData.organization_id)
+          .maybeSingle();
+
+        // Busca nomes das provas para compor a mensagem
+        const { data: cats } = await supabase
+          .from("tournament_categories")
+          .select("name")
+          .in("id", targetCategoryIds);
+        const categoryNames = cats?.map((c: any) => c.name) || targetCategoryIds;
+
+        // PIX ou link de pagamento do primeiro sub
+        const pixLink = totalFee > 0 ? `${process.env.APP_URL || "https://querocompetir.com.br"}/public/register-athlete/${createdSubIds[0]}` : undefined;
+
+        await sendPreRegistrationMessage({
+          phone,
+          athleteName,
+          tournamentName: tData.name,
+          tournamentId,
+          orgId: tData.organization_id,
+          categoryNames,
+          totalFee,
+          paymentLink: pixLink,
+          orgTemplate: org?.whatsapp_tpl_pre_registration,
+        });
+      } catch (wErr) {
+        console.warn("[WhatsApp] Falha ao enviar mensagem de pré-inscrição:", wErr);
+      }
+    }
   } catch (err: any) {
     console.error("[self-register]", err);
     res.status(500).json({ error: err.message });
@@ -4862,6 +4899,54 @@ async function updateSubscriptionPaymentStatus(subId: string, status: 'pending' 
   if (index !== -1) {
     db.athleteSubscriptions[index].paymentStatus = status;
     saveDb(db);
+  }
+
+  // ── WhatsApp: Confirmação de Pagamento ───────────────────────────────────
+  if (status === "paid") {
+    try {
+      const { sendConfirmedMessage } = await import("../services/utalkService.ts");
+      const supabase = getSupabaseAdmin();
+      const tournamentId = sub?.tournament_id || sub?.tournamentId;
+      const phone = sub?.parent_phone || sub?.parentPhone || sub?.additional_data?.phone;
+      const athleteName = sub?.athlete_name || sub?.athleteName;
+
+      if (phone && tournamentId) {
+        const { data: tournament } = await supabase
+          .from("tournaments")
+          .select("id, name, organization_id")
+          .eq("id", tournamentId)
+          .maybeSingle();
+
+        const { data: org } = tournament?.organization_id
+          ? await supabase.from("organizations").select("whatsapp_tpl_confirmed").eq("id", tournament.organization_id).maybeSingle()
+          : { data: null };
+
+        // Busca todas as inscrições confirmadas do atleta neste torneio para listar as provas
+        const { data: allSubs } = await supabase
+          .from("athlete_subscriptions")
+          .select("category_id")
+          .eq("tournament_id", tournamentId)
+          .or(`document.eq.${sub?.document || ""},athlete_name.eq.${athleteName || ""}`);
+
+        const catIds = [...new Set((allSubs || []).map((s: any) => s.category_id).filter(Boolean))];
+        const { data: cats } = catIds.length > 0
+          ? await supabase.from("tournament_categories").select("name").in("id", catIds)
+          : { data: [] };
+
+        await sendConfirmedMessage({
+          phone,
+          athleteName: athleteName || "Atleta",
+          tournamentName: tournament?.name || "Torneio",
+          tournamentId,
+          orgId: tournament?.organization_id,
+          categoryNames: cats?.map((c: any) => c.name) || [],
+          subId,
+          orgTemplate: (org as any)?.whatsapp_tpl_confirmed,
+        });
+      }
+    } catch (wErr) {
+      console.warn("[WhatsApp] Falha ao enviar mensagem de confirmação:", wErr);
+    }
   }
 }
 
