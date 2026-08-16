@@ -133,7 +133,7 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
       const ms = capped.slice(capped.length - 2);
       return `${sec}.${ms}`;
     } else {
-      const min = capped.slice(0, capped.length - 4).padStart(2, "0");
+      const min = capped.slice(0, capped.length - 4);
       const sec = capped.slice(capped.length - 4, capped.length - 2);
       const ms = capped.slice(capped.length - 2);
       return `${min}:${sec}.${ms}`;
@@ -597,7 +597,8 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
                                 ) : (
                                   <input
                                     type="text"
-                                    placeholder="00:32.50 (digite 003250)"
+                                    inputMode="numeric"
+                                    placeholder="Ex: 3250 ou 010530"
                                     value={editingResults[lane.athleteId!] || ""}
                                     onChange={(e) => handleResultChange(lane.athleteId!, e.target.value)}
                                     onBlur={() => {

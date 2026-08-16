@@ -36,6 +36,46 @@ function calcAge(birthDate: string) {
   return age;
 }
 
+function formatSeedTimeInput(val: string): string {
+  if (!val) return "";
+  const digits = val.replace(/\D/g, "");
+  if (digits.length === 0) return "";
+
+  const capped = digits.slice(0, 6);
+  if (capped.length <= 2) {
+    return capped;
+  } else if (capped.length <= 4) {
+    const sec = capped.slice(0, capped.length - 2);
+    const ms = capped.slice(capped.length - 2);
+    return `${sec}.${ms}`;
+  } else {
+    const min = capped.slice(0, capped.length - 4);
+    const sec = capped.slice(capped.length - 4, capped.length - 2);
+    const ms = capped.slice(capped.length - 2);
+    return `${min}:${sec}.${ms}`;
+  }
+}
+
+function finalizeSeedTimeOnBlur(val: string): string {
+  if (!val) return "";
+  const digits = val.replace(/\D/g, "");
+  if (digits.length === 0) return "";
+
+  const capped = digits.slice(0, 6);
+  if (capped.length <= 2) {
+    return `${capped}.00`;
+  } else if (capped.length <= 4) {
+    const sec = capped.slice(0, capped.length - 2).padStart(2, "0");
+    const ms = capped.slice(capped.length - 2);
+    return `00:${sec}.${ms}`;
+  } else {
+    const min = capped.slice(0, capped.length - 4).padStart(2, "0");
+    const sec = capped.slice(capped.length - 4, capped.length - 2);
+    const ms = capped.slice(capped.length - 2);
+    return `${min}:${sec}.${ms}`;
+  }
+}
+
 // ── Step indicator ────────────────────────────────────────────────────────────
 const steps = [
   { id: "athlete",     label: "Atleta",      icon: User },
@@ -521,10 +561,21 @@ export default function PublicSelfRegistration() {
                                 </label>
                                 <input
                                   type="text"
-                                  placeholder="00:32.50"
+                                  inputMode="numeric"
+                                  placeholder="Ex: 3250 (32.50s)"
                                   value={seedTimes[cat.id] || ""}
-                                  onChange={(e) => setSeedTimes(prev => ({ ...prev, [cat.id]: e.target.value }))}
-                                  className="px-3 py-1.5 border border-indigo-300 rounded-xl text-xs font-mono font-bold text-indigo-950 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 w-36 shadow-xs"
+                                  onChange={(e) => {
+                                    const formatted = formatSeedTimeInput(e.target.value);
+                                    setSeedTimes(prev => ({ ...prev, [cat.id]: formatted }));
+                                  }}
+                                  onBlur={() => {
+                                    const currentVal = seedTimes[cat.id] || "";
+                                    const finalized = finalizeSeedTimeOnBlur(currentVal);
+                                    if (finalized !== currentVal) {
+                                      setSeedTimes(prev => ({ ...prev, [cat.id]: finalized }));
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 border border-indigo-300 rounded-xl text-xs font-mono font-bold text-indigo-950 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 w-44 shadow-xs placeholder:text-indigo-300"
                                 />
                               </div>
                             )}
