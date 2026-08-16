@@ -1283,6 +1283,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         code: pay.id,
         items: [
           {
+            code: pay.id,
             amount: Math.round(pay.amount * 100),
             description: `Taxa de Adesão - ${pay.tournamentName}`,
             quantity: 1
@@ -1352,6 +1353,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         code: pay.id,
         items: [
           {
+            code: pay.id,
             amount: Math.round(pay.amount * 100),
             description: `Taxa de Adesão - ${pay.tournamentName}`,
             quantity: 1
@@ -1409,6 +1411,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         code: pay.id,
         items: [
           {
+            code: pay.id,
             amount: Math.round(pay.amount * 100),
             description: `Taxa de Adesão - ${pay.tournamentName}`,
             quantity: 1

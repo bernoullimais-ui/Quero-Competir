@@ -1053,6 +1053,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         code: pay.id,
         items: [
           {
+            code: pay.id,
             amount: Math.round(pay.amount * 100),
             description: `Taxa de Ades\xE3o - ${pay.tournamentName}`,
             quantity: 1
@@ -1112,6 +1113,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         code: pay.id,
         items: [
           {
+            code: pay.id,
             amount: Math.round(pay.amount * 100),
             description: `Taxa de Ades\xE3o - ${pay.tournamentName}`,
             quantity: 1
@@ -1163,6 +1165,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         code: pay.id,
         items: [
           {
+            code: pay.id,
             amount: Math.round(pay.amount * 100),
             description: `Taxa de Ades\xE3o - ${pay.tournamentName}`,
             quantity: 1
@@ -4452,6 +4455,7 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
     const items = [];
     if (athleteFee > 0) {
       items.push({
+        code: `athlete_${sub.id?.slice(0, 8) || "fee"}`,
         amount: Math.round(athleteFee * 100),
         description: `Inscri\xE7\xE3o Torneio - ${sub.athleteName}`,
         quantity: 1
@@ -4459,6 +4463,7 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
     }
     if (membershipFee > 0) {
       items.push({
+        code: `membership_${sub.id?.slice(0, 8) || "fee"}`,
         amount: Math.round(membershipFee * 100),
         description: `Anuidade Liga (${orgName}) - ${sub.athleteName}`,
         quantity: 1

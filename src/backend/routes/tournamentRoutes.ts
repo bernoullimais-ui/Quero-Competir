@@ -4526,6 +4526,7 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
     const items = [];
     if (athleteFee > 0) {
       items.push({
+        code: `athlete_${sub.id?.slice(0, 8) || 'fee'}`,
         amount: Math.round(athleteFee * 100),
         description: `Inscrição Torneio - ${sub.athleteName}`,
         quantity: 1
@@ -4533,6 +4534,7 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
     }
     if (membershipFee > 0) {
       items.push({
+        code: `membership_${sub.id?.slice(0, 8) || 'fee'}`,
         amount: Math.round(membershipFee * 100),
         description: `Anuidade Liga (${orgName}) - ${sub.athleteName}`,
         quantity: 1
