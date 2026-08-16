@@ -3411,15 +3411,25 @@ function mapSubToFrontend(dbSub) {
   };
 }
 async function getSubscriptionSettings(idOrSlug) {
-  let showBrackets = true;
   try {
     const tData3 = await findTournamentByIdOrSlug(idOrSlug);
     const tournamentId2 = tData3 ? tData3.id : idOrSlug;
-    if (tData3?.rules_config?.show_brackets_publicly !== void 0) {
-      showBrackets = !!tData3.rules_config.show_brackets_publicly;
-    }
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase.from("tournament_subscription_settings").select("*").eq("tournament_id", tournamentId2).maybeSingle();
+    let showBrackets = true;
+    if (data?.registration_config?.show_brackets_publicly !== void 0) {
+      showBrackets = !!data.registration_config.show_brackets_publicly;
+    } else if (data?.show_brackets_publicly !== void 0) {
+      showBrackets = !!data.show_brackets_publicly;
+    } else if (tData3?.rules_config?.show_brackets_publicly !== void 0) {
+      showBrackets = !!tData3.rules_config.show_brackets_publicly;
+    } else {
+      const db2 = loadDb();
+      const raw = db2.settings[tournamentId2] || db2.settings[idOrSlug];
+      if (raw && raw.showBracketsPublicly !== void 0) {
+        showBrackets = !!raw.showBracketsPublicly;
+      }
+    }
     if (error) {
       if (error.code === "PGRST116" || error.message.includes('relation "tournament_subscription_settings" does not exist') || error.message.includes("Public.tournament_subscription_settings")) {
         console.warn("Using JSON fallback for subscription settings: Table not found in Supabase.");
@@ -3428,7 +3438,7 @@ async function getSubscriptionSettings(idOrSlug) {
       }
     } else if (data) {
       const mapped = mapSettingsToFrontend(data);
-      mapped.showBracketsPublicly = showBrackets;
+      if (mapped) mapped.showBracketsPublicly = showBrackets;
       return mapped;
     }
   } catch (err) {
@@ -3438,6 +3448,12 @@ async function getSubscriptionSettings(idOrSlug) {
   const tournamentId = tData2 ? tData2.id : idOrSlug;
   const db = loadDb();
   const rawSettings = db.settings[tournamentId] || db.settings[idOrSlug];
+  let showBracketsFallback = true;
+  if (rawSettings && rawSettings.showBracketsPublicly !== void 0) {
+    showBracketsFallback = !!rawSettings.showBracketsPublicly;
+  } else if (tData2?.rules_config?.show_brackets_publicly !== void 0) {
+    showBracketsFallback = !!tData2.rules_config.show_brackets_publicly;
+  }
   if (rawSettings) {
     const hasConfig = rawSettings.registrationConfig && (rawSettings.registrationConfig.fields?.length > 0 || rawSettings.registrationConfig.uploads?.length > 0 || rawSettings.registrationConfig.terms?.length > 0);
     return {
@@ -3449,7 +3465,7 @@ async function getSubscriptionSettings(idOrSlug) {
       requireMembership: !!rawSettings.requireMembership,
       registrationConfig: hasConfig ? rawSettings.registrationConfig : getDefaultRegistrationConfig(),
       maxVisitorsPerAthlete: Number(rawSettings.maxVisitorsPerAthlete) || 0,
-      showBracketsPublicly: rawSettings.showBracketsPublicly !== void 0 ? !!rawSettings.showBracketsPublicly : showBrackets
+      showBracketsPublicly: showBracketsFallback
     };
   }
   return {
@@ -3461,7 +3477,7 @@ async function getSubscriptionSettings(idOrSlug) {
     requireMembership: false,
     registrationConfig: getDefaultRegistrationConfig(),
     maxVisitorsPerAthlete: 0,
-    showBracketsPublicly: showBrackets
+    showBracketsPublicly: showBracketsFallback
   };
 }
 async function saveSubscriptionSettings(idOrSlug, payload) {

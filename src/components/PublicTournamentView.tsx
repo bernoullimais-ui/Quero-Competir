@@ -301,9 +301,13 @@ export default function PublicTournamentView() {
         if (pubSettings && !pubSettings.error) {
           setSelfRegEnabled(true);
         }
+        let isPublic = true;
         if (subSettings && subSettings.showBracketsPublicly !== undefined) {
-          setShowBracketsPublicly(subSettings.showBracketsPublicly);
+          isPublic = !!subSettings.showBracketsPublicly;
+        } else if (tData.rules_config?.show_brackets_publicly !== undefined) {
+          isPublic = !!tData.rules_config.show_brackets_publicly;
         }
+        setShowBracketsPublicly(isPublic);
         setLoading(false);
       })
       .catch(err => {
