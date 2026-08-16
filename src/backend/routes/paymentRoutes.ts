@@ -779,7 +779,9 @@ router.post("/webhook", async (req, res) => {
 
     const supabase = getSupabaseAdmin();
 
-    if (eventType === "charge.paid" || eventType === "order.paid") {
+    const isPaidEvent = eventType === "charge.paid" || eventType === "order.paid" || eventType?.includes("paid") || data?.status === "paid" || data?.charges?.[0]?.status === "paid";
+
+    if (isPaidEvent) {
       // 1. Verificar se é uma inscrição de atleta (athlete_subscriptions)
       let sub: any = null;
 
@@ -797,6 +799,15 @@ router.post("/webhook", async (req, res) => {
           .from("athlete_subscriptions")
           .select("id, tournament_id, document, athlete_name")
           .filter("additional_data->>pagarmeOrderId", "eq", orderId)
+          .maybeSingle();
+        sub = dbSub;
+      }
+
+      if (!sub && chargeId) {
+        const { data: dbSub } = await supabase
+          .from("athlete_subscriptions")
+          .select("id, tournament_id, document, athlete_name")
+          .filter("additional_data->>pagarmeChargeId", "eq", chargeId)
           .maybeSingle();
         sub = dbSub;
       }

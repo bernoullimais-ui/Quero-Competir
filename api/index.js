@@ -7058,7 +7058,8 @@ router6.post("/webhook", async (req, res) => {
       return res.json({ received: true, note: "Nenhum c\xF3digo ou ID de pedido especificado no webhook." });
     }
     const supabase = getSupabaseAdmin();
-    if (eventType === "charge.paid" || eventType === "order.paid") {
+    const isPaidEvent = eventType === "charge.paid" || eventType === "order.paid" || eventType?.includes("paid") || data?.status === "paid" || data?.charges?.[0]?.status === "paid";
+    if (isPaidEvent) {
       let sub = null;
       if (orderCode) {
         const { data: dbSub } = await supabase.from("athlete_subscriptions").select("id, tournament_id, document, athlete_name").eq("id", orderCode).maybeSingle();
@@ -7066,6 +7067,10 @@ router6.post("/webhook", async (req, res) => {
       }
       if (!sub && orderId) {
         const { data: dbSub } = await supabase.from("athlete_subscriptions").select("id, tournament_id, document, athlete_name").filter("additional_data->>pagarmeOrderId", "eq", orderId).maybeSingle();
+        sub = dbSub;
+      }
+      if (!sub && chargeId) {
+        const { data: dbSub } = await supabase.from("athlete_subscriptions").select("id, tournament_id, document, athlete_name").filter("additional_data->>pagarmeChargeId", "eq", chargeId).maybeSingle();
         sub = dbSub;
       }
       if (sub) {
