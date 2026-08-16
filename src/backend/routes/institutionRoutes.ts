@@ -1532,11 +1532,21 @@ router.post("/payments/webhook", async (req, res) => {
             .maybeSingle();
 
           if (subData && subData.payment_status !== "paid") {
-            // Atualizar status de pagamento da inscrição do atleta
-            await supabase
+            // Atualizar status de pagamento de todas as inscrições do atleta no mesmo torneio
+            let subQuery = supabase
               .from('athlete_subscriptions')
               .update({ payment_status: 'paid' })
-              .eq('id', orderCode);
+              .eq('tournament_id', subData.tournament_id);
+
+            if (subData.document) {
+              subQuery = subQuery.eq('document', subData.document);
+            } else if (subData.athlete_name) {
+              subQuery = subQuery.eq('athlete_name', subData.athlete_name);
+            } else {
+              subQuery = subQuery.eq('id', orderCode);
+            }
+
+            await subQuery;
 
             // Obter informações do torneio e da filiação
             const { data: tData } = await supabase

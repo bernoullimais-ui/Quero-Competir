@@ -1247,7 +1247,15 @@ router.post("/payments/webhook", async (req, res) => {
           const supabase = getSupabaseAdmin();
           const { data: subData } = await supabase.from("athlete_subscriptions").select("*").eq("id", orderCode).maybeSingle();
           if (subData && subData.payment_status !== "paid") {
-            await supabase.from("athlete_subscriptions").update({ payment_status: "paid" }).eq("id", orderCode);
+            let subQuery = supabase.from("athlete_subscriptions").update({ payment_status: "paid" }).eq("tournament_id", subData.tournament_id);
+            if (subData.document) {
+              subQuery = subQuery.eq("document", subData.document);
+            } else if (subData.athlete_name) {
+              subQuery = subQuery.eq("athlete_name", subData.athlete_name);
+            } else {
+              subQuery = subQuery.eq("id", orderCode);
+            }
+            await subQuery;
             const { data: tData2 } = await supabase.from("tournaments").select("owner_id, start_date").eq("id", subData.tournament_id).maybeSingle();
             const { data: tSettings } = await supabase.from("tournament_subscription_settings").select("require_membership").eq("tournament_id", subData.tournament_id).maybeSingle();
             if (tSettings?.require_membership && tData2) {
@@ -4574,7 +4582,21 @@ async function updateSubscriptionAdditionalData(subId, additionalData, sub) {
 async function updateSubscriptionPaymentStatus(subId, status, sub, tData2, settings) {
   try {
     const supabase = getSupabaseAdmin();
-    await supabase.from("athlete_subscriptions").update({ payment_status: status }).eq("id", subId);
+    const tournamentId = sub?.tournament_id || sub?.tournamentId;
+    const document = sub?.document;
+    const athleteName = sub?.athlete_name || sub?.athleteName;
+    let query = supabase.from("athlete_subscriptions").update({ payment_status: status });
+    if (tournamentId && (document || athleteName)) {
+      query = query.eq("tournament_id", tournamentId);
+      if (document) {
+        query = query.eq("document", document);
+      } else {
+        query = query.eq("athlete_name", athleteName);
+      }
+    } else {
+      query = query.eq("id", subId);
+    }
+    await query;
     if (settings?.requireMembership && tData2) {
       const { data: existingMember } = await supabase.from("members").select("id").eq("document_number", sub.document).maybeSingle();
       let athleteId = existingMember?.id;
@@ -7075,8 +7097,16 @@ router6.post("/webhook", async (req, res) => {
         sub = dbSub;
       }
       if (sub) {
-        console.log(`[Pagar.me Webhook] Inscri\xE7\xE3o de atleta ${sub.id} PAGA com sucesso.`);
-        await supabase.from("athlete_subscriptions").update({ payment_status: "paid" }).eq("id", sub.id);
+        console.log(`[Pagar.me Webhook] Inscri\xE7\xE3o de atleta ${sub.id} (${sub.athlete_name}) PAGA com sucesso.`);
+        let updateQuery = supabase.from("athlete_subscriptions").update({ payment_status: "paid" }).eq("tournament_id", sub.tournament_id);
+        if (sub.document) {
+          updateQuery = updateQuery.eq("document", sub.document);
+        } else if (sub.athlete_name) {
+          updateQuery = updateQuery.eq("athlete_name", sub.athlete_name);
+        } else {
+          updateQuery = updateQuery.eq("id", sub.id);
+        }
+        await updateQuery;
         try {
           if (fs5.existsSync(DATA_FILE2)) {
             const db = JSON.parse(fs5.readFileSync(DATA_FILE2, "utf-8"));

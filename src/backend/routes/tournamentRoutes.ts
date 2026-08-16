@@ -4676,10 +4676,26 @@ async function updateSubscriptionAdditionalData(subId: string, additionalData: a
 async function updateSubscriptionPaymentStatus(subId: string, status: 'pending' | 'paid', sub: any, tData?: any, settings?: any) {
   try {
     const supabase = getSupabaseAdmin();
-    await supabase
+    const tournamentId = sub?.tournament_id || sub?.tournamentId;
+    const document = sub?.document;
+    const athleteName = sub?.athlete_name || sub?.athleteName;
+
+    let query = supabase
       .from('athlete_subscriptions')
-      .update({ payment_status: status })
-      .eq('id', subId);
+      .update({ payment_status: status });
+
+    if (tournamentId && (document || athleteName)) {
+      query = query.eq('tournament_id', tournamentId);
+      if (document) {
+        query = query.eq('document', document);
+      } else {
+        query = query.eq('athlete_name', athleteName);
+      }
+    } else {
+      query = query.eq('id', subId);
+    }
+
+    await query;
 
     // Se exige anuidade/filiação, criar o membro e filiação correspondente como ativo e pago
     if (settings?.requireMembership && tData) {

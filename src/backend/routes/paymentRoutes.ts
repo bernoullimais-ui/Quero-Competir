@@ -813,12 +813,22 @@ router.post("/webhook", async (req, res) => {
       }
 
       if (sub) {
-        console.log(`[Pagar.me Webhook] Inscrição de atleta ${sub.id} PAGA com sucesso.`);
+        console.log(`[Pagar.me Webhook] Inscrição de atleta ${sub.id} (${sub.athlete_name}) PAGA com sucesso.`);
         
-        await supabase
+        let updateQuery = supabase
           .from("athlete_subscriptions")
           .update({ payment_status: "paid" })
-          .eq("id", sub.id);
+          .eq("tournament_id", sub.tournament_id);
+
+        if (sub.document) {
+          updateQuery = updateQuery.eq("document", sub.document);
+        } else if (sub.athlete_name) {
+          updateQuery = updateQuery.eq("athlete_name", sub.athlete_name);
+        } else {
+          updateQuery = updateQuery.eq("id", sub.id);
+        }
+
+        await updateQuery;
 
         // Fallback local JSON
         try {
