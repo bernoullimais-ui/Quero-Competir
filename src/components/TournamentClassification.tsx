@@ -208,7 +208,7 @@ export default function TournamentClassification({ tournamentId }: Props) {
           s.additionalData?.institution_name ||
           "Avulso",
         seedTime: s.additionalData?.seed_time || s.additional_data?.seed_time || "--:--.--",
-        resultTime: s.additionalData?.result_time || s.additional_data?.result_time || "",
+        resultTime: s.additionalData?.result_time || s.additional_data?.result_time || s.additionalData?.resultTime || s.additional_data?.resultTime || "",
       }))
       .sort((a, b) => {
         const hasTimeA = a.resultTime && a.resultTime.trim() !== "" && a.resultTime !== "--:--.--";

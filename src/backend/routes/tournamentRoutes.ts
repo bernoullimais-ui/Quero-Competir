@@ -3727,8 +3727,21 @@ router.patch("/athlete-subscriptions/:subId", async (req, res) => {
 
   try {
     const supabase = getSupabaseAdmin();
+    
+    // Buscar inscrição atual para mesclar additional_data sem sobrescrever outros campos
+    const { data: currentSub } = await supabase
+      .from('athlete_subscriptions')
+      .select('additional_data')
+      .eq('id', subId)
+      .maybeSingle();
+
+    const mergedAdditionalData = {
+      ...(currentSub?.additional_data || {}),
+      ...(additionalData || {})
+    };
+
     const updatePayload: any = {};
-    if (additionalData !== undefined) updatePayload.additional_data = additionalData;
+    if (additionalData !== undefined) updatePayload.additional_data = mergedAdditionalData;
     if (validationStatus !== undefined) updatePayload.validation_status = validationStatus;
 
     const { data, error } = await supabase

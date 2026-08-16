@@ -3873,8 +3873,13 @@ router2.patch("/athlete-subscriptions/:subId", async (req, res) => {
   const { additionalData, validationStatus } = req.body;
   try {
     const supabase = getSupabaseAdmin();
+    const { data: currentSub } = await supabase.from("athlete_subscriptions").select("additional_data").eq("id", subId).maybeSingle();
+    const mergedAdditionalData = {
+      ...currentSub?.additional_data || {},
+      ...additionalData || {}
+    };
     const updatePayload = {};
-    if (additionalData !== void 0) updatePayload.additional_data = additionalData;
+    if (additionalData !== void 0) updatePayload.additional_data = mergedAdditionalData;
     if (validationStatus !== void 0) updatePayload.validation_status = validationStatus;
     const { data, error } = await supabase.from("athlete_subscriptions").update(updatePayload).eq("id", subId).select().single();
     if (error) throw error;

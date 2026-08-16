@@ -129,7 +129,30 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
 
   const handleTimeChange = handleResultChange;
 
-  // Persistir tempos obtidos no Supabase / backend
+  // Persistir tempo obtido de um único atleta no Supabase/backend
+  const handleSaveSingleAthleteResult = async (athleteId: string, resultTime: string) => {
+    if (!athleteId || resultTime === undefined) return;
+    const ath = categoryAthletes.find((s: any) => s.id === athleteId);
+    if (!ath) return;
+
+    const currentAdd = ath.additionalData || ath.additional_data || {};
+    const updatedAdditionalData = {
+      ...currentAdd,
+      result_time: resultTime.trim()
+    };
+
+    try {
+      await fetch(`/api/tournaments/athlete-subscriptions/${athleteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ additionalData: updatedAdditionalData }),
+      });
+    } catch (e) {
+      console.error("Auto-save error:", e);
+    }
+  };
+
+  // Persistir tempos obtidos no Supabase / backend em lote
   const handleSaveResults = async () => {
     const entries = Object.entries(editingResults);
     if (entries.length === 0) {
@@ -544,6 +567,7 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
                                   placeholder="00:32.50"
                                   value={editingResults[lane.athleteId!] || ""}
                                   onChange={(e) => handleResultChange(lane.athleteId!, e.target.value)}
+                                  onBlur={() => handleSaveSingleAthleteResult(lane.athleteId!, editingResults[lane.athleteId!])}
                                   className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
                                 />
                               )
