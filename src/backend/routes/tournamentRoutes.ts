@@ -4305,7 +4305,7 @@ function buildSplitRules(
   organizerRecipientId?: string | null,
   platformFeePercent: number = 10
 ) {
-  const platformRecipientId = process.env.PAGARME_PLATFORM_RECIPIENT_ID;
+  const platformRecipientId = process.env.PAGARME_PLATFORM_RECIPIENT_ID || "re_cmqzdju442lzv0l9tmscp6lw7";
   if (!organizerRecipientId || !platformRecipientId) return undefined;
 
   const platformCents = Math.round(totalCents * (platformFeePercent / 100));
