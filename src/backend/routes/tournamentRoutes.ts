@@ -3086,8 +3086,22 @@ function mapSubToDb(feSub: any) {
 }
 
 async function getSubscriptionSettings(tournamentId: string) {
+  let showBrackets = true;
+
   try {
     const supabase = getSupabaseAdmin();
+
+    // Check rules_config on tournaments table
+    const { data: tourData } = await supabase
+      .from('tournaments')
+      .select('rules_config')
+      .eq('id', tournamentId)
+      .maybeSingle();
+
+    if (tourData?.rules_config?.show_brackets_publicly !== undefined) {
+      showBrackets = !!tourData.rules_config.show_brackets_publicly;
+    }
+
     const { data, error } = await supabase
       .from('tournament_subscription_settings')
       .select('*')
@@ -3101,7 +3115,11 @@ async function getSubscriptionSettings(tournamentId: string) {
         throw error;
       }
     } else if (data) {
-      return mapSettingsToFrontend(data);
+      const mapped = mapSettingsToFrontend(data);
+      if (tourData?.rules_config?.show_brackets_publicly !== undefined) {
+        mapped.showBracketsPublicly = showBrackets;
+      }
+      return mapped;
     }
   } catch (err: any) {
     console.warn("Supabase exception on subscription settings, using JSON fallback", err.message);
@@ -3124,7 +3142,7 @@ async function getSubscriptionSettings(tournamentId: string) {
       requireMembership: !!rawSettings.requireMembership,
       registrationConfig: hasConfig ? rawSettings.registrationConfig : getDefaultRegistrationConfig(),
       maxVisitorsPerAthlete: Number(rawSettings.maxVisitorsPerAthlete) || 0,
-      showBracketsPublicly: rawSettings.showBracketsPublicly !== undefined ? !!rawSettings.showBracketsPublicly : true
+      showBracketsPublicly: rawSettings.showBracketsPublicly !== undefined ? !!rawSettings.showBracketsPublicly : showBrackets
     };
   }
   return {
@@ -3136,7 +3154,7 @@ async function getSubscriptionSettings(tournamentId: string) {
     requireMembership: false,
     registrationConfig: getDefaultRegistrationConfig(),
     maxVisitorsPerAthlete: 0,
-    showBracketsPublicly: true
+    showBracketsPublicly: showBrackets
   };
 }
 
@@ -3146,7 +3164,31 @@ async function saveSubscriptionSettings(tournamentId: string, payload: any) {
     const dbPayload = mapSettingsToDb(payload);
     console.log("[saveSubscriptionSettings] dbPayload:", JSON.stringify(dbPayload));
 
-    const { error } = await supabase
+    // Update rules_config on tournaments table as primary JSONB setting
+    if (payload.showBracketsPublicly !== undefined) {
+      try {
+        const { data: tour } = await supabase
+          .from('tournaments')
+          .select('rules_config')
+          .eq('id', tournamentId)
+          .maybeSingle();
+
+        const currentRules = tour?.rules_config || {};
+        await supabase
+          .from('tournaments')
+          .update({
+            rules_config: {
+              ...currentRules,
+              show_brackets_publicly: !!payload.showBracketsPublicly
+            }
+          })
+          .eq('id', tournamentId);
+      } catch (err: any) {
+        console.error("Error updating rules_config in tournaments:", err);
+      }
+    }
+
+    let { error } = await supabase
       .from('tournament_subscription_settings')
       .upsert({
         tournament_id: tournamentId,
@@ -3154,11 +3196,18 @@ async function saveSubscriptionSettings(tournamentId: string, payload: any) {
       });
 
     if (error) {
-      console.error("[saveSubscriptionSettings] Supabase upsert error:", error.message, error.details);
-      // Don't silently fall through — log and also persist to JSON as backup
+      console.error("[saveSubscriptionSettings] Supabase upsert error:", error.message);
+      if (error.message?.includes("show_brackets_publicly")) {
+        const { show_brackets_publicly, ...sansCol } = dbPayload;
+        await supabase
+          .from('tournament_subscription_settings')
+          .upsert({
+            tournament_id: tournamentId,
+            ...sansCol
+          });
+      }
     } else {
-      console.log("[saveSubscriptionSettings] Supabase upsert OK — re-reading to confirm");
-      // Re-read from Supabase to return the actual persisted values
+      console.log("[saveSubscriptionSettings] Supabase upsert OK");
       const { data: saved } = await supabase
         .from('tournament_subscription_settings')
         .select('*')
@@ -3166,7 +3215,9 @@ async function saveSubscriptionSettings(tournamentId: string, payload: any) {
         .maybeSingle();
       if (saved) {
         const mapped = mapSettingsToFrontend(saved);
-        console.log("[saveSubscriptionSettings] confirmed feeType in DB:", saved.fee_type);
+        if (payload.showBracketsPublicly !== undefined) {
+          mapped.showBracketsPublicly = !!payload.showBracketsPublicly;
+        }
         return mapped;
       }
     }
@@ -3177,6 +3228,7 @@ async function saveSubscriptionSettings(tournamentId: string, payload: any) {
   // Fallback to local JSON (dev env or Supabase unavailable)
   const db = loadDb();
   db.settings[tournamentId] = {
+    ...(db.settings[tournamentId] || {}),
     deadline: payload.deadline || "",
     feeType: payload.feeType || "free",
     teamFee: Number(payload.teamFee) || 0,
@@ -3185,7 +3237,8 @@ async function saveSubscriptionSettings(tournamentId: string, payload: any) {
     requireMembership: !!payload.requireMembership,
     allowIndependent: !!payload.allowIndependent,
     registrationConfig: payload.registrationConfig || getDefaultRegistrationConfig(),
-    maxVisitorsPerAthlete: Number(payload.maxVisitorsPerAthlete) || 0
+    maxVisitorsPerAthlete: Number(payload.maxVisitorsPerAthlete) || 0,
+    showBracketsPublicly: payload.showBracketsPublicly !== undefined ? !!payload.showBracketsPublicly : true
   };
   saveDb(db);
   return db.settings[tournamentId];
