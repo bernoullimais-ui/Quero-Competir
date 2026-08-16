@@ -313,6 +313,15 @@ export default function TournamentDashboard() {
     }
   });
 
+  const currentUser = React.useMemo(() => {
+    try {
+      const saved = localStorage.getItem("currentUser");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const loading = tLoading || cLoading || rLoading;
   const [activeTab, setActiveTab] = useState<Tab>("geral");
   const [isSavingVisibility, setIsSavingVisibility] = useState(false);
@@ -3352,16 +3361,18 @@ export default function TournamentDashboard() {
         )}
 
         {activeTab === "comunicacao" && (
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
-            <WhatsAppBroadcastTab
-              tournamentId={id!}
-              tournamentName={tournament?.name || ""}
-              categories={categories}
-              institutions={institutions}
-              authToken={currentUser?.token}
-              orgId={tournament?.organization_id || tournament?.organizationId}
-            />
-          </div>
+          <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar o painel de comunicação WhatsApp.</div>}>
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+              <WhatsAppBroadcastTab
+                tournamentId={id!}
+                tournamentName={tournament?.name || ""}
+                categories={categories}
+                institutions={institutions}
+                authToken={currentUser?.token}
+                orgId={tournament?.organization_id || tournament?.organizationId || tournament?.owner_id || tournament?.ownerId}
+              />
+            </div>
+          </ErrorBoundary>
         )}
 
         {/* Modal Gerar Link de Pagamento */}
