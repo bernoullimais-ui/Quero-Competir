@@ -36,6 +36,7 @@ export default function PublicAthleteRegistration() {
   const [parentName, setParentName] = useState("");
   const [parentPhone, setParentPhone] = useState("");
   const [parentEmail, setParentEmail] = useState("");
+  const [parentDocument, setParentDocument] = useState("");
   const [parentPassword, setParentPassword] = useState("");
   const [bloodType, setBloodType] = useState("O+");
   const [allergies, setAllergies] = useState("");
@@ -146,6 +147,12 @@ export default function PublicAthleteRegistration() {
         if (resData.subscription) {
           setParentName(resData.subscription.parentName || "");
           setParentPhone(resData.subscription.parentPhone || "");
+          setParentDocument(
+            resData.subscription.document ||
+            resData.subscription.additionalData?.parentDocument ||
+            resData.subscription.additionalData?.document ||
+            ""
+          );
           if (resData.subscription.additionalData) {
             setParentEmail(resData.subscription.additionalData.parentEmail || "");
             setBloodType(resData.subscription.additionalData.bloodType || "O+");
@@ -417,8 +424,9 @@ export default function PublicAthleteRegistration() {
     try {
       let bodyData: any = { 
         method: paymentMethod,
-        parentName,
-        parentPhone
+        parentName: parentName || data?.subscription?.parentName || data?.subscription?.athleteName,
+        parentPhone: parentPhone || data?.subscription?.parentPhone || data?.subscription?.additionalData?.phone,
+        parentDocument: parentDocument || data?.subscription?.document || data?.subscription?.additionalData?.parentDocument || data?.subscription?.additionalData?.document,
       };
 
       if (forceSimulate) {
@@ -1288,7 +1296,7 @@ export default function PublicAthleteRegistration() {
                     </div>
 
                     {/* Cartão de Identificação do Atleta e Responsável */}
-                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2 mb-4">
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-3 mb-4">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black uppercase text-indigo-600 tracking-wider">Identificação da Inscrição</span>
                         <span className="text-[10px] font-bold text-slate-400">Protocolo: {subId?.slice(0, 8).toUpperCase()}</span>
@@ -1310,6 +1318,16 @@ export default function PublicAthleteRegistration() {
                           <span className="block text-[10px] font-bold text-slate-400 uppercase">Torneio</span>
                           <span className="font-bold text-slate-700">{tournament?.name || "Torneio"}</span>
                         </div>
+                      </div>
+                      <div className="pt-2 border-t border-slate-200/60">
+                        <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">CPF do Titular da Cobrança (para Emissão Pix/Cartão)</label>
+                        <input
+                          type="text"
+                          value={parentDocument}
+                          onChange={e => setParentDocument(e.target.value)}
+                          placeholder="Digite seu CPF (ex: 000.000.000-00)"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-indigo-500"
+                        />
                       </div>
                     </div>
 
