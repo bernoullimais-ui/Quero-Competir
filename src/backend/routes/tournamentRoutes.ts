@@ -4299,6 +4299,36 @@ router.post("/public/athlete-subscription/:subId/complete", async (req, res) => 
   }
 });
 
+// Helper function to calculate split payment rules
+function buildSplitRules(
+  totalCents: number,
+  organizerRecipientId?: string | null,
+  platformFeePercent: number = 10
+) {
+  const platformRecipientId = process.env.PAGARME_PLATFORM_RECIPIENT_ID;
+  if (!organizerRecipientId || !platformRecipientId) return undefined;
+
+  const platformCents = Math.round(totalCents * (platformFeePercent / 100));
+  const organizerCents = totalCents - platformCents;
+
+  if (organizerCents <= 0) return undefined;
+
+  return [
+    {
+      amount: organizerCents,
+      recipient_id: organizerRecipientId,
+      type: "flat",
+      options: { charge_processing_fee: false, liable: false }
+    },
+    {
+      amount: platformCents,
+      recipient_id: platformRecipientId,
+      type: "flat",
+      options: { charge_processing_fee: true, liable: true }
+    }
+  ];
+}
+
 // Helper function to call Pagar.me API v5
 async function callPagarMe(endpoint: string, method: string, body: any) {
   const secretKey = process.env.PAGARME_SECRET_KEY;
@@ -4478,6 +4508,26 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
       });
     }
 
+    // Buscar informações de split de pagamento do recebedor do organizador
+    let splitRules: any[] | undefined = undefined;
+    if (tData?.owner_id) {
+      try {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('pagarme_recipient_id, platform_fee_percent')
+          .eq('id', tData.owner_id)
+          .maybeSingle();
+
+        if (orgData?.pagarme_recipient_id) {
+          const totalCents = Math.round(totalAmount * 100);
+          const feePercent = orgData.platform_fee_percent !== undefined ? Number(orgData.platform_fee_percent) : 10;
+          splitRules = buildSplitRules(totalCents, orgData.pagarme_recipient_id, feePercent);
+        }
+      } catch (err: any) {
+        console.warn("[Split Rules Warning]", err.message);
+      }
+    }
+
     if (method === "pix") {
       const orderPayload = {
         code: sub.id,
@@ -4488,7 +4538,8 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
             payment_method: "pix",
             pix: {
               expires_in: 86400
-            }
+            },
+            ...(splitRules ? { split: splitRules } : {})
           }
         ]
       };
@@ -4532,7 +4583,8 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
               operation_type: "auth_and_capture",
               installments: 1,
               statement_descriptor: "QUEROCOMPETIR"
-            }
+            },
+            ...(splitRules ? { split: splitRules } : {})
           }
         ]
       };

@@ -1112,6 +1112,36 @@ router.get("/payments/public/:paymentId", async (req, res) => {
   }
 });
 
+// Helper function to calculate split payment rules
+function buildSplitRules(
+  totalCents: number,
+  organizerRecipientId?: string | null,
+  platformFeePercent: number = 10
+) {
+  const platformRecipientId = process.env.PAGARME_PLATFORM_RECIPIENT_ID;
+  if (!organizerRecipientId || !platformRecipientId) return undefined;
+
+  const platformCents = Math.round(totalCents * (platformFeePercent / 100));
+  const organizerCents = totalCents - platformCents;
+
+  if (organizerCents <= 0) return undefined;
+
+  return [
+    {
+      amount: organizerCents,
+      recipient_id: organizerRecipientId,
+      type: "flat",
+      options: { charge_processing_fee: false, liable: false }
+    },
+    {
+      amount: platformCents,
+      recipient_id: platformRecipientId,
+      type: "flat",
+      options: { charge_processing_fee: true, liable: true }
+    }
+  ];
+}
+
 // Helper function to call Pagar.me API v5
 async function callPagarMe(endpoint: string, method: string, body: any) {
   const secretKey = process.env.PAGARME_SECRET_KEY;
@@ -1246,6 +1276,32 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
       .eq('id', pay.institutionId)
       .maybeSingle();
 
+    // Obter dados do recebedor do organizador do torneio
+    let splitRules: any[] | undefined = undefined;
+    try {
+      const { data: tData } = await supabase
+        .from('tournaments')
+        .select('owner_id')
+        .eq('id', pay.tournamentId)
+        .maybeSingle();
+
+      if (tData?.owner_id) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('pagarme_recipient_id, platform_fee_percent')
+          .eq('id', tData.owner_id)
+          .maybeSingle();
+
+        if (orgData?.pagarme_recipient_id) {
+          const totalCents = Math.round(pay.amount * 100);
+          const feePercent = orgData.platform_fee_percent !== undefined ? Number(orgData.platform_fee_percent) : 10;
+          splitRules = buildSplitRules(totalCents, orgData.pagarme_recipient_id, feePercent);
+        }
+      }
+    } catch (err: any) {
+      console.warn("[Institution Split Rules Warning]", err.message);
+    }
+
     const cleanDoc = (instData?.cnpj || "00000000000191").replace(/\D/g, "");
     const customer = {
       name: pay.institutionName || "Instituição",
@@ -1277,7 +1333,8 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
             payment_method: "pix",
             pix: {
               expires_in: 86400
-            }
+            },
+            ...(splitRules ? { split: splitRules } : {})
           }
         ]
       };
@@ -1317,7 +1374,8 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
               bank: "341", // Itaú
               instructions: "Pagar até o vencimento. Não receber após vencimento.",
               due_at: new Date(pay.deadline + "T23:59:59").toISOString()
-            }
+            },
+            ...(splitRules ? { split: splitRules } : {})
           }
         ]
       };
@@ -1362,7 +1420,8 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
               operation_type: "auth_and_capture",
               installments: 1,
               statement_descriptor: "QUEROCOMPETIR"
-            }
+            },
+            ...(splitRules ? { split: splitRules } : {})
           }
         ]
       };

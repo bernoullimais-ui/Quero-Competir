@@ -973,6 +973,27 @@ router.get("/payments/public/:paymentId", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+function buildSplitRules(totalCents, organizerRecipientId, platformFeePercent = 10) {
+  const platformRecipientId = process.env.PAGARME_PLATFORM_RECIPIENT_ID;
+  if (!organizerRecipientId || !platformRecipientId) return void 0;
+  const platformCents = Math.round(totalCents * (platformFeePercent / 100));
+  const organizerCents = totalCents - platformCents;
+  if (organizerCents <= 0) return void 0;
+  return [
+    {
+      amount: organizerCents,
+      recipient_id: organizerRecipientId,
+      type: "flat",
+      options: { charge_processing_fee: false, liable: false }
+    },
+    {
+      amount: platformCents,
+      recipient_id: platformRecipientId,
+      type: "flat",
+      options: { charge_processing_fee: true, liable: true }
+    }
+  ];
+}
 async function callPagarMe(endpoint, method, body) {
   const secretKey = process.env.PAGARME_SECRET_KEY;
   if (!secretKey) {
@@ -1059,6 +1080,20 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     }
     const supabase = getSupabaseAdmin();
     const { data: instData } = await supabase.from("institutions").select("email, cnpj, contact_phone").eq("id", pay.institutionId).maybeSingle();
+    let splitRules = void 0;
+    try {
+      const { data: tData2 } = await supabase.from("tournaments").select("owner_id").eq("id", pay.tournamentId).maybeSingle();
+      if (tData2?.owner_id) {
+        const { data: orgData } = await supabase.from("organizations").select("pagarme_recipient_id, platform_fee_percent").eq("id", tData2.owner_id).maybeSingle();
+        if (orgData?.pagarme_recipient_id) {
+          const totalCents = Math.round(pay.amount * 100);
+          const feePercent = orgData.platform_fee_percent !== void 0 ? Number(orgData.platform_fee_percent) : 10;
+          splitRules = buildSplitRules(totalCents, orgData.pagarme_recipient_id, feePercent);
+        }
+      }
+    } catch (err) {
+      console.warn("[Institution Split Rules Warning]", err.message);
+    }
     const cleanDoc = (instData?.cnpj || "00000000000191").replace(/\D/g, "");
     const customer = {
       name: pay.institutionName || "Institui\xE7\xE3o",
@@ -1089,7 +1124,8 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
             payment_method: "pix",
             pix: {
               expires_in: 86400
-            }
+            },
+            ...splitRules ? { split: splitRules } : {}
           }
         ]
       };
@@ -1125,7 +1161,8 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
               // Itaú
               instructions: "Pagar at\xE9 o vencimento. N\xE3o receber ap\xF3s vencimento.",
               due_at: (/* @__PURE__ */ new Date(pay.deadline + "T23:59:59")).toISOString()
-            }
+            },
+            ...splitRules ? { split: splitRules } : {}
           }
         ]
       };
@@ -1164,7 +1201,8 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
               operation_type: "auth_and_capture",
               installments: 1,
               statement_descriptor: "QUEROCOMPETIR"
-            }
+            },
+            ...splitRules ? { split: splitRules } : {}
           }
         ]
       };
@@ -4275,6 +4313,27 @@ router2.post("/public/athlete-subscription/:subId/complete", async (req, res) =>
     res.status(500).json({ error: err.message });
   }
 });
+function buildSplitRules2(totalCents, organizerRecipientId, platformFeePercent = 10) {
+  const platformRecipientId = process.env.PAGARME_PLATFORM_RECIPIENT_ID;
+  if (!organizerRecipientId || !platformRecipientId) return void 0;
+  const platformCents = Math.round(totalCents * (platformFeePercent / 100));
+  const organizerCents = totalCents - platformCents;
+  if (organizerCents <= 0) return void 0;
+  return [
+    {
+      amount: organizerCents,
+      recipient_id: organizerRecipientId,
+      type: "flat",
+      options: { charge_processing_fee: false, liable: false }
+    },
+    {
+      amount: platformCents,
+      recipient_id: platformRecipientId,
+      type: "flat",
+      options: { charge_processing_fee: true, liable: true }
+    }
+  ];
+}
 async function callPagarMe2(endpoint, method, body) {
   const secretKey = process.env.PAGARME_SECRET_KEY;
   if (!secretKey) {
@@ -4395,6 +4454,19 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
         quantity: 1
       });
     }
+    let splitRules = void 0;
+    if (tData2?.owner_id) {
+      try {
+        const { data: orgData } = await supabase.from("organizations").select("pagarme_recipient_id, platform_fee_percent").eq("id", tData2.owner_id).maybeSingle();
+        if (orgData?.pagarme_recipient_id) {
+          const totalCents = Math.round(totalAmount * 100);
+          const feePercent = orgData.platform_fee_percent !== void 0 ? Number(orgData.platform_fee_percent) : 10;
+          splitRules = buildSplitRules2(totalCents, orgData.pagarme_recipient_id, feePercent);
+        }
+      } catch (err) {
+        console.warn("[Split Rules Warning]", err.message);
+      }
+    }
     if (method === "pix") {
       const orderPayload = {
         code: sub.id,
@@ -4405,7 +4477,8 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
             payment_method: "pix",
             pix: {
               expires_in: 86400
-            }
+            },
+            ...splitRules ? { split: splitRules } : {}
           }
         ]
       };
@@ -4442,7 +4515,8 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
               operation_type: "auth_and_capture",
               installments: 1,
               statement_descriptor: "QUEROCOMPETIR"
-            }
+            },
+            ...splitRules ? { split: splitRules } : {}
           }
         ]
       };
@@ -6195,9 +6269,9 @@ router4.get("/guardian/:email/athletes", requireAuth, async (req, res) => {
       });
       return res.json(enriched);
     }
-    const DATA_FILE2 = path4.join(process.cwd(), "src/backend/data/subscriptions.json");
-    if (fs4.existsSync(DATA_FILE2)) {
-      const raw = fs4.readFileSync(DATA_FILE2, "utf-8");
+    const DATA_FILE3 = path4.join(process.cwd(), "src/backend/data/subscriptions.json");
+    if (fs4.existsSync(DATA_FILE3)) {
+      const raw = fs4.readFileSync(DATA_FILE3, "utf-8");
       const db = JSON.parse(raw);
       return res.json(db.athleteSubscriptions || []);
     }
@@ -6325,6 +6399,249 @@ router5.post("/status-bulk", async (req, res) => {
 });
 var membershipRoutes_default = router5;
 
+// src/backend/routes/paymentRoutes.ts
+import { Router as Router6 } from "express";
+init_auth();
+import fs5 from "fs";
+import path5 from "path";
+var router6 = Router6();
+var DATA_FILE2 = path5.join(process.cwd(), "src", "backend", "data", "subscriptions.json");
+var INST_PAYMENTS_FILE2 = path5.join(process.cwd(), "src", "backend", "data", "institution_payments.json");
+async function callPagarMe3(endpoint, method, body) {
+  const secretKey = process.env.PAGARME_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error("PAGARME_SECRET_KEY n\xE3o configurada no servidor.");
+  }
+  const authHeader = "Basic " + Buffer.from(secretKey + ":").toString("base64");
+  const response = await fetch(`https://api.pagar.me/core/v5${endpoint}`, {
+    method,
+    headers: {
+      "Authorization": authHeader,
+      "Content-Type": "application/json",
+      "accept": "application/json"
+    },
+    body: body ? JSON.stringify(body) : void 0
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    console.error("[Pagar.me Error]", data);
+    throw new Error(data.message || (data.errors ? JSON.stringify(data.errors) : "Erro na API do Pagar.me"));
+  }
+  return data;
+}
+router6.get("/organizations/:id/recipient-status", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: org, error } = await supabase.from("organizations").select("*").eq("id", id).maybeSingle();
+    if (error) throw error;
+    if (!org) {
+      return res.status(404).json({ error: "Organiza\xE7\xE3o n\xE3o encontrada." });
+    }
+    let liveStatus = org.pagarme_recipient_status || "not_configured";
+    let pagarmeDetails = null;
+    if (org.pagarme_recipient_id && process.env.PAGARME_SECRET_KEY) {
+      try {
+        pagarmeDetails = await callPagarMe3(`/recipients/${org.pagarme_recipient_id}`, "GET", null);
+        if (pagarmeDetails && pagarmeDetails.status) {
+          liveStatus = pagarmeDetails.status;
+          if (liveStatus !== org.pagarme_recipient_status) {
+            await supabase.from("organizations").update({ pagarme_recipient_status: liveStatus }).eq("id", id);
+          }
+        }
+      } catch (err) {
+        console.warn("[Pagar.me Status Check Warning]", err.message);
+      }
+    }
+    res.json({
+      pagarmeRecipientId: org.pagarme_recipient_id || null,
+      pagarmeRecipientStatus: liveStatus,
+      platformFeePercent: org.platform_fee_percent !== void 0 ? Number(org.platform_fee_percent) : 10,
+      bankData: {
+        holderName: org.bank_holder_name || "",
+        holderDocument: org.bank_holder_document || "",
+        holderType: org.bank_holder_type || "individual",
+        bankCode: org.bank_code || "",
+        bankBranch: org.bank_branch || "",
+        bankAccount: org.bank_account || "",
+        bankAccountType: org.bank_account_type || "checking",
+        holderEmail: org.bank_holder_email || "",
+        holderPhone: org.bank_holder_phone || ""
+      },
+      pagarmeDetails
+    });
+  } catch (err) {
+    console.error("Erro ao buscar status do recebedor:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+router6.post("/organizations/:id/create-recipient", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const {
+    holderName,
+    holderDocument,
+    holderType,
+    bankCode,
+    bankBranch,
+    bankAccount,
+    bankAccountDigit,
+    bankAccountType,
+    holderEmail,
+    holderPhone
+  } = req.body;
+  if (!holderName || !holderDocument || !bankCode || !bankBranch || !bankAccount) {
+    return res.status(400).json({ error: "Preencha todos os campos obrigat\xF3rios dos dados banc\xE1rios." });
+  }
+  try {
+    const supabase = getSupabaseAdmin();
+    const cleanDoc = holderDocument.replace(/\D/g, "");
+    const cleanPhone = (holderPhone || "999999999").replace(/\D/g, "").slice(-9);
+    const cleanBranch = bankBranch.replace(/\D/g, "");
+    const accountFull = bankAccountDigit ? `${bankAccount}-${bankAccountDigit}` : bankAccount;
+    let recipientId = null;
+    let recipientStatus = "active";
+    if (process.env.PAGARME_SECRET_KEY) {
+      const recipientPayload = {
+        name: holderName,
+        email: holderEmail || "financeiro@querocompetir.com.br",
+        document: cleanDoc,
+        type: cleanDoc.length === 11 ? "individual" : "corporation",
+        default_bank_account: {
+          holder_name: holderName,
+          holder_type: cleanDoc.length === 11 ? "individual" : "corporation",
+          holder_document: cleanDoc,
+          bank: bankCode,
+          branch_number: cleanBranch,
+          account_number: bankAccount,
+          account_check_digit: bankAccountDigit || "0",
+          type: bankAccountType === "savings" ? "savings" : "checking"
+        },
+        transfer_settings: {
+          transfer_enabled: true,
+          transfer_interval: "Daily",
+          transfer_day: 0
+        }
+      };
+      const pgRecipient = await callPagarMe3("/recipients", "POST", recipientPayload);
+      recipientId = pgRecipient.id;
+      recipientStatus = pgRecipient.status || "active";
+    } else {
+      console.warn("PAGARME_SECRET_KEY n\xE3o configurada. Simulando cria\xE7\xE3o de recebedor.");
+      recipientId = `re_simulated_${Math.random().toString(36).substring(2, 11)}`;
+      recipientStatus = "active";
+    }
+    const dbPayload = {
+      pagarme_recipient_id: recipientId,
+      pagarme_recipient_status: recipientStatus,
+      bank_holder_name: holderName,
+      bank_holder_document: cleanDoc,
+      bank_holder_type: holderType || (cleanDoc.length === 11 ? "individual" : "corporation"),
+      bank_code: bankCode,
+      bank_branch: cleanBranch,
+      bank_account: accountFull,
+      bank_account_type: bankAccountType || "checking",
+      bank_holder_email: holderEmail || null,
+      bank_holder_phone: cleanPhone || null
+    };
+    const { error: updateErr } = await supabase.from("organizations").update(dbPayload).eq("id", id);
+    if (updateErr) {
+      console.error("Erro ao atualizar organiza\xE7\xF5es no Supabase:", updateErr);
+      await supabase.from("organizations").update({
+        pagarme_recipient_id: recipientId,
+        pagarme_recipient_status: recipientStatus
+      }).eq("id", id);
+    }
+    res.json({
+      success: true,
+      pagarmeRecipientId: recipientId,
+      pagarmeRecipientStatus: recipientStatus,
+      message: "Dados banc\xE1rios e conta de recebedor configurados com sucesso!"
+    });
+  } catch (err) {
+    console.error("Erro ao criar recebedor Pagar.me:", err);
+    res.status(500).json({ error: err.message || "Erro ao registrar conta de recebimento no Pagar.me." });
+  }
+});
+router6.patch("/admin/organizations/:id/fee", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { platformFeePercent } = req.body;
+  if (platformFeePercent === void 0 || isNaN(Number(platformFeePercent))) {
+    return res.status(400).json({ error: "Percentual inv\xE1lido." });
+  }
+  const feeVal = Number(platformFeePercent);
+  if (feeVal < 0 || feeVal > 100) {
+    return res.status(400).json({ error: "O percentual deve estar entre 0% e 100%." });
+  }
+  try {
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase.from("organizations").update({ platform_fee_percent: feeVal }).eq("id", id);
+    if (error) throw error;
+    res.json({ success: true, platformFeePercent: feeVal });
+  } catch (err) {
+    console.error("Erro ao atualizar taxa da plataforma:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+router6.post("/webhook", async (req, res) => {
+  try {
+    const event = req.body;
+    console.log("[Pagar.me Webhook Event Received]", event?.type || "Unknown event");
+    const eventType = event?.type;
+    const charge = event?.data;
+    const orderCode = charge?.code || charge?.order?.code;
+    if (!orderCode) {
+      return res.json({ received: true, note: "Nenhum c\xF3digo de pedido especificado no webhook." });
+    }
+    if (eventType === "charge.paid" || eventType === "order.paid") {
+      const supabase = getSupabaseAdmin();
+      const { data: sub } = await supabase.from("athlete_subscriptions").select("id, tournament_id, document, athlete_name").eq("id", orderCode).maybeSingle();
+      if (sub) {
+        console.log(`[Pagar.me Webhook] Inscri\xE7\xE3o de atleta ${sub.id} PAGA com sucesso.`);
+        await supabase.from("athlete_subscriptions").update({ payment_status: "paid" }).eq("id", sub.id);
+        try {
+          if (fs5.existsSync(DATA_FILE2)) {
+            const db = JSON.parse(fs5.readFileSync(DATA_FILE2, "utf-8"));
+            if (db.athleteSubscriptions) {
+              const idx = db.athleteSubscriptions.findIndex((s) => s.id === sub.id);
+              if (idx !== -1) {
+                db.athleteSubscriptions[idx].paymentStatus = "paid";
+                fs5.writeFileSync(DATA_FILE2, JSON.stringify(db, null, 2));
+              }
+            }
+          }
+        } catch (_) {
+        }
+        return res.json({ received: true, status: "updated_athlete_subscription" });
+      }
+      try {
+        if (fs5.existsSync(INST_PAYMENTS_FILE2)) {
+          const payments = JSON.parse(fs5.readFileSync(INST_PAYMENTS_FILE2, "utf-8"));
+          const idx = payments.findIndex((p) => p.id === orderCode);
+          if (idx !== -1) {
+            payments[idx].status = "paid";
+            payments[idx].paidAt = (/* @__PURE__ */ new Date()).toISOString();
+            fs5.writeFileSync(INST_PAYMENTS_FILE2, JSON.stringify(payments, null, 2));
+            const pay = payments[idx];
+            const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay.tournamentId).eq("institution_id", pay.institutionId).maybeSingle();
+            if (reg) {
+              await supabase.from("tournament_registrations").update({ status: "confirmed" }).eq("id", reg.id);
+            }
+            console.log(`[Pagar.me Webhook] Pagamento de institui\xE7\xE3o ${orderCode} PAGO com sucesso.`);
+            return res.json({ received: true, status: "updated_institution_payment" });
+          }
+        }
+      } catch (err) {
+        console.error("Erro no processamento do webhook institucional:", err.message);
+      }
+    }
+    res.json({ received: true });
+  } catch (err) {
+    console.error("Erro no processamento do webhook do Pagar.me:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+var paymentRoutes_default = router6;
+
 // src/backend/app.ts
 init_auth();
 dotenv.config();
@@ -6398,6 +6715,7 @@ app.use("/api/tournaments", tournamentRoutes_default);
 app.use("/api/members", memberRoutes_default);
 app.use("/api/auth", authRoutes_default);
 app.use("/api/memberships", membershipRoutes_default);
+app.use("/api/payments", paymentRoutes_default);
 app.use((err, _req, res, _next) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Erro interno do servidor.";

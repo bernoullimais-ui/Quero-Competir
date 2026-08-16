@@ -8,6 +8,7 @@ import tournamentRoutes from "./routes/tournamentRoutes.ts";
 import memberRoutes from "./routes/memberRoutes.ts";
 import authRoutes from "./routes/authRoutes.ts";
 import membershipRoutes from "./routes/membershipRoutes.ts";
+import paymentRoutes from "./routes/paymentRoutes.ts";
 import { optionalAuth } from "./middleware/auth.ts";
 
 // ─── Load env vars first (ESM-safe: called in module body, not hoisted) ────────
@@ -114,6 +115,7 @@ app.use("/api/tournaments", tournamentRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/memberships", membershipRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // ─── Global Error Handler (must be last) ─────────────────────────────────────
 // Catches any unhandled errors and returns JSON instead of HTML/plain-text.

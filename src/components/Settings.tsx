@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Building2, Palette, Link as LinkIcon, Globe, Image as ImageIcon, Save, Phone, Mail, FileText, ExternalLink } from 'lucide-react';
+import { Building2, Palette, Link as LinkIcon, Globe, Image as ImageIcon, Save, Phone, Mail, FileText, ExternalLink, CreditCard } from 'lucide-react';
 import { useToast } from './ui/Toast.tsx';
 import { applyBrandColors } from '../utils/theme';
+import { BankDataTab } from './BankDataTab.tsx';
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<'geral' | 'visual' | 'redes' | 'avancado'>('geral');
+  const [activeTab, setActiveTab] = useState<'geral' | 'visual' | 'redes' | 'avancado' | 'bancario'>('geral');
+  const [organizationId, setOrganizationId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { success, error: toastError } = useToast();
@@ -45,6 +46,7 @@ export default function Settings() {
       .then(res => res.json())
       .then(data => {
         if (data) {
+          if (data.id) setOrganizationId(data.id);
           setFormData(prev => ({
             ...prev,
             ...data
@@ -161,6 +163,15 @@ export default function Settings() {
             >
               <Globe size={18} />
               Avançado & Domínio
+            </button>
+            <button
+              onClick={() => setActiveTab('bancario')}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'bancario' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <CreditCard size={18} />
+              Dados Bancários & Split
             </button>
           </nav>
         </div>
@@ -358,6 +369,10 @@ export default function Settings() {
 
               </div>
             </div>
+          )}
+
+          {activeTab === 'bancario' && (
+            <BankDataTab organizationId={organizationId} />
           )}
         </div>
       </div>
