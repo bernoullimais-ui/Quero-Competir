@@ -4461,23 +4461,10 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
       return res.json({ success: true, method, paid: true });
     }
 
-    // Se não há chaves do Pagar.me configuradas, simulamos o sucesso (Sandbox fallback)
+    // Verificar se há chave do Pagar.me configurada no ambiente
     if (!hasSecretKey) {
-      console.warn("PAGARME_SECRET_KEY não detectada. Executando pagamento individual em modo SIMULADO.");
-      
-      if (method === "pix") {
-        const pixPayload = generatePixEMV("+5571991414913", totalAmount);
-        return res.json({
-          success: true,
-          method: "pix",
-          qrCode: pixPayload,
-          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixPayload)}`
-        });
-      }
-
-      // No caso de cartão, confirmamos imediatamente no modo simulado
-      await updateSubscriptionPaymentStatus(subId, "paid", sub, tData, settings);
-      return res.json({ success: true, method: "card", paid: true });
+      console.error("PAGARME_SECRET_KEY não configurada no servidor Vercel.");
+      return res.status(400).json({ error: "Integração com gateway Pagar.me não configurada. Defina PAGARME_SECRET_KEY nas variáveis de ambiente." });
     }
 
     // Fluxo Real Integrado ao Pagar.me v5
@@ -4534,7 +4521,7 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
     }
 
     if (method === "pix") {
-      const orderPayload = {
+      const orderPayload: any = {
         code: sub.id,
         items,
         customer,
@@ -4549,18 +4536,27 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
         ]
       };
 
-      const pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      let pgOrder: any;
+      try {
+        pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      } catch (pgErr: any) {
+        if (splitRules && orderPayload.payments[0].split) {
+          console.warn("[Pagar.me Pix Split Warning] Tentando criar cobrança Pix sem split:", pgErr.message);
+          delete orderPayload.payments[0].split;
+          pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+        } else {
+          throw pgErr;
+        }
+      }
+
       const charge = pgOrder.charges?.[0];
       const transaction = charge?.last_transaction || charge?.transactions?.[0];
 
-      let qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || "";
+      const qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || pgOrder?.qr_code || "";
+      const qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || (qrCode ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}` : "");
+
       if (!qrCode) {
-        qrCode = generatePixEMV("+5571991414913", totalAmount);
-      }
-      
-      let qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || "";
-      if (!qrCodeUrl && qrCode) {
-        qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}`;
+        return res.status(400).json({ error: "O gateway Pagar.me não retornou a chave Pix para esta transação." });
       }
 
       // Salvar IDs de referência na subscription
@@ -4586,7 +4582,7 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
         return res.status(400).json({ error: "Token do cartão não fornecido." });
       }
 
-      const orderPayload = {
+      const orderPayload: any = {
         code: sub.id,
         items,
         customer,
@@ -4604,11 +4600,22 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
         ]
       };
 
-      const pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      let pgOrder: any;
+      try {
+        pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      } catch (pgErr: any) {
+        if (splitRules && orderPayload.payments[0].split) {
+          console.warn("[Pagar.me Card Split Warning] Tentando criar cobrança Cartão sem split:", pgErr.message);
+          delete orderPayload.payments[0].split;
+          pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+        } else {
+          throw pgErr;
+        }
+      }
+
       const charge = pgOrder.charges?.[0];
 
       if (charge?.status === "paid") {
-        // Salvar IDs de referência e atualizar status para pago
         const currentAdditional = sub.additionalData || {};
         const updatedAdditional = {
           ...currentAdditional,
@@ -4616,7 +4623,6 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
           pagarmeChargeId: charge.id
         };
 
-        // Salva e ativa o status pago
         await updateSubscriptionAdditionalData(sub.id, updatedAdditional, sub);
         await updateSubscriptionPaymentStatus(subId, "paid", sub, tData, settings);
 

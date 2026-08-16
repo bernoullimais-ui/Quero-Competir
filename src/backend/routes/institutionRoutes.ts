@@ -1223,50 +1223,10 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
       return res.json({ success: true, method, paid: true });
     }
 
-    // Se não há chaves do Pagar.me configuradas, simulamos o sucesso (Sandbox fallback)
+    // Verificar se há chave do Pagar.me configurada no ambiente
     if (!hasSecretKey) {
-      console.warn("PAGARME_SECRET_KEY não detectada. Executando pagamento em modo SIMULADO.");
-      
-      if (method === "pix") {
-        const pixPayload = generatePixEMV("+5571991414913", pay.amount);
-        return res.json({
-          success: true,
-          method: "pix",
-          qrCode: pixPayload,
-          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixPayload)}`
-        });
-      }
-
-      if (method === "boleto") {
-        return res.json({
-          success: true,
-          method: "boleto",
-          barcode: "34191.79001 01043.513184 91020.150008 7 974000000",
-          pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf-test.pdf"
-        });
-      }
-
-      // No caso de cartão, confirmamos imediatamente no modo simulado
-      payments[payIndex].status = "paid";
-      payments[payIndex].paidAt = new Date().toISOString();
-      savePayments(payments);
-
-      const supabase = getSupabaseAdmin();
-      const { data: reg } = await supabase
-        .from('tournament_registrations')
-        .select('id')
-        .eq('tournament_id', pay.tournamentId)
-        .eq('institution_id', pay.institutionId)
-        .maybeSingle();
-
-      if (reg) {
-        await supabase
-          .from('tournament_registrations')
-          .update({ status: 'confirmed' })
-          .eq('id', reg.id);
-      }
-
-      return res.json({ success: true, method: "card", paid: true });
+      console.error("PAGARME_SECRET_KEY não configurada no servidor Vercel.");
+      return res.status(400).json({ error: "Integração com gateway Pagar.me não configurada. Defina PAGARME_SECRET_KEY nas variáveis de ambiente." });
     }
 
     // Fluxo Real Integrado ao Pagar.me v5
@@ -1319,7 +1279,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     };
 
     if (method === "pix") {
-      const orderPayload = {
+      const orderPayload: any = {
         code: pay.id,
         items: [
           {
@@ -1340,18 +1300,27 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         ]
       };
 
-      const pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      let pgOrder: any;
+      try {
+        pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      } catch (pgErr: any) {
+        if (splitRules && orderPayload.payments[0].split) {
+          console.warn("[Pagar.me Institution Pix Split Warning] Tentando criar cobrança Pix sem split:", pgErr.message);
+          delete orderPayload.payments[0].split;
+          pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+        } else {
+          throw pgErr;
+        }
+      }
+
       const charge = pgOrder.charges?.[0];
       const transaction = charge?.last_transaction || charge?.transactions?.[0];
 
-      let qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || "";
+      const qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || pgOrder?.qr_code || "";
+      const qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || (qrCode ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}` : "");
+
       if (!qrCode) {
-        qrCode = generatePixEMV("+5571991414913", pay.amount);
-      }
-      
-      let qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || "";
-      if (!qrCodeUrl && qrCode) {
-        qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}`;
+        return res.status(400).json({ error: "O gateway Pagar.me não retornou a chave Pix para esta transação." });
       }
 
       // Salvar IDs de referência
@@ -1368,7 +1337,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     }
 
     if (method === "boleto") {
-      const orderPayload = {
+      const orderPayload: any = {
         code: pay.id,
         items: [
           {
@@ -1391,7 +1360,19 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         ]
       };
 
-      const pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      let pgOrder: any;
+      try {
+        pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      } catch (pgErr: any) {
+        if (splitRules && orderPayload.payments[0].split) {
+          console.warn("[Pagar.me Institution Boleto Split Warning] Tentando criar cobrança Boleto sem split:", pgErr.message);
+          delete orderPayload.payments[0].split;
+          pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+        } else {
+          throw pgErr;
+        }
+      }
+
       const charge = pgOrder.charges?.[0];
       const transaction = charge?.last_transaction;
 
@@ -1413,7 +1394,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         return res.status(400).json({ error: "Token do cartão não fornecido." });
       }
 
-      const orderPayload = {
+      const orderPayload: any = {
         code: pay.id,
         items: [
           {
@@ -1437,7 +1418,19 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         ]
       };
 
-      const pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      let pgOrder: any;
+      try {
+        pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      } catch (pgErr: any) {
+        if (splitRules && orderPayload.payments[0].split) {
+          console.warn("[Pagar.me Institution Card Split Warning] Tentando criar cobrança Cartão sem split:", pgErr.message);
+          delete orderPayload.payments[0].split;
+          pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+        } else {
+          throw pgErr;
+        }
+      }
+
       const charge = pgOrder.charges?.[0];
 
       if (charge?.status === "paid") {
@@ -1471,15 +1464,6 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     res.status(400).json({ error: "Método de pagamento inválido." });
   } catch (err: any) {
     console.error("Erro na transação Pagar.me:", err);
-    if (method === "pix") {
-      const pixPayload = generatePixEMV("+5571991414913", pay.amount);
-      return res.json({
-        success: true,
-        method: "pix",
-        qrCode: pixPayload,
-        qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixPayload)}`
-      });
-    }
     res.status(500).json({ error: err.message || "Erro desconhecido ao processar pagamento." });
   }
 });

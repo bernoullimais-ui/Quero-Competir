@@ -86,42 +86,6 @@ import morgan from "morgan";
 // src/backend/routes/institutionRoutes.ts
 import { Router } from "express";
 
-// src/backend/utils/pix.ts
-function generatePixEMV(pixKey, amount, merchantName = "QUEROCOMPETIR", merchantCity = "SALVADOR", txid = "***") {
-  const cleanKey = pixKey.trim();
-  const gui = "0014br.gov.bcb.pix";
-  const keyTag = "01" + String(cleanKey.length).padStart(2, "0") + cleanKey;
-  const merchantAccountInfo = gui + keyTag;
-  const field26 = "26" + String(merchantAccountInfo.length).padStart(2, "0") + merchantAccountInfo;
-  const field52 = "52040000";
-  const field53 = "5303986";
-  const amountStr = amount.toFixed(2);
-  const field54 = "54" + String(amountStr.length).padStart(2, "0") + amountStr;
-  const field58 = "5802BR";
-  const cleanName = merchantName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9 ]/g, "").slice(0, 25).trim() || "QUEROCOMPETIR";
-  const field59 = "59" + String(cleanName.length).padStart(2, "0") + cleanName;
-  const cleanCity = merchantCity.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9 ]/g, "").slice(0, 15).trim() || "SALVADOR";
-  const field60 = "60" + String(cleanCity.length).padStart(2, "0") + cleanCity;
-  const cleanTxid = txid.replace(/[^a-zA-Z0-9]/g, "").slice(0, 25) || "***";
-  const txidSubtag = "05" + String(cleanTxid.length).padStart(2, "0") + cleanTxid;
-  const field62 = "62" + String(txidSubtag.length).padStart(2, "0") + txidSubtag;
-  const payloadWithoutCRC = "000201" + field26 + field52 + field53 + field54 + field58 + field59 + field60 + field62 + "6304";
-  let crc = 65535;
-  for (let i = 0; i < payloadWithoutCRC.length; i++) {
-    crc ^= payloadWithoutCRC.charCodeAt(i) << 8;
-    for (let j = 0; j < 8; j++) {
-      if ((crc & 32768) !== 0) {
-        crc = crc << 1 ^ 4129;
-      } else {
-        crc = crc << 1;
-      }
-      crc &= 65535;
-    }
-  }
-  const crcHex = crc.toString(16).toUpperCase().padStart(4, "0");
-  return payloadWithoutCRC + crcHex;
-}
-
 // src/backend/lib/supabase.ts
 import { createClient } from "@supabase/supabase-js";
 var supabaseAdmin = null;
@@ -943,8 +907,8 @@ router.get("/payments/public/:paymentId", async (req, res) => {
   const { paymentId } = req.params;
   try {
     const payments = loadPayments();
-    const pay2 = payments.find((p) => p.id === paymentId);
-    if (!pay2) {
+    const pay = payments.find((p) => p.id === paymentId);
+    if (!pay) {
       return res.status(404).json({ error: "Link de pagamento n\xE3o encontrado." });
     }
     const supabase = getSupabaseAdmin();
@@ -953,7 +917,7 @@ router.get("/payments/public/:paymentId", async (req, res) => {
       const { data: dbTeams, error: dbTeamsError } = await supabase.from("team_registrations").select(`
           id,
           category:tournament_category_id(name, gender, age_group)
-        `).eq("tournament_id", pay2.tournamentId).eq("institution_id", pay2.institutionId);
+        `).eq("tournament_id", pay.tournamentId).eq("institution_id", pay.institutionId);
       if (!dbTeamsError && dbTeams) {
         teamsList = dbTeams.map((t) => {
           if (!t.category) return "Equipe";
@@ -965,7 +929,7 @@ router.get("/payments/public/:paymentId", async (req, res) => {
       console.error("Erro ao buscar equipes para o pagamento:", e);
     }
     res.json({
-      ...pay2,
+      ...pay,
       teams: teamsList,
       pagarmePublicKey: process.env.PAGARME_PUBLIC_KEY || ""
     });
@@ -1029,12 +993,12 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     if (payIndex === -1) {
       return res.status(404).json({ error: "Link de pagamento n\xE3o encontrado." });
     }
-    const pay2 = payments[payIndex];
-    if (pay2.status === "paid") {
+    const pay = payments[payIndex];
+    if (pay.status === "paid") {
       return res.status(400).json({ error: "Este pagamento j\xE1 foi realizado." });
     }
     const now = /* @__PURE__ */ new Date();
-    const limitDate = /* @__PURE__ */ new Date(pay2.deadline + "T23:59:59");
+    const limitDate = /* @__PURE__ */ new Date(pay.deadline + "T23:59:59");
     if (now > limitDate) {
       return res.status(400).json({ error: "Este link de pagamento expirou." });
     }
@@ -1044,50 +1008,25 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
       payments[payIndex].paidAt = (/* @__PURE__ */ new Date()).toISOString();
       savePayments(payments);
       const supabase2 = getSupabaseAdmin();
-      const { data: reg } = await supabase2.from("tournament_registrations").select("id").eq("tournament_id", pay2.tournamentId).eq("institution_id", pay2.institutionId).maybeSingle();
+      const { data: reg } = await supabase2.from("tournament_registrations").select("id").eq("tournament_id", pay.tournamentId).eq("institution_id", pay.institutionId).maybeSingle();
       if (reg) {
         await supabase2.from("tournament_registrations").update({ status: "confirmed" }).eq("id", reg.id);
       }
       return res.json({ success: true, method, paid: true });
     }
     if (!hasSecretKey) {
-      console.warn("PAGARME_SECRET_KEY n\xE3o detectada. Executando pagamento em modo SIMULADO.");
-      if (method === "pix") {
-        const pixPayload = generatePixEMV("+5571991414913", pay2.amount);
-        return res.json({
-          success: true,
-          method: "pix",
-          qrCode: pixPayload,
-          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixPayload)}`
-        });
-      }
-      if (method === "boleto") {
-        return res.json({
-          success: true,
-          method: "boleto",
-          barcode: "34191.79001 01043.513184 91020.150008 7 974000000",
-          pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf-test.pdf"
-        });
-      }
-      payments[payIndex].status = "paid";
-      payments[payIndex].paidAt = (/* @__PURE__ */ new Date()).toISOString();
-      savePayments(payments);
-      const supabase2 = getSupabaseAdmin();
-      const { data: reg } = await supabase2.from("tournament_registrations").select("id").eq("tournament_id", pay2.tournamentId).eq("institution_id", pay2.institutionId).maybeSingle();
-      if (reg) {
-        await supabase2.from("tournament_registrations").update({ status: "confirmed" }).eq("id", reg.id);
-      }
-      return res.json({ success: true, method: "card", paid: true });
+      console.error("PAGARME_SECRET_KEY n\xE3o configurada no servidor Vercel.");
+      return res.status(400).json({ error: "Integra\xE7\xE3o com gateway Pagar.me n\xE3o configurada. Defina PAGARME_SECRET_KEY nas vari\xE1veis de ambiente." });
     }
     const supabase = getSupabaseAdmin();
-    const { data: instData } = await supabase.from("institutions").select("email, cnpj, contact_phone").eq("id", pay2.institutionId).maybeSingle();
+    const { data: instData } = await supabase.from("institutions").select("email, cnpj, contact_phone").eq("id", pay.institutionId).maybeSingle();
     let splitRules = void 0;
     try {
-      const { data: tData2 } = await supabase.from("tournaments").select("owner_id").eq("id", pay2.tournamentId).maybeSingle();
+      const { data: tData2 } = await supabase.from("tournaments").select("owner_id").eq("id", pay.tournamentId).maybeSingle();
       if (tData2?.owner_id) {
         const { data: orgData } = await supabase.from("organizations").select("pagarme_recipient_id, platform_fee_percent").eq("id", tData2.owner_id).maybeSingle();
         if (orgData?.pagarme_recipient_id) {
-          const totalCents = Math.round(pay2.amount * 100);
+          const totalCents = Math.round(pay.amount * 100);
           const feePercent = orgData.platform_fee_percent !== void 0 ? Number(orgData.platform_fee_percent) : 10;
           splitRules = buildSplitRules(totalCents, orgData.pagarme_recipient_id, feePercent);
         }
@@ -1097,7 +1036,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     }
     const cleanDoc = (instData?.cnpj || "00000000000191").replace(/\D/g, "");
     const customer = {
-      name: pay2.institutionName || "Institui\xE7\xE3o",
+      name: pay.institutionName || "Institui\xE7\xE3o",
       email: instData?.email || "financeiro@querocompetir.com.br",
       document: cleanDoc.length === 11 || cleanDoc.length === 14 ? cleanDoc : "00000000000191",
       type: cleanDoc.length === 11 ? "individual" : "corporation",
@@ -1111,11 +1050,11 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     };
     if (method === "pix") {
       const orderPayload = {
-        code: pay2.id,
+        code: pay.id,
         items: [
           {
-            amount: Math.round(pay2.amount * 100),
-            description: `Taxa de Ades\xE3o - ${pay2.tournamentName}`,
+            amount: Math.round(pay.amount * 100),
+            description: `Taxa de Ades\xE3o - ${pay.tournamentName}`,
             quantity: 1
           }
         ],
@@ -1130,16 +1069,24 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
           }
         ]
       };
-      const pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      let pgOrder;
+      try {
+        pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      } catch (pgErr) {
+        if (splitRules && orderPayload.payments[0].split) {
+          console.warn("[Pagar.me Institution Pix Split Warning] Tentando criar cobran\xE7a Pix sem split:", pgErr.message);
+          delete orderPayload.payments[0].split;
+          pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+        } else {
+          throw pgErr;
+        }
+      }
       const charge = pgOrder.charges?.[0];
       const transaction = charge?.last_transaction || charge?.transactions?.[0];
-      let qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || "";
+      const qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || pgOrder?.qr_code || "";
+      const qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || (qrCode ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}` : "");
       if (!qrCode) {
-        qrCode = generatePixEMV("+5571991414913", pay2.amount);
-      }
-      let qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || "";
-      if (!qrCodeUrl && qrCode) {
-        qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}`;
+        return res.status(400).json({ error: "O gateway Pagar.me n\xE3o retornou a chave Pix para esta transa\xE7\xE3o." });
       }
       payments[payIndex].pagarmeOrderId = pgOrder.id;
       payments[payIndex].pagarmeChargeId = charge?.id;
@@ -1153,11 +1100,11 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     }
     if (method === "boleto") {
       const orderPayload = {
-        code: pay2.id,
+        code: pay.id,
         items: [
           {
-            amount: Math.round(pay2.amount * 100),
-            description: `Taxa de Ades\xE3o - ${pay2.tournamentName}`,
+            amount: Math.round(pay.amount * 100),
+            description: `Taxa de Ades\xE3o - ${pay.tournamentName}`,
             quantity: 1
           }
         ],
@@ -1169,13 +1116,24 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
               bank: "341",
               // Itaú
               instructions: "Pagar at\xE9 o vencimento. N\xE3o receber ap\xF3s vencimento.",
-              due_at: (/* @__PURE__ */ new Date(pay2.deadline + "T23:59:59")).toISOString()
+              due_at: (/* @__PURE__ */ new Date(pay.deadline + "T23:59:59")).toISOString()
             },
             ...splitRules ? { split: splitRules } : {}
           }
         ]
       };
-      const pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      let pgOrder;
+      try {
+        pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      } catch (pgErr) {
+        if (splitRules && orderPayload.payments[0].split) {
+          console.warn("[Pagar.me Institution Boleto Split Warning] Tentando criar cobran\xE7a Boleto sem split:", pgErr.message);
+          delete orderPayload.payments[0].split;
+          pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+        } else {
+          throw pgErr;
+        }
+      }
       const charge = pgOrder.charges?.[0];
       const transaction = charge?.last_transaction;
       payments[payIndex].pagarmeOrderId = pgOrder.id;
@@ -1193,11 +1151,11 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         return res.status(400).json({ error: "Token do cart\xE3o n\xE3o fornecido." });
       }
       const orderPayload = {
-        code: pay2.id,
+        code: pay.id,
         items: [
           {
-            amount: Math.round(pay2.amount * 100),
-            description: `Taxa de Ades\xE3o - ${pay2.tournamentName}`,
+            amount: Math.round(pay.amount * 100),
+            description: `Taxa de Ades\xE3o - ${pay.tournamentName}`,
             quantity: 1
           }
         ],
@@ -1215,7 +1173,18 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
           }
         ]
       };
-      const pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      let pgOrder;
+      try {
+        pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+      } catch (pgErr) {
+        if (splitRules && orderPayload.payments[0].split) {
+          console.warn("[Pagar.me Institution Card Split Warning] Tentando criar cobran\xE7a Cart\xE3o sem split:", pgErr.message);
+          delete orderPayload.payments[0].split;
+          pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+        } else {
+          throw pgErr;
+        }
+      }
       const charge = pgOrder.charges?.[0];
       if (charge?.status === "paid") {
         payments[payIndex].status = "paid";
@@ -1223,7 +1192,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         payments[payIndex].pagarmeOrderId = pgOrder.id;
         payments[payIndex].pagarmeChargeId = charge.id;
         savePayments(payments);
-        const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay2.tournamentId).eq("institution_id", pay2.institutionId).maybeSingle();
+        const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay.tournamentId).eq("institution_id", pay.institutionId).maybeSingle();
         if (reg) {
           await supabase.from("tournament_registrations").update({ status: "confirmed" }).eq("id", reg.id);
         }
@@ -1235,15 +1204,6 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     res.status(400).json({ error: "M\xE9todo de pagamento inv\xE1lido." });
   } catch (err) {
     console.error("Erro na transa\xE7\xE3o Pagar.me:", err);
-    if (method === "pix") {
-      const pixPayload = generatePixEMV("+5571991414913", pay.amount);
-      return res.json({
-        success: true,
-        method: "pix",
-        qrCode: pixPayload,
-        qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixPayload)}`
-      });
-    }
     res.status(500).json({ error: err.message || "Erro desconhecido ao processar pagamento." });
   }
 });
@@ -1261,9 +1221,9 @@ router.post("/payments/webhook", async (req, res) => {
             payments[payIndex].status = "paid";
             payments[payIndex].paidAt = (/* @__PURE__ */ new Date()).toISOString();
             savePayments(payments);
-            const pay2 = payments[payIndex];
+            const pay = payments[payIndex];
             const supabase = getSupabaseAdmin();
-            const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay2.tournamentId).eq("institution_id", pay2.institutionId).maybeSingle();
+            const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay.tournamentId).eq("institution_id", pay.institutionId).maybeSingle();
             if (reg) {
               const { error: updateErr } = await supabase.from("tournament_registrations").update({ status: "confirmed" }).eq("id", reg.id);
               if (updateErr) {
@@ -4427,18 +4387,8 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
       return res.json({ success: true, method, paid: true });
     }
     if (!hasSecretKey) {
-      console.warn("PAGARME_SECRET_KEY n\xE3o detectada. Executando pagamento individual em modo SIMULADO.");
-      if (method === "pix") {
-        const pixPayload = generatePixEMV("+5571991414913", totalAmount);
-        return res.json({
-          success: true,
-          method: "pix",
-          qrCode: pixPayload,
-          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixPayload)}`
-        });
-      }
-      await updateSubscriptionPaymentStatus(subId, "paid", sub, tData2, settings);
-      return res.json({ success: true, method: "card", paid: true });
+      console.error("PAGARME_SECRET_KEY n\xE3o configurada no servidor Vercel.");
+      return res.status(400).json({ error: "Integra\xE7\xE3o com gateway Pagar.me n\xE3o configurada. Defina PAGARME_SECRET_KEY nas vari\xE1veis de ambiente." });
     }
     const cleanDoc = (sub.document || "00000000000").replace(/\D/g, "");
     const docToUse = cleanDoc.length === 11 || cleanDoc.length === 14 ? cleanDoc : "00000000000";
@@ -4498,16 +4448,24 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
           }
         ]
       };
-      const pgOrder = await callPagarMe2("/orders", "POST", orderPayload);
+      let pgOrder;
+      try {
+        pgOrder = await callPagarMe2("/orders", "POST", orderPayload);
+      } catch (pgErr) {
+        if (splitRules && orderPayload.payments[0].split) {
+          console.warn("[Pagar.me Pix Split Warning] Tentando criar cobran\xE7a Pix sem split:", pgErr.message);
+          delete orderPayload.payments[0].split;
+          pgOrder = await callPagarMe2("/orders", "POST", orderPayload);
+        } else {
+          throw pgErr;
+        }
+      }
       const charge = pgOrder.charges?.[0];
       const transaction = charge?.last_transaction || charge?.transactions?.[0];
-      let qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || "";
+      const qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || pgOrder?.qr_code || "";
+      const qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || (qrCode ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}` : "");
       if (!qrCode) {
-        qrCode = generatePixEMV("+5571991414913", totalAmount);
-      }
-      let qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || "";
-      if (!qrCodeUrl && qrCode) {
-        qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}`;
+        return res.status(400).json({ error: "O gateway Pagar.me n\xE3o retornou a chave Pix para esta transa\xE7\xE3o." });
       }
       const currentAdditional = sub.additionalData || {};
       const updatedAdditional = {
@@ -4544,7 +4502,18 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
           }
         ]
       };
-      const pgOrder = await callPagarMe2("/orders", "POST", orderPayload);
+      let pgOrder;
+      try {
+        pgOrder = await callPagarMe2("/orders", "POST", orderPayload);
+      } catch (pgErr) {
+        if (splitRules && orderPayload.payments[0].split) {
+          console.warn("[Pagar.me Card Split Warning] Tentando criar cobran\xE7a Cart\xE3o sem split:", pgErr.message);
+          delete orderPayload.payments[0].split;
+          pgOrder = await callPagarMe2("/orders", "POST", orderPayload);
+        } else {
+          throw pgErr;
+        }
+      }
       const charge = pgOrder.charges?.[0];
       if (charge?.status === "paid") {
         const currentAdditional = sub.additionalData || {};
@@ -7097,8 +7066,8 @@ router6.post("/webhook", async (req, res) => {
             payments[idx].status = "paid";
             payments[idx].paidAt = (/* @__PURE__ */ new Date()).toISOString();
             fs5.writeFileSync(INST_PAYMENTS_FILE2, JSON.stringify(payments, null, 2));
-            const pay2 = payments[idx];
-            const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay2.tournamentId).eq("institution_id", pay2.institutionId).maybeSingle();
+            const pay = payments[idx];
+            const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay.tournamentId).eq("institution_id", pay.institutionId).maybeSingle();
             if (reg) {
               await supabase.from("tournament_registrations").update({ status: "confirmed" }).eq("id", reg.id);
             }
