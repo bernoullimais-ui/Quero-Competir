@@ -6,7 +6,9 @@ interface SwimmingBalizamentoProps {
   category: any;
   athleteSubs: any[];
   tournamentId: string;
+  institutions?: any[];
   readOnly?: boolean;
+  hideResults?: boolean;
 }
 
 interface LaneAssignment {
@@ -24,7 +26,7 @@ interface Heat {
   lanes: LaneAssignment[];
 }
 
-export default function SwimmingBalizamento({ category, athleteSubs, tournamentId, readOnly = false, hideResults = false }: SwimmingBalizamentoProps) {
+export default function SwimmingBalizamento({ category, athleteSubs, tournamentId, institutions = [], readOnly = false, hideResults = false }: SwimmingBalizamentoProps) {
   const [lanesCount, setLanesCount] = useState<number>(6);
   const [heats, setHeats] = useState<Heat[]>([]);
   const [editingResults, setEditingResults] = useState<Record<string, string>>({});
@@ -37,7 +39,7 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
       (sub.validationStatus === "approved" || sub.validation_status === "approved" || sub.isCompleted || sub.is_completed || !sub.validationStatus)
   );
 
-  // Helper to get lane seeding order (FINA / CBDA standard)
+  // Helper to get lane seeding order (FINA / CBDA standard with central lanes)
   const getLaneOrder = (numLanes: number): number[] => {
     switch (numLanes) {
       case 8: return [4, 5, 3, 6, 2, 7, 1, 8];
@@ -51,7 +53,62 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
     }
   };
 
-  // Generate Heats (Balizamento)
+  const getAthleteSeedTime = (ath: any): string => {
+    const add = ath.additionalData || ath.additional_data || {};
+    if (add.seedTimes && add.seedTimes[category.id]) {
+      return add.seedTimes[category.id];
+    }
+    if (add.seed_time) return add.seed_time;
+    if (add.seedTime) return add.seedTime;
+    return "--:--.--";
+  };
+
+  const parseSeedTimeToMs = (timeStr?: string): number => {
+    if (!timeStr || timeStr === "--:--.--" || timeStr === "00:00.00") return 99999999;
+    const cleaned = timeStr.replace(/[^\d:.]/g, "");
+    if (!cleaned) return 99999999;
+
+    let mins = 0;
+    let secs = 0;
+    let ms = 0;
+
+    if (cleaned.includes(":")) {
+      const parts = cleaned.split(":");
+      mins = Number(parts[0]) || 0;
+      const secParts = (parts[1] || "").split(".");
+      secs = Number(secParts[0]) || 0;
+      ms = Number((secParts[1] || "0").padEnd(2, "0").slice(0, 2)) * 10;
+    } else if (cleaned.includes(".")) {
+      const parts = cleaned.split(".");
+      secs = Number(parts[0]) || 0;
+      ms = Number((parts[1] || "0").padEnd(2, "0").slice(0, 2)) * 10;
+    } else {
+      secs = Number(cleaned) || 0;
+    }
+
+    return (mins * 60 * 1000) + (secs * 1000) + ms;
+  };
+
+  const getAthleteInstitutionName = (ath: any): string => {
+    const instId = ath.institutionId || ath.institution_id;
+    if (instId && Array.isArray(institutions) && institutions.length > 0) {
+      const found = institutions.find((i: any) => i.id === instId);
+      if (found?.name) return found.name;
+    }
+    if (ath.institutionName) return ath.institutionName;
+    if (ath.institution_name) return ath.institution_name;
+    if (ath.institution?.name) return ath.institution.name;
+    
+    const add = ath.additionalData || ath.additional_data || {};
+    if (add.institution_name) return add.institution_name;
+    if (add.club_name) return add.club_name;
+    if (add.team_name) return add.team_name;
+    if (add.representative_name) return add.representative_name;
+
+    return "Avulso";
+  };
+
+  // Generate Heats (Balizamento Equitativo FINA/CBDA)
   const generateBalizamento = () => {
     if (categoryAthletes.length === 0) {
       setHeats([]);
@@ -62,33 +119,51 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
     const totalAthletes = categoryAthletes.length;
     const numHeats = Math.max(1, Math.ceil(totalAthletes / lanesCount));
 
-    // Copy and sort athletes (by seed time if available, or name)
+    // Distribuir atletas equitativamente pelas séries (ex: 14 atletas em 6 raias -> 5, 5, 4)
+    const baseCount = Math.floor(totalAthletes / numHeats);
+    const remainder = totalAthletes % numHeats;
+    const heatSizes: number[] = [];
+    for (let h = 0; h < numHeats; h++) {
+      heatSizes.push(baseCount + (h < remainder ? 1 : 0));
+    }
+
+    // Ordenar atletas do mais LENTO/sem tempo (primeiras séries) ao mais RÁPIDO (última série)
     const sortedAthletes = [...categoryAthletes].sort((a, b) => {
-      const timeA = a.additionalData?.seed_time || "99:99.99";
-      const timeB = b.additionalData?.seed_time || "99:99.99";
-      return timeA.localeCompare(timeB);
+      const timeA = parseSeedTimeToMs(getAthleteSeedTime(a));
+      const timeB = parseSeedTimeToMs(getAthleteSeedTime(b));
+      return timeB - timeA; // Descending order of timeMs (slowest first, fastest last)
     });
 
     const newHeats: Heat[] = [];
+    let offset = 0;
 
     for (let h = 0; h < numHeats; h++) {
-      const heatAthletes = sortedAthletes.slice(h * lanesCount, (h + 1) * lanesCount);
-      
-      // Initialize lanes 1..lanesCount
+      const count = heatSizes[h];
+      const heatAthletesRaw = sortedAthletes.slice(offset, offset + count);
+      offset += count;
+
+      // Dentro de cada série, ordenar do mais RÁPIDO ao mais LENTO para colocar os melhores tempos nas raias centrais
+      const heatAthletes = [...heatAthletesRaw].sort((a, b) => {
+        const timeA = parseSeedTimeToMs(getAthleteSeedTime(a));
+        const timeB = parseSeedTimeToMs(getAthleteSeedTime(b));
+        return timeA - timeB; // Ascending order of timeMs (fastest first)
+      });
+
+      // Inicializar raias 1..lanesCount
       const laneAssignments: LaneAssignment[] = Array.from({ length: lanesCount }, (_, i) => ({
         laneNumber: i + 1,
       }));
 
-      // Distribute athletes into lanes based on FINA seeding order
+      // Distribuir atletas nas raias segundo a ordem de raias centrais (FINA / CBDA)
       heatAthletes.forEach((ath, index) => {
         const targetLaneNum = laneOrder[index] || (index + 1);
         const laneObj = laneAssignments.find(l => l.laneNumber === targetLaneNum);
         if (laneObj) {
           laneObj.athleteId = ath.id;
-          laneObj.athleteName = ath.athleteName;
-          laneObj.institutionName = ath.institutionName || ath.institution_name || ath.institution?.name || ath.additionalData?.club_name || ath.additionalData?.institution_name || "Avulso";
-          laneObj.seedTime = ath.additionalData?.seed_time || "--:--.--";
-          laneObj.resultTime = editingResults[ath.id] || "";
+          laneObj.athleteName = ath.athleteName || ath.full_name || ath.athlete_name;
+          laneObj.institutionName = getAthleteInstitutionName(ath);
+          laneObj.seedTime = getAthleteSeedTime(ath);
+          laneObj.resultTime = editingResults[ath.id] || ath.additionalData?.result_time || ath.additional_data?.result_time || "";
         }
       });
 
@@ -117,7 +192,7 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
 
   useEffect(() => {
     generateBalizamento();
-  }, [category.id, lanesCount, categoryAthletes.length, JSON.stringify(editingResults)]);
+  }, [category.id, lanesCount, categoryAthletes.length, JSON.stringify(editingResults), JSON.stringify(institutions)]);
 
   // Mascara automática para digitação de tempo de natação (6 dígitos numéricos)
   const formatSwimmingTimeInput = (val: string): string => {

@@ -593,6 +593,7 @@ export default function PublicTournamentView() {
                                         category={cat}
                                         athleteSubs={athleteSubs}
                                         tournamentId={id!}
+                                        institutions={institutions}
                                         readOnly={true}
                                         hideResults={true}
                                       />
@@ -673,6 +674,7 @@ export default function PublicTournamentView() {
                                 category={cat}
                                 athleteSubs={athleteSubs}
                                 tournamentId={id!}
+                                institutions={institutions}
                                 readOnly={true}
                                 hideResults={true}
                               />

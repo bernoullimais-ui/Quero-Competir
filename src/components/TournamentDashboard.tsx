@@ -2435,6 +2435,7 @@ export default function TournamentDashboard() {
                     category={selectedCatForBracket}
                     athleteSubs={athleteSubs}
                     tournamentId={id!}
+                    institutions={institutions}
                   />
                 ) : (
                   /* MODALIDADES TRADICIONAIS (Combate, Esportes Coletivos, etc.) */
