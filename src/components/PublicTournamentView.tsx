@@ -282,6 +282,9 @@ export default function PublicTournamentView() {
         }
         setTournament(tData);
         if (tData.organization) applyBrandColors(tData.organization);
+        if (tData.rules_config?.show_brackets_publicly !== undefined) {
+          setShowBracketsPublicly(!!tData.rules_config.show_brackets_publicly);
+        }
 
         const realId = tData.id || id;
 
