@@ -328,7 +328,7 @@ export default function PublicTournamentView() {
                 activeTab === "tabela" ? "bg-white text-indigo-700 shadow-sm" : "text-indigo-100 hover:text-white hover:bg-white/10"
               }`}
             >
-              <LayoutGrid size={16} /> Tabela de Jogos
+              <LayoutGrid size={16} /> Tabela/Chave/Balizamento
             </button>
             <button
               onClick={() => setActiveTab("classificacao")}
@@ -495,6 +495,7 @@ export default function PublicTournamentView() {
                                         athleteSubs={athleteSubs}
                                         tournamentId={id!}
                                         readOnly={true}
+                                        hideResults={true}
                                       />
                                     ) : (
                                       <TournamentBracket 
@@ -574,6 +575,7 @@ export default function PublicTournamentView() {
                                 athleteSubs={athleteSubs}
                                 tournamentId={id!}
                                 readOnly={true}
+                                hideResults={true}
                               />
                             ) : (
                               <TournamentBracket 

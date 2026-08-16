@@ -24,7 +24,7 @@ interface Heat {
   lanes: LaneAssignment[];
 }
 
-export default function SwimmingBalizamento({ category, athleteSubs, tournamentId, readOnly = false }: SwimmingBalizamentoProps) {
+export default function SwimmingBalizamento({ category, athleteSubs, tournamentId, readOnly = false, hideResults = false }: SwimmingBalizamentoProps) {
   const [lanesCount, setLanesCount] = useState<number>(6);
   const [heats, setHeats] = useState<Heat[]>([]);
   const [editingResults, setEditingResults] = useState<Record<string, string>>({});
@@ -161,8 +161,6 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
     }));
   };
 
-  const handleTimeChange = handleResultChange;
-
   // Persistir tempo obtido de um único atleta no Supabase/backend
   const handleSaveSingleAthleteResult = async (athleteId: string, resultTime: string) => {
     if (!athleteId || resultTime === undefined) return;
@@ -294,7 +292,7 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
           <h2>Prova/Categoria: ${category.name} (${category.gender || ""} ${category.age_group || ""}) • Raias: ${lanesCount}</h2>
 
           ${heats.map(h => `
-            <div class="heat-header">SÉRLE ${h.heatNumber} de ${heats.length}</div>
+            <div class="heat-header">SÉRIE ${h.heatNumber} de ${heats.length}</div>
             <table>
               <thead>
                 <tr>
@@ -302,8 +300,8 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
                   <th>Atleta</th>
                   <th>Clube / Entidade</th>
                   <th style="width: 120px;">Tempo Inscrição</th>
-                  <th style="width: 120px;">Tempo Final</th>
-                  <th style="width: 80px;">Classif.</th>
+                  ${!hideResults ? `<th style="width: 120px;">Tempo Final</th>` : ""}
+                  ${!hideResults ? `<th style="width: 80px;">Classif.</th>` : ""}
                 </tr>
               </thead>
               <tbody>
@@ -313,8 +311,8 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
                     <td><strong>${l.athleteName || "—"}</strong></td>
                     <td>${l.institutionName || "—"}</td>
                     <td>${l.seedTime || "--:--.--"}</td>
-                    <td>${(l.athleteId && editingResults[l.athleteId]) || "___:___.___"}</td>
-                    <td></td>
+                    ${!hideResults ? `<td>${(l.athleteId && editingResults[l.athleteId]) || "___:___.___"}</td>` : ""}
+                    ${!hideResults ? `<td></td>` : ""}
                   </tr>
                 `).join("")}
               </tbody>
@@ -452,8 +450,8 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
 
         return (
           <div className="space-y-6">
-            {/* Overall Race Classification Table (when results exist) */}
-            {overallRankings.length > 0 && (
+            {/* Overall Race Classification Table (when results exist and not hidden) */}
+            {overallRankings.length > 0 && !hideResults && (
               <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl border border-indigo-900 space-y-4 animate-in fade-in duration-300">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-800/60 pb-4">
                   <div>
@@ -543,9 +541,9 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
                       <th className="py-3 px-4 w-16 text-center">Raia</th>
                       <th className="py-3 px-4">Atleta</th>
                       <th className="py-3 px-4">Clube / Entidade</th>
-                      <th className="py-3 px-4 w-32">Tempo Inscrição</th>
-                      <th className="py-3 px-4 w-36">Tempo Final (Obtido)</th>
-                      <th className="py-3 px-4 w-28 text-center">Classificação</th>
+                      <th className="py-3 px-4 w-32 text-center">Tempo Inscrição</th>
+                      {!hideResults && <th className="py-3 px-4 w-36">Tempo Final (Obtido)</th>}
+                      {!hideResults && <th className="py-3 px-4 w-28 text-center">Classificação</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -584,44 +582,48 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
                           </td>
 
                           {/* Seed Time */}
-                          <td className="py-3 px-4 font-mono text-slate-500 font-medium">
+                          <td className="py-3 px-4 font-mono text-slate-500 font-medium text-center">
                             {lane.seedTime || "--:--.--"}
                           </td>
 
                           {/* Result Time Input / Text */}
-                          <td className="py-3 px-4">
-                            {isOccupied ? (
-                              readOnly ? (
-                                <span className="font-mono font-bold text-slate-700 text-xs">
-                                  {editingResults[lane.athleteId!] || lane.resultTime || "--:--.--"}
-                                </span>
+                          {!hideResults && (
+                            <td className="py-3 px-4">
+                              {isOccupied ? (
+                                readOnly ? (
+                                  <span className="font-mono font-bold text-slate-700 text-xs">
+                                    {editingResults[lane.athleteId!] || lane.resultTime || "--:--.--"}
+                                  </span>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    placeholder="00:32.50 (digite 003250)"
+                                    value={editingResults[lane.athleteId!] || ""}
+                                    onChange={(e) => handleResultChange(lane.athleteId!, e.target.value)}
+                                    onBlur={() => {
+                                      const currentVal = editingResults[lane.athleteId!] || "";
+                                      const finalized = finalizeSwimmingTimeOnBlur(currentVal);
+                                      if (finalized !== currentVal) {
+                                        handleResultChange(lane.athleteId!, finalized);
+                                      }
+                                      handleSaveSingleAthleteResult(lane.athleteId!, finalized);
+                                    }}
+                                    maxLength={8}
+                                    className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs placeholder:text-slate-300"
+                                  />
+                                )
                               ) : (
-                                <input
-                                  type="text"
-                                  placeholder="00:32.50 (digite 003250)"
-                                  value={editingResults[lane.athleteId!] || ""}
-                                  onChange={(e) => handleResultChange(lane.athleteId!, e.target.value)}
-                                  onBlur={() => {
-                                    const currentVal = editingResults[lane.athleteId!] || "";
-                                    const finalized = finalizeSwimmingTimeOnBlur(currentVal);
-                                    if (finalized !== currentVal) {
-                                      handleResultChange(lane.athleteId!, finalized);
-                                    }
-                                    handleSaveSingleAthleteResult(lane.athleteId!, finalized);
-                                  }}
-                                  maxLength={8}
-                                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs placeholder:text-slate-300"
-                                />
-                              )
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
-                          </td>
+                                <span className="text-slate-300">—</span>
+                              )}
+                            </td>
+                          )}
 
                           {/* Rank Badge */}
-                          <td className="py-3 px-4 text-center">
-                            {isOccupied && lane.athleteId && getRankBadge(lane.athleteId)}
-                          </td>
+                          {!hideResults && (
+                            <td className="py-3 px-4 text-center">
+                              {isOccupied && lane.athleteId && getRankBadge(lane.athleteId)}
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
