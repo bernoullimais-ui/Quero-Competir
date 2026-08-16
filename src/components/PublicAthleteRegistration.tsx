@@ -431,14 +431,16 @@ export default function PublicAthleteRegistration() {
           throw new Error("Preencha todos os campos do cartão.");
         }
         
-        const expMonth = Number(simulatedCard.expiry.split("/")[0]);
-        const expYear = Number("20" + simulatedCard.expiry.split("/")[1]);
+        const expiryParts = (simulatedCard.expiry || "").split("/");
+        const expMonth = Number(expiryParts[0] || "1");
+        const rawYear = (expiryParts[1] || "").trim();
+        const expYear = rawYear.length === 2 ? Number("20" + rawYear) : Number(rawYear);
 
         bodyData.card = {
           number: simulatedCard.number.replace(/\s/g, ""),
           holder_name: simulatedCard.name,
           exp_month: expMonth,
-          exp_year: expYear,
+          exp_year: expYear > 2000 && expYear < 2100 ? expYear : (expYear >= 24 && expYear <= 99 ? 2000 + expYear : 2029),
           cvv: simulatedCard.cvv
         };
 

@@ -4631,6 +4631,21 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
       const cardData = req.body.card;
       let cardToken = req.body.cardToken;
 
+      const parseYear = (yrVal: any, expStr?: string) => {
+        let yrNum = Number(yrVal);
+        if (yrNum > 2000 && yrNum < 2100) return yrNum;
+        if (expStr && typeof expStr === "string") {
+          const parts = expStr.split("/");
+          if (parts[1]) {
+            const yr = parts[1].trim();
+            yrNum = yr.length === 2 ? Number("20" + yr) : Number(yr);
+            if (yrNum > 2000 && yrNum < 2100) return yrNum;
+          }
+        }
+        if (yrNum >= 24 && yrNum <= 99) return 2000 + yrNum;
+        return 2029;
+      };
+
       // Se não temos cardToken real do Pagar.me e temos cardData, tenta tokenizar via Pagar.me público
       if ((!cardToken || !cardToken.startsWith("tok_")) && cardData?.number) {
         const publicKey = process.env.PAGARME_PUBLIC_KEY;
@@ -4644,8 +4659,8 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
                 card: {
                   number: String(cardData.number).replace(/\s/g, ""),
                   holder_name: String(cardData.holder_name || cardData.name || customer.name),
-                  exp_month: Number(cardData.exp_month || cardData.expiry?.split("/")[0]),
-                  exp_year: Number(cardData.exp_year || (cardData.expiry?.split("/")[1] ? ("20" + cardData.expiry.split("/")[1]) : 2029)),
+                  exp_month: Number(cardData.exp_month || cardData.expiry?.split("/")[0] || 1),
+                  exp_year: parseYear(cardData.exp_year, cardData.expiry),
                   cvv: String(cardData.cvv)
                 }
               })
@@ -4672,8 +4687,8 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
         creditCardPayload.card = {
           number: String(cardData.number).replace(/\s/g, ""),
           holder_name: String(cardData.holder_name || cardData.name || customer.name),
-          exp_month: Number(cardData.exp_month || cardData.expiry?.split("/")[0]),
-          exp_year: Number(cardData.exp_year || (cardData.expiry?.split("/")[1] ? ("20" + cardData.expiry.split("/")[1]) : 2029)),
+          exp_month: Number(cardData.exp_month || cardData.expiry?.split("/")[0] || 1),
+          exp_year: parseYear(cardData.exp_year, cardData.expiry),
           cvv: String(cardData.cvv)
         };
       } else {
