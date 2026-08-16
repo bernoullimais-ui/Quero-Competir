@@ -1305,9 +1305,19 @@ export default function PublicAthleteRegistration() {
                           <span className="text-xs font-bold text-indigo-600 uppercase tracking-wide">Total a Pagar</span>
                           <p className="text-3xl font-extrabold text-indigo-950 mt-1">R$ {totalAmount.toFixed(2)}</p>
                         </div>
-                        <div className="text-right">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">Beneficiário</span>
-                          <span className="text-xs font-bold text-slate-600">Quero Competir Ltda</span>
+                        <div className="text-right space-y-1">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">Beneficiário</span>
+                            <span className="text-xs font-bold text-slate-700 block">
+                              {organization?.name || tournament?.organizer_name || "Organizador do Torneio"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider block">Intermediário da Inscrição</span>
+                            <span className="text-[11px] font-bold text-indigo-600 block">
+                              Quero Competir (By Segunda Gaveta)
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
