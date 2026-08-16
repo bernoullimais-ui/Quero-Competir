@@ -37,6 +37,20 @@ interface BankDataTabProps {
   organizationId: string;
 }
 
+function getAuthToken(): string {
+  const directToken = localStorage.getItem("token");
+  if (directToken) return directToken;
+
+  const savedUser = localStorage.getItem("currentUser");
+  if (savedUser) {
+    try {
+      const u = JSON.parse(savedUser);
+      if (u && u.token) return u.token;
+    } catch (_) {}
+  }
+  return "";
+}
+
 export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
   const { success, error } = useToast();
 
@@ -66,46 +80,54 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
   const [holderPhone, setHolderPhone] = useState("");
 
   const fetchRecipientStatus = async () => {
+    if (!organizationId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
+      const token = getAuthToken();
       const res = await fetch(`/api/payments/organizations/${organizationId}/recipient-status`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+          Authorization: `Bearer ${token}`
         }
       });
-      if (!res.ok) throw new Error("Erro ao carregar status financeiro");
+      if (!res.ok) {
+        console.warn("Erro ao buscar status do recebedor:", res.statusText);
+        setLoading(false);
+        return;
+      }
       const data = await res.json();
+      if (data && !data.error) {
+        setPagarmeRecipientId(data.pagarmeRecipientId || null);
+        setRecipientStatus(data.pagarmeRecipientStatus || "not_configured");
+        setPlatformFeePercent(data.platformFeePercent !== undefined ? data.platformFeePercent : 10);
+        setAdminFeeInput(data.platformFeePercent !== undefined ? data.platformFeePercent : 10);
 
-      setPagarmeRecipientId(data.pagarmeRecipientId || null);
-      setRecipientStatus(data.pagarmeRecipientStatus || "not_configured");
-      setPlatformFeePercent(data.platformFeePercent !== undefined ? data.platformFeePercent : 10);
-      setAdminFeeInput(data.platformFeePercent !== undefined ? data.platformFeePercent : 10);
+        if (data.bankData) {
+          setHolderName(data.bankData.holderName || "");
+          setHolderDocument(data.bankData.holderDocument || "");
+          setHolderType(data.bankData.holderType || "individual");
+          setBankCode(data.bankData.bankCode || "341");
+          setBankBranch(data.bankData.bankBranch || "");
+          
+          const accFull = data.bankData.bankAccount || "";
+          if (accFull.includes("-")) {
+            const parts = accFull.split("-");
+            setBankAccount(parts[0]);
+            setBankAccountDigit(parts[1]);
+          } else {
+            setBankAccount(accFull);
+            setBankAccountDigit("");
+          }
 
-      if (data.bankData) {
-        setHolderName(data.bankData.holderName || "");
-        setHolderDocument(data.bankData.holderDocument || "");
-        setHolderType(data.bankData.holderType || "individual");
-        setBankCode(data.bankData.bankCode || "341");
-        setBankBranch(data.bankData.bankBranch || "");
-        
-        // Parse account & digit if available
-        const accFull = data.bankData.bankAccount || "";
-        if (accFull.includes("-")) {
-          const parts = accFull.split("-");
-          setBankAccount(parts[0]);
-          setBankAccountDigit(parts[1]);
-        } else {
-          setBankAccount(accFull);
-          setBankAccountDigit("");
+          setBankAccountType(data.bankData.bankAccountType || "checking");
+          setHolderEmail(data.bankData.holderEmail || "");
+          setHolderPhone(data.bankData.holderPhone || "");
         }
-
-        setBankAccountType(data.bankData.bankAccountType || "checking");
-        setHolderEmail(data.bankData.holderEmail || "");
-        setHolderPhone(data.bankData.holderPhone || "");
       }
     } catch (err: any) {
-      console.error(err);
-      error("Não foi possível carregar as informações de recebimento.");
+      console.error("Error fetching recipient status:", err);
     } finally {
       setLoading(false);
     }
@@ -126,7 +148,7 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
 
     setSaving(true);
     try {
-      const token = localStorage.getItem("token") || "";
+      const token = getAuthToken();
       const res = await fetch(`/api/payments/organizations/${organizationId}/create-recipient`, {
         method: "POST",
         headers: {
@@ -166,7 +188,7 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
   const handleUpdatePlatformFee = async () => {
     setUpdatingFee(true);
     try {
-      const token = localStorage.getItem("token") || "";
+      const token = getAuthToken();
       const res = await fetch(`/api/payments/admin/organizations/${organizationId}/fee`, {
         method: "PATCH",
         headers: {
