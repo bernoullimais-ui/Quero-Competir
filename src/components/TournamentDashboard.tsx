@@ -2166,6 +2166,7 @@ export default function TournamentDashboard() {
                               <th className="pb-3 font-bold">Entidade / Categoria</th>
                               <th className="pb-3 text-right font-bold">Taxa</th>
                               <th className="pb-3 text-center font-bold">Status</th>
+                              <th className="pb-3 text-right font-bold">Ações</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2174,7 +2175,7 @@ export default function TournamentDashboard() {
                               if (completedFiltered.length === 0) {
                                 return (
                                   <tr>
-                                    <td colSpan={4} className="py-8 text-center text-slate-400 italic">
+                                    <td colSpan={5} className="py-8 text-center text-slate-400 italic">
                                       Nenhum atleta com inscrição concluída.
                                     </td>
                                   </tr>
@@ -2201,6 +2202,7 @@ export default function TournamentDashboard() {
                                    tableGroupMap.set(key, {
                                      key,
                                      athleteName: s.athleteName,
+                                     parentPhone: s.parentPhone || s.additionalData?.phone,
                                      institutionId: s.institutionId,
                                      categoryNames: [catName],
                                      subIds: [s.id],
@@ -2254,6 +2256,40 @@ export default function TournamentDashboard() {
                                          <option value="paid">Pago</option>
                                          <option value="pending">Pendente</option>
                                        </select>
+                                     </td>
+                                     <td className="py-3.5 text-right whitespace-nowrap">
+                                       {g.subIds && g.subIds.length > 0 && (
+                                         <div className="flex items-center justify-end gap-1">
+                                           <button
+                                             type="button"
+                                             onClick={() => {
+                                               const payUrl = `${window.location.origin}/public/register-athlete/${g.subIds[0]}`;
+                                               navigator.clipboard.writeText(payUrl);
+                                               alert(`Link de pagamento copiado para ${g.athleteName}!\n\n${payUrl}`);
+                                             }}
+                                             className="px-2 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] font-bold hover:bg-indigo-100 transition inline-flex items-center gap-1 cursor-pointer"
+                                             title="Copiar Link de Pagamento"
+                                           >
+                                             <Copy size={11} /> Link
+                                           </button>
+                                           {!isPaid && (
+                                             <button
+                                               type="button"
+                                               onClick={() => {
+                                                 const payUrl = `${window.location.origin}/public/register-athlete/${g.subIds[0]}`;
+                                                 const msg = `Olá! Segue o link para pagamento da inscrição de *${g.athleteName}* em *${tournament?.name || "Torneio"}*:\n\n${payUrl}`;
+                                                 const phone = (g.parentPhone || "").replace(/\D/g, "");
+                                                 const waUrl = phone ? `https://api.whatsapp.com/send?phone=55${phone}&text=${encodeURIComponent(msg)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+                                                 window.open(waUrl, "_blank");
+                                               }}
+                                               className="px-2 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 transition inline-flex items-center gap-1 cursor-pointer"
+                                               title="Enviar por WhatsApp"
+                                             >
+                                               <Share2 size={11} /> WhatsApp
+                                             </button>
+                                           )}
+                                         </div>
+                                       )}
                                      </td>
                                    </tr>
                                  );

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Settings, Timer, AlertCircle, Users, Plus, Trash2, Eye, Download, FileText, X } from "lucide-react";
+import { Settings, Timer, AlertCircle, Users, Plus, Trash2, Eye, Download, FileText, X, Copy, Share2 } from "lucide-react";
 import { useToast } from "./ui/Toast.tsx";
 import { useConfirm } from "./ui/ConfirmDialog.tsx";
 import AthleteEnrollmentModal from "./AthleteEnrollmentModal.tsx";
@@ -532,6 +532,42 @@ export default function SubscriptionsTab({
                           </div>
                         )}
                       </div>
+
+                      {/* Link de Pagamento para Responsável */}
+                      {sub.paymentStatus !== "paid" && (
+                        <div className="bg-amber-50/70 border border-amber-200/70 p-3 rounded-2xl flex items-center justify-between gap-2 flex-wrap">
+                          <div>
+                            <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider block">💳 Pagamento Pendente</span>
+                            <span className="text-[11px] font-semibold text-slate-600">Envie o link de pagamento para o responsável</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const payUrl = `${window.location.origin}/public/register-athlete/${sub.id}`;
+                                navigator.clipboard.writeText(payUrl);
+                                toastSuccess(`Link de pagamento copiado para ${sub.athleteName}!`);
+                              }}
+                              className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs flex items-center gap-1 cursor-pointer"
+                            >
+                              <Copy size={12} /> Copiar Link
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const payUrl = `${window.location.origin}/public/register-athlete/${sub.id}`;
+                                const msg = `Olá! Segue o link para pagamento da inscrição de *${sub.athleteName}*:\n\n${payUrl}`;
+                                const phone = (sub.parentPhone || sub.additionalData?.phone || "").replace(/\D/g, "");
+                                const waUrl = phone ? `https://api.whatsapp.com/send?phone=55${phone}&text=${encodeURIComponent(msg)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+                                window.open(waUrl, "_blank");
+                              }}
+                              className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition shadow-xs flex items-center gap-1 cursor-pointer"
+                            >
+                              <Share2 size={12} /> WhatsApp
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Preview de Foto e Documento */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
