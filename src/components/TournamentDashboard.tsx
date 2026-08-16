@@ -2320,18 +2320,29 @@ export default function TournamentDashboard() {
                                      <td className="py-3.5 text-right whitespace-nowrap">
                                        {g.subIds && g.subIds.length > 0 && (
                                          <div className="flex items-center justify-end gap-1">
-                                           <button
-                                             type="button"
-                                             onClick={() => {
-                                               const payUrl = `${window.location.origin}/public/register-athlete/${g.subIds[0]}`;
-                                               navigator.clipboard.writeText(payUrl);
-                                               alert(`Link de pagamento copiado para ${g.athleteName}!\n\n${payUrl}`);
-                                             }}
-                                             className="px-2 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] font-bold hover:bg-indigo-100 transition inline-flex items-center gap-1 cursor-pointer"
-                                             title="Copiar Link de Pagamento"
-                                           >
-                                             <Copy size={11} /> Link
-                                           </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const ticketUrl = `${window.location.origin}/public/ticket/${g.subIds[0]}`;
+                                                window.open(ticketUrl, "_blank");
+                                              }}
+                                              className="px-2 py-1 rounded-lg border border-purple-200 bg-purple-50 text-purple-700 text-[10px] font-bold hover:bg-purple-100 transition inline-flex items-center gap-1 cursor-pointer"
+                                              title="Abrir Credencial Digital do Atleta"
+                                            >
+                                              🎟️ Credencial
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const payUrl = `${window.location.origin}/public/register-athlete/${g.subIds[0]}`;
+                                                navigator.clipboard.writeText(payUrl);
+                                                alert(`Link de pagamento copiado para ${g.athleteName}!\n\n${payUrl}`);
+                                              }}
+                                              className="px-2 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] font-bold hover:bg-indigo-100 transition inline-flex items-center gap-1 cursor-pointer"
+                                              title="Copiar Link de Pagamento"
+                                            >
+                                              <Copy size={11} /> Link
+                                            </button>
                                            {!isPaid && (
                                              <button
                                                type="button"

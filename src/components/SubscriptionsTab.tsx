@@ -544,6 +544,17 @@ export default function SubscriptionsTab({
                             <button
                               type="button"
                               onClick={() => {
+                                const ticketUrl = `${window.location.origin}/public/ticket/${sub.id}`;
+                                window.open(ticketUrl, "_blank");
+                              }}
+                              className="px-2.5 py-1.5 bg-purple-500 text-white rounded-xl text-xs font-bold hover:bg-purple-600 transition shadow-xs flex items-center gap-1 cursor-pointer"
+                              title="Ver Credencial Digital do Atleta"
+                            >
+                              🎟️ Credencial
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
                                 const payUrl = `${window.location.origin}/public/register-athlete/${sub.id}`;
                                 navigator.clipboard.writeText(payUrl);
                                 toastSuccess(`Link de pagamento copiado para ${sub.athleteName}!`);
