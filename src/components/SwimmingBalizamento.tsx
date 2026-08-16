@@ -119,11 +119,45 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
     generateBalizamento();
   }, [category.id, lanesCount, categoryAthletes.length, JSON.stringify(editingResults)]);
 
+  // Mascara automática para digitação de tempo de natação (6 dígitos numéricos)
+  const formatSwimmingTimeInput = (val: string): string => {
+    if (!val) return "";
+    const digits = val.replace(/\D/g, "");
+    if (digits.length === 0) return "";
+
+    const capped = digits.slice(0, 6);
+    if (capped.length <= 2) {
+      return capped;
+    } else if (capped.length <= 4) {
+      const sec = capped.slice(0, capped.length - 2);
+      const ms = capped.slice(capped.length - 2);
+      return `${sec}.${ms}`;
+    } else {
+      const min = capped.slice(0, capped.length - 4).padStart(2, "0");
+      const sec = capped.slice(capped.length - 4, capped.length - 2);
+      const ms = capped.slice(capped.length - 2);
+      return `${min}:${sec}.${ms}`;
+    }
+  };
+
+  const finalizeSwimmingTimeOnBlur = (val: string): string => {
+    if (!val) return "";
+    const digits = val.replace(/\D/g, "");
+    if (digits.length === 0) return "";
+
+    const padded = digits.padStart(6, "0").slice(0, 6);
+    const min = padded.slice(0, 2);
+    const sec = padded.slice(2, 4);
+    const ms = padded.slice(4, 6);
+    return `${min}:${sec}.${ms}`;
+  };
+
   // Handle time result input (soluciona o erro de handleResultChange)
   const handleResultChange = (athleteId: string, value: string) => {
+    const formatted = formatSwimmingTimeInput(value);
     setEditingResults(prev => ({
       ...prev,
-      [athleteId]: value
+      [athleteId]: formatted
     }));
   };
 
@@ -564,11 +598,19 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
                               ) : (
                                 <input
                                   type="text"
-                                  placeholder="00:32.50"
+                                  placeholder="00:32.50 (digite 003250)"
                                   value={editingResults[lane.athleteId!] || ""}
                                   onChange={(e) => handleResultChange(lane.athleteId!, e.target.value)}
-                                  onBlur={() => handleSaveSingleAthleteResult(lane.athleteId!, editingResults[lane.athleteId!])}
-                                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
+                                  onBlur={() => {
+                                    const currentVal = editingResults[lane.athleteId!] || "";
+                                    const finalized = finalizeSwimmingTimeOnBlur(currentVal);
+                                    if (finalized !== currentVal) {
+                                      handleResultChange(lane.athleteId!, finalized);
+                                    }
+                                    handleSaveSingleAthleteResult(lane.athleteId!, finalized);
+                                  }}
+                                  maxLength={8}
+                                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs placeholder:text-slate-300"
                                 />
                               )
                             ) : (
