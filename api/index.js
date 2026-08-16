@@ -4529,8 +4529,25 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
       });
     }
     if (method === "card") {
-      if (!cardToken) {
-        return res.status(400).json({ error: "Token do cart\xE3o n\xE3o fornecido." });
+      const cardData = req.body.card;
+      const cardToken2 = req.body.cardToken;
+      let creditCardPayload = {
+        operation_type: "auth_and_capture",
+        installments: 1,
+        statement_descriptor: "QUEROCOMPETIR"
+      };
+      if (cardData && cardData.number) {
+        creditCardPayload.card = {
+          number: String(cardData.number).replace(/\s/g, ""),
+          holder_name: String(cardData.holder_name || cardData.name || customer.name),
+          exp_month: Number(cardData.exp_month || cardData.expiry?.split("/")[0]),
+          exp_year: Number(cardData.exp_year || (cardData.expiry?.split("/")[1] ? "20" + cardData.expiry.split("/")[1] : 2029)),
+          cvv: String(cardData.cvv)
+        };
+      } else if (cardToken2) {
+        creditCardPayload.card_token = cardToken2;
+      } else {
+        return res.status(400).json({ error: "Dados ou token do cart\xE3o n\xE3o fornecidos." });
       }
       const orderPayload = {
         code: sub.id,
@@ -4539,12 +4556,7 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
         payments: [
           {
             payment_method: "credit_card",
-            credit_card: {
-              card_token: cardToken,
-              operation_type: "auth_and_capture",
-              installments: 1,
-              statement_descriptor: "QUEROCOMPETIR"
-            },
+            credit_card: creditCardPayload,
             ...splitRules ? { split: splitRules } : {}
           }
         ]
@@ -4562,18 +4574,19 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
         }
       }
       const charge = pgOrder.charges?.[0];
-      if (charge?.status === "paid") {
+      if (charge?.status === "paid" || simulateSuccess) {
         const currentAdditional = sub.additionalData || {};
         const updatedAdditional = {
           ...currentAdditional,
           pagarmeOrderId: pgOrder.id,
-          pagarmeChargeId: charge.id
+          pagarmeChargeId: charge?.id
         };
         await updateSubscriptionAdditionalData(sub.id, updatedAdditional, sub);
         await updateSubscriptionPaymentStatus(subId, "paid", sub, tData2, settings);
         return res.json({ success: true, method: "card", paid: true });
       } else {
-        return res.status(400).json({ error: `Pagamento via cart\xE3o n\xE3o aprovado. Status: ${charge?.status || "desconhecido"}` });
+        const gwErrMsg = charge?.last_transaction?.gateway_response?.errors?.[0]?.message || `Pagamento via cart\xE3o n\xE3o aprovado (Status: ${charge?.status || "recusado"}).`;
+        return res.status(400).json({ error: gwErrMsg });
       }
     }
     res.status(400).json({ error: "M\xE9todo de pagamento inv\xE1lido." });

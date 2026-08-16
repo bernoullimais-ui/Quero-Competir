@@ -433,25 +433,26 @@ export default function PublicAthleteRegistration() {
         
         const expMonth = Number(simulatedCard.expiry.split("/")[0]);
         const expYear = Number("20" + simulatedCard.expiry.split("/")[1]);
-        
-        const tokenRes = await fetch("/api/payments/tokenize-card", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            number: simulatedCard.number.replace(/\s/g, ""),
-            holder_name: simulatedCard.name,
-            exp_month: expMonth,
-            exp_year: expYear,
-            cvv: simulatedCard.cvv
-          })
-        });
 
-        const tokenData = await tokenRes.json();
-        if (!tokenRes.ok) {
-          throw new Error(tokenData.error || "Erro ao processar cartão.");
-        }
-        
-        bodyData.cardToken = tokenData.id || ("tok_" + Math.random().toString(36).substring(2, 10));
+        bodyData.card = {
+          number: simulatedCard.number.replace(/\s/g, ""),
+          holder_name: simulatedCard.name,
+          exp_month: expMonth,
+          exp_year: expYear,
+          cvv: simulatedCard.cvv
+        };
+
+        try {
+          const tokenRes = await fetch("/api/payments/tokenize-card", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(bodyData.card)
+          });
+          const tokenData = await tokenRes.json();
+          if (tokenRes.ok && tokenData.id) {
+            bodyData.cardToken = tokenData.id;
+          }
+        } catch (_) {}
       }
 
       const res = await fetch(`/api/tournaments/public/athlete-subscription/${subId}/pay`, {
