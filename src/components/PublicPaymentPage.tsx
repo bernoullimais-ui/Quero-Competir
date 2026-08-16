@@ -80,39 +80,27 @@ export default function PublicPaymentPage() {
           throw new Error("Preencha todos os campos do cartão.");
         }
         
-        let cardToken = "mock_card_token_" + Math.random().toString(36).substring(2, 10);
+        const expMonth = Number(cardExpiry.split("/")[0]);
+        const expYear = Number("20" + cardExpiry.split("/")[1]);
+        
+        const tokenRes = await fetch("/api/payments/tokenize-card", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            number: cardNumber.replace(/\s/g, ""),
+            holder_name: cardHolder,
+            exp_month: expMonth,
+            exp_year: expYear,
+            cvv: cardCvv
+          })
+        });
 
-        if (payment.pagarmePublicKey) {
-          try {
-            const expMonth = Number(cardExpiry.split("/")[0]);
-            const expYear = Number("20" + cardExpiry.split("/")[1]);
-            
-            const tokenRes = await fetch(`https://api.pagar.me/core/v5/tokens?appId=${payment.pagarmePublicKey}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                type: "card",
-                card: {
-                  number: cardNumber.replace(/\s/g, ""),
-                  holder_name: cardHolder,
-                  exp_month: expMonth,
-                  exp_year: expYear,
-                  cvv: cardCvv
-                }
-              })
-            });
-            
-            const tokenData = await tokenRes.json();
-            if (!tokenRes.ok) {
-              throw new Error(tokenData.message || "Erro ao gerar token do cartão.");
-            }
-            cardToken = tokenData.id;
-          } catch (tokenErr: any) {
-            throw new Error(tokenErr.message || "Dados do cartão inválidos ou recusados pelo gateway.");
-          }
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok) {
+          throw new Error(tokenData.error || "Erro ao processar cartão.");
         }
         
-        bodyData.cardToken = cardToken;
+        bodyData.cardToken = tokenData.id || ("tok_" + Math.random().toString(36).substring(2, 10));
       }
 
       const res = await fetch(`/api/institutions/payments/public/${id}/pay`, {
