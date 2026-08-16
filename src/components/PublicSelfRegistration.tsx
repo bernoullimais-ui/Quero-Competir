@@ -456,27 +456,47 @@ export default function PublicSelfRegistration() {
                     <input type="text" placeholder="000.000.000-00" value={docNum} onChange={e => setDocNum(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 focus:border-indigo-400" />
                   </div>
-                  <hr className="border-slate-100" />
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Informações Médicas (opcional)</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tipo Sanguíneo</label>
-                      <select value={bloodType} onChange={e => setBloodType(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 bg-white">
-                        {BLOOD_TYPES.map(bt => <option key={bt}>{bt}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Contato de Emergência</label>
-                      <input type="tel" placeholder="(41) 99999-9999" value={emergencyContact} onChange={e => setEmergencyContact(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 focus:border-indigo-400" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Alergias / Restrições</label>
-                    <input type="text" placeholder="Ex: Amendoim, Látex" value={allergies} onChange={e => setAllergies(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 focus:border-indigo-400" />
-                  </div>
+                  {/* Informações Médicas (somente solicitadas se habilitadas nas configurações pelo organizador) */}
+                  {(() => {
+                    const fields = settings?.registrationConfig?.fields || [];
+                    const isBloodTypeEnabled = fields.some((f: any) => f.id === "bloodType" && f.enabled);
+                    const isEmergencyEnabled = fields.some((f: any) => f.id === "emergencyContact" && f.enabled);
+                    const isAllergiesEnabled = fields.some((f: any) => f.id === "allergies" && f.enabled);
+
+                    if (!isBloodTypeEnabled && !isEmergencyEnabled && !isAllergiesEnabled) return null;
+
+                    return (
+                      <>
+                        <hr className="border-slate-100" />
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Informações Médicas</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {isBloodTypeEnabled && (
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tipo Sanguíneo</label>
+                              <select value={bloodType} onChange={e => setBloodType(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 bg-white">
+                                {BLOOD_TYPES.map(bt => <option key={bt}>{bt}</option>)}
+                              </select>
+                            </div>
+                          )}
+                          {isEmergencyEnabled && (
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Contato de Emergência</label>
+                              <input type="tel" placeholder="(41) 99999-9999" value={emergencyContact} onChange={e => setEmergencyContact(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 focus:border-indigo-400" />
+                            </div>
+                          )}
+                        </div>
+                        {isAllergiesEnabled && (
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Alergias / Restrições</label>
+                            <input type="text" placeholder="Ex: Amendoim, Látex" value={allergies} onChange={e => setAllergies(e.target.value)}
+                              className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 focus:border-indigo-400" />
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <button onClick={handleNext} disabled={!athleteName || !birthDate || !docNum}
                   className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-sm hover:bg-indigo-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">

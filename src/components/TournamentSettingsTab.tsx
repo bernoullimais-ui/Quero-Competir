@@ -61,9 +61,9 @@ function getDefaultRegistrationConfig(): RegistrationConfig {
       { id: "parentName", label: "Nome do Responsável", enabled: true, required: true, custom: false },
       { id: "parentPhone", label: "Telefone do Responsável", enabled: true, required: true, custom: false },
       { id: "seedTime", label: "Tempo de Inscrição / Balizamento (Opcional)", enabled: true, required: false, custom: false },
-      { id: "bloodType", label: "Tipo Sanguíneo", enabled: true, required: false, custom: false },
-      { id: "allergies", label: "Alergias / Restrições", enabled: true, required: false, custom: false },
-      { id: "emergencyContact", label: "Contato de Emergência", enabled: true, required: true, custom: false }
+      { id: "bloodType", label: "Tipo Sanguíneo", enabled: false, required: false, custom: false },
+      { id: "allergies", label: "Alergias / Restrições", enabled: false, required: false, custom: false },
+      { id: "emergencyContact", label: "Contato de Emergência", enabled: false, required: false, custom: false }
     ],
     uploads: [
       { id: "document", label: "Documento de Identidade (RG/CPF)", enabled: true, required: true, custom: false },
