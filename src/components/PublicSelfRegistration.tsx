@@ -307,19 +307,32 @@ export default function PublicSelfRegistration() {
           <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 size={44} className="text-emerald-600" />
           </div>
-          <h2 className="text-2xl font-black text-slate-800 mb-2">Inscrição Confirmada!</h2>
+          <h2 className="text-2xl font-black text-slate-800 mb-2">
+            {totalAthleteFee > 0 ? "Confirmação de Pré-Inscrição!" : "Inscrição Concluída!"}
+          </h2>
           <p className="text-slate-500 text-sm mb-1">
-            <strong className="text-slate-700">{athleteName}</strong> foi inscrito(a) em {selectedCategoryIds.length} prova{selectedCategoryIds.length > 1 ? "s" : ""}.
+            <strong className="text-slate-700">{athleteName}</strong> foi {totalAthleteFee > 0 ? "pré-inscrito(a)" : "inscrito(a)"} em {selectedCategoryIds.length} prova{selectedCategoryIds.length > 1 ? "s" : ""}.
           </p>
           {resultSubIds.length > 0 && (
             <p className="text-slate-400 text-xs mb-4">
               Protocolo: <span className="font-mono font-bold text-slate-600">{resultSubIds[0]?.slice(0, 8).toUpperCase()}</span>
             </p>
           )}
-          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-left mb-4">
-            <p className="text-xs font-bold text-emerald-700 mb-1">✅ Inscrição Aprovada</p>
-            <p className="text-xs text-slate-500 leading-relaxed">Sua inscrição foi confirmada no sistema.</p>
-          </div>
+          {totalAthleteFee > 0 ? (
+            <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 text-left mb-4">
+              <p className="text-xs font-bold text-amber-800 mb-1 flex items-center gap-1.5">
+                <span>⏳</span> Pré-Inscrição Registrada
+              </p>
+              <p className="text-xs text-amber-900/80 font-medium leading-relaxed">
+                A confirmação do pagamento é necessária para a efetivação e garantia da sua inscrição no torneio.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-left mb-4">
+              <p className="text-xs font-bold text-emerald-700 mb-1">✅ Inscrição Confirmada</p>
+              <p className="text-xs text-slate-500 leading-relaxed">Sua inscrição foi confirmada com sucesso no sistema.</p>
+            </div>
+          )}
           {totalAthleteFee > 0 && (
             <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-left mb-6">
               <p className="text-xs font-bold text-indigo-700 mb-1">
