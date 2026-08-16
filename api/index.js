@@ -6562,6 +6562,22 @@ router6.post("/organizations/:id/create-recipient", requireAuth, async (req, res
     res.status(500).json({ error: err.message || "Erro ao registrar conta de recebimento no Pagar.me." });
   }
 });
+router6.get("/admin/organizations", requireAuth, async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: orgs, error } = await supabase.from("organizations").select("id, name, subdomain, pagarme_recipient_id, pagarme_recipient_status, platform_fee_percent, bank_holder_name, created_at").order("created_at", { ascending: false });
+    if (error) {
+      if (error.message.includes('relation "organizations" does not exist')) {
+        return res.json([]);
+      }
+      throw error;
+    }
+    res.json(orgs || []);
+  } catch (err) {
+    console.error("Erro ao buscar lista de organiza\xE7\xF5es no admin:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 router6.patch("/admin/organizations/:id/fee", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { platformFeePercent } = req.body;

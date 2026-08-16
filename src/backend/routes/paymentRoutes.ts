@@ -205,7 +205,29 @@ router.post("/organizations/:id/create-recipient", requireAuth, async (req, res)
   }
 });
 
-// 3. Atualizar percentual da plataforma por organização (Somente Super Admin)
+// 3. Listar todas as organizações com seus percentuais e dados de recebedor (Somente Super Admin)
+router.get("/admin/organizations", requireAuth, async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: orgs, error } = await supabase
+      .from("organizations")
+      .select("id, name, subdomain, pagarme_recipient_id, pagarme_recipient_status, platform_fee_percent, bank_holder_name, created_at")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      if (error.message.includes('relation "organizations" does not exist')) {
+        return res.json([]);
+      }
+      throw error;
+    }
+    res.json(orgs || []);
+  } catch (err: any) {
+    console.error("Erro ao buscar lista de organizações no admin:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Atualizar percentual da plataforma por organização (Somente Super Admin)
 router.patch("/admin/organizations/:id/fee", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { platformFeePercent } = req.body;

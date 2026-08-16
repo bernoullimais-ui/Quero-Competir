@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Activity, Shield, Users, Building2, Trophy, Key, Trash2, ShieldAlert, CheckCircle, TrendingUp, DollarSign, Plus, Eye, Check, X } from "lucide-react";
+import { Activity, Shield, Users, Building2, Trophy, Key, Trash2, ShieldAlert, CheckCircle, TrendingUp, DollarSign, Plus, Eye, Check, X, Percent, Save } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useToast } from "./ui/Toast.tsx";
 import { useConfirm } from "./ui/ConfirmDialog.tsx";
@@ -48,6 +48,29 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
     return headersObj;
   };
 
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [editingFees, setEditingFees] = useState<Record<string, number>>({});
+  const [savingFeeId, setSavingFeeId] = useState<string | null>(null);
+
+  const fetchOrganizations = async () => {
+    try {
+      const res = await fetch("/api/payments/admin/organizations", { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setOrganizations(data);
+          const feesMap: Record<string, number> = {};
+          data.forEach(o => {
+            feesMap[o.id] = o.platform_fee_percent !== undefined ? Number(o.platform_fee_percent) : 10;
+          });
+          setEditingFees(feesMap);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching organizations in super admin:", err);
+    }
+  };
+
   const fetchAllData = async () => {
     setLoading(true);
     try {
@@ -69,6 +92,8 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
       if (Array.isArray(iData)) setInstitutions(iData);
       if (Array.isArray(tData)) setTournaments(tData);
       if (Array.isArray(aData)) setAthletes(aData);
+
+      await fetchOrganizations();
     } catch (err: any) {
       setError("Erro ao carregar dados do painel: " + err.message);
     } finally {
@@ -79,6 +104,31 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  const handleSaveOrgFee = async (orgId: string) => {
+    const feeVal = editingFees[orgId];
+    if (feeVal === undefined || isNaN(feeVal)) return;
+
+    setSavingFeeId(orgId);
+    try {
+      const res = await fetch(`/api/payments/admin/organizations/${orgId}/fee`, {
+        method: "PATCH",
+        headers: getHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ platformFeePercent: feeVal })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toastSuccess(`Taxa da organização atualizada para ${feeVal}%!`);
+        fetchOrganizations();
+      } else {
+        toastError(data.error || "Erro ao atualizar taxa.");
+      }
+    } catch (err: any) {
+      toastError(err.message);
+    } finally {
+      setSavingFeeId(null);
+    }
+  };
 
   const handleDeleteUser = async (userId: string) => {
     const isConfirmed = await confirm({
@@ -328,6 +378,107 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
                   </button>
                 </div>
               </form>
+            </div>
+
+            {/* Gestão de Taxas de Comissão por Organizador (Split SaaS) */}
+            <div className="bg-white rounded-3xl border border-slate-150 p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                    <Percent className="text-indigo-600" size={20} /> Comissão por Organizador (Split SaaS)
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium">Configure a porcentagem de serviço da Quero Competir retida em cada transação por organizador</p>
+                </div>
+                <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full font-bold text-xs">
+                  {organizations.length} Organizadores
+                </span>
+              </div>
+
+              {organizations.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs italic">
+                  Nenhuma organização cadastrada no momento.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-600">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-slate-400 uppercase text-[10px] tracking-wider font-extrabold">
+                        <th className="py-3 px-4">Organizador / Liga</th>
+                        <th className="py-3 px-4 text-center">Status Pagar.me</th>
+                        <th className="py-3 px-4 text-center">Titular / Recebedor</th>
+                        <th className="py-3 px-4 text-center">Taxa Plataforma (%)</th>
+                        <th className="py-3 px-4 text-center">Repasse Organizador (%)</th>
+                        <th className="py-3 px-4 text-right">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 font-medium">
+                      {organizations.map((org: any) => {
+                        const currentFee = editingFees[org.id] !== undefined ? editingFees[org.id] : (org.platform_fee_percent || 10);
+                        const orgShare = 100 - currentFee;
+                        const isSaving = savingFeeId === org.id;
+
+                        return (
+                          <tr key={org.id} className="hover:bg-slate-50/50">
+                            <td className="py-3.5 px-4 font-bold text-slate-800">
+                              <div>{org.name}</div>
+                              {org.subdomain && (
+                                <span className="text-[10px] text-indigo-600 font-mono font-semibold">
+                                  {org.subdomain}.querocompetir.com.br
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {org.pagarme_recipient_status === "active" ? (
+                                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold">
+                                  🟢 Ativo
+                                </span>
+                              ) : org.pagarme_recipient_status === "registration" || org.pagarme_recipient_status === "waiting_for_doc" ? (
+                                <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-bold">
+                                  🟡 Em Análise
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 bg-slate-100 text-slate-500 border border-slate-200 rounded-lg text-[10px] font-bold">
+                                  ⚪ Não Configurado
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center text-slate-600 text-xs">
+                              {org.bank_holder_name || org.pagarme_recipient_id || "—"}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.5"
+                                  value={currentFee}
+                                  onChange={(e) => setEditingFees({ ...editingFees, [org.id]: Number(e.target.value) })}
+                                  className="w-16 text-center bg-slate-50 border border-slate-200 font-bold rounded-lg py-1 text-xs text-indigo-600 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                                />
+                                <span className="font-bold text-slate-400">%</span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-center font-bold text-emerald-600">
+                              {orgShare}%
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <button
+                                type="button"
+                                disabled={isSaving}
+                                onClick={() => handleSaveOrgFee(org.id)}
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[11px] transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1 shadow-xs"
+                              >
+                                {isSaving ? "Salvando..." : <><Save size={12} /> Salvar</>}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
 
