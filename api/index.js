@@ -6671,7 +6671,13 @@ async function callPagarMe3(endpoint, method, body) {
   });
   const data = await response.json();
   if (!response.ok) {
-    const detailMsg = data?.message || (data?.errors ? JSON.stringify(data.errors) : JSON.stringify(data));
+    let detailMsg = data?.message || "Erro no gateway Pagar.me";
+    if (data?.errors && typeof data.errors === "object") {
+      const errList = Object.entries(data.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" | ");
+      if (errList) {
+        detailMsg = `${detailMsg} (${errList})`;
+      }
+    }
     throw new Error(detailMsg);
   }
   return data;
@@ -6761,38 +6767,6 @@ router6.post("/organizations/:id/create-recipient", requireAuth, async (req, res
     const cleanPhone = (holderPhone || "999999999").replace(/\D/g, "").slice(-9);
     const cleanBranch = bankBranch.replace(/\D/g, "");
     const accountFull = bankAccountDigit ? `${bankAccount}-${bankAccountDigit}` : bankAccount;
-    let recipientId = null;
-    let recipientStatus = "active";
-    if (process.env.PAGARME_SECRET_KEY) {
-      const recipientPayload = {
-        name: holderName,
-        email: holderEmail || "financeiro@querocompetir.com.br",
-        document: cleanDoc,
-        type: cleanDoc.length === 11 ? "individual" : "corporation",
-        default_bank_account: {
-          holder_name: holderName,
-          holder_type: cleanDoc.length === 11 ? "individual" : "corporation",
-          holder_document: cleanDoc,
-          bank: bankCode,
-          branch_number: cleanBranch,
-          account_number: bankAccount,
-          account_check_digit: bankAccountDigit || "0",
-          type: bankAccountType === "savings" ? "savings" : "checking"
-        },
-        transfer_settings: {
-          transfer_enabled: true,
-          transfer_interval: "Daily",
-          transfer_day: 0
-        }
-      };
-      const pgRecipient = await callPagarMe3("/recipients", "POST", recipientPayload);
-      recipientId = pgRecipient.id;
-      recipientStatus = pgRecipient.status || "active";
-    } else {
-      console.warn("PAGARME_SECRET_KEY n\xE3o configurada. Simulando cria\xE7\xE3o de recebedor.");
-      recipientId = `re_simulated_${Math.random().toString(36).substring(2, 11)}`;
-      recipientStatus = "active";
-    }
     let org = null;
     try {
       const { data } = await supabase.from("organizations").select("*").eq("id", id).maybeSingle();
@@ -6802,6 +6776,63 @@ router6.post("/organizations/:id/create-recipient", requireAuth, async (req, res
         org = fallback;
       }
     } catch (_) {
+    }
+    const existingFinData = parseFinDataFromDescription(org?.description);
+    const existingRecipientId = org?.pagarme_recipient_id || existingFinData?.pagarmeRecipientId;
+    let recipientId = null;
+    let recipientStatus = "active";
+    const bankAccountPayload = {
+      holder_name: holderName,
+      holder_type: cleanDoc.length === 11 ? "individual" : "corporation",
+      holder_document: cleanDoc,
+      bank: bankCode,
+      branch_number: cleanBranch,
+      account_number: bankAccount,
+      account_check_digit: bankAccountDigit || "0",
+      type: bankAccountType === "savings" ? "savings" : "checking"
+    };
+    if (process.env.PAGARME_SECRET_KEY) {
+      if (existingRecipientId && existingRecipientId.startsWith("re_") && !existingRecipientId.startsWith("re_simulated_")) {
+        try {
+          const pgRecipient = await callPagarMe3(`/recipients/${existingRecipientId}/default-bank-account`, "PATCH", bankAccountPayload);
+          recipientId = existingRecipientId;
+          recipientStatus = pgRecipient?.status || "active";
+        } catch (patchErr) {
+          console.warn("[Pagar.me Patch Bank Account Failed, attempting PUT /recipients]", patchErr.message);
+          try {
+            const pgRecipient = await callPagarMe3(`/recipients/${existingRecipientId}`, "PUT", {
+              name: holderName,
+              email: holderEmail || "financeiro@querocompetir.com.br",
+              default_bank_account: bankAccountPayload
+            });
+            recipientId = existingRecipientId;
+            recipientStatus = pgRecipient?.status || "active";
+          } catch (putErr) {
+            console.warn("[Pagar.me Update Recipient Exception, retaining recipientId]", putErr.message);
+            recipientId = existingRecipientId;
+          }
+        }
+      } else {
+        const recipientPayload = {
+          name: holderName,
+          email: holderEmail || "financeiro@querocompetir.com.br",
+          document: cleanDoc,
+          type: cleanDoc.length === 11 ? "individual" : "corporation",
+          default_bank_account: bankAccountPayload,
+          transfer_settings: {
+            transfer_enabled: true,
+            transfer_interval: "Daily",
+            transfer_day: 0
+          }
+        };
+        const pgRecipient = await callPagarMe3("/recipients", "POST", recipientPayload);
+        recipientId = pgRecipient.id;
+        recipientStatus = pgRecipient.status || "active";
+      }
+    } else {
+      console.warn("PAGARME_SECRET_KEY n\xE3o configurada. Simulando cria\xE7\xE3o de recebedor.");
+      recipientId = existingRecipientId || `re_simulated_${Math.random().toString(36).substring(2, 11)}`;
+      recipientStatus = "active";
     }
     const orgIdToUse = org?.id || id;
     const newDesc = embedFinDataInDescription(org?.description, {
