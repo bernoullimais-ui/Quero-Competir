@@ -6629,6 +6629,7 @@ router6.get("/admin/organizations", requireAuth, async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
     const resultMap = /* @__PURE__ */ new Map();
+    const localBankDb = loadBankDataDb();
     try {
       const { data: orgs } = await supabase.from("organizations").select("*").order("created_at", { ascending: false });
       if (orgs && Array.isArray(orgs)) {
@@ -6637,14 +6638,17 @@ router6.get("/admin/organizations", requireAuth, async (req, res) => {
           if (org.id === "org-1" || org.subdomain === "redefluir" || org.name === "Organizador Principal" || org.name.toLowerCase().includes("fluir")) {
             displayName = "Rede Fluir (Organizador Principal)";
           }
+          const localData = localBankDb[org.id] || localBankDb["org-1"] || {};
+          let fee = org.platform_fee_percent !== void 0 && org.platform_fee_percent !== null ? Number(org.platform_fee_percent) : localData.platformFeePercent;
+          if (fee === void 0 || fee === null) fee = 10;
           resultMap.set(org.id, {
             id: org.id,
             name: displayName,
             subdomain: org.subdomain || "redefluir",
-            pagarme_recipient_id: org.pagarme_recipient_id || null,
-            pagarme_recipient_status: org.pagarme_recipient_status || "not_configured",
-            platform_fee_percent: org.platform_fee_percent !== void 0 && org.platform_fee_percent !== null ? Number(org.platform_fee_percent) : 10,
-            bank_holder_name: org.bank_holder_name || "",
+            pagarme_recipient_id: org.pagarme_recipient_id || localData.pagarmeRecipientId || null,
+            pagarme_recipient_status: org.pagarme_recipient_status || localData.pagarmeRecipientStatus || "not_configured",
+            platform_fee_percent: fee,
+            bank_holder_name: org.bank_holder_name || localData.holderName || "",
             created_at: org.created_at || (/* @__PURE__ */ new Date()).toISOString()
           });
         }
@@ -6671,14 +6675,16 @@ router6.get("/admin/organizations", requireAuth, async (req, res) => {
           if (targetId === "org-1" || acc.email?.includes("fluir") || displayName.toLowerCase().includes("fluir") || displayName === "Organizador Principal") {
             displayName = "Rede Fluir (Organizador Principal)";
           }
+          const localData = localBankDb[targetId] || localBankDb["org-1"] || {};
+          const fee = localData.platformFeePercent !== void 0 ? Number(localData.platformFeePercent) : 10;
           resultMap.set(targetId, {
             id: targetId,
             name: displayName,
             subdomain: (acc.email || "").split("@")[0],
-            pagarme_recipient_id: null,
-            pagarme_recipient_status: "not_configured",
-            platform_fee_percent: 10,
-            bank_holder_name: "",
+            pagarme_recipient_id: localData.pagarmeRecipientId || null,
+            pagarme_recipient_status: localData.pagarmeRecipientStatus || "not_configured",
+            platform_fee_percent: fee,
+            bank_holder_name: localData.holderName || "",
             created_at: acc.created_at || acc.createdAt || (/* @__PURE__ */ new Date()).toISOString()
           });
         }
@@ -6695,14 +6701,16 @@ router6.get("/admin/organizations", requireAuth, async (req, res) => {
             if (t.owner_id === "org-1" || t.name.toLowerCase().includes("fluir")) {
               displayName = "Rede Fluir (Organizador Principal)";
             }
+            const localData = localBankDb[t.owner_id] || localBankDb["org-1"] || {};
+            const fee = localData.platformFeePercent !== void 0 ? Number(localData.platformFeePercent) : 10;
             resultMap.set(t.owner_id, {
               id: t.owner_id,
               name: displayName,
               subdomain: "",
-              pagarme_recipient_id: null,
-              pagarme_recipient_status: "not_configured",
-              platform_fee_percent: 10,
-              bank_holder_name: "",
+              pagarme_recipient_id: localData.pagarmeRecipientId || null,
+              pagarme_recipient_status: localData.pagarmeRecipientStatus || "not_configured",
+              platform_fee_percent: fee,
+              bank_holder_name: localData.holderName || "",
               created_at: (/* @__PURE__ */ new Date()).toISOString()
             });
           }
@@ -6729,14 +6737,32 @@ router6.patch("/admin/organizations/:id/fee", requireAuth, async (req, res) => {
   }
   try {
     const supabase = getSupabaseAdmin();
-    const { error: updateErr, data } = await supabase.from("organizations").update({ platform_fee_percent: feeVal }).eq("id", id).select();
-    if (updateErr || !data || data.length === 0) {
-      await supabase.from("organizations").upsert({
-        id,
-        name: "Organiza\xE7\xE3o",
-        platform_fee_percent: feeVal
-      });
+    try {
+      const { error: updateErr, data } = await supabase.from("organizations").update({ platform_fee_percent: feeVal }).eq("id", id).select();
+      if (updateErr || !data || data.length === 0) {
+        await supabase.from("organizations").upsert({
+          id,
+          name: "Organiza\xE7\xE3o",
+          platform_fee_percent: feeVal
+        });
+      }
+    } catch (e) {
+      console.warn("Aviso ao salvar fee no Supabase:", e.message);
     }
+    const localBankDb = loadBankDataDb();
+    const targetId = id || "org-1";
+    const record = localBankDb[targetId] || {};
+    record.platformFeePercent = feeVal;
+    localBankDb[targetId] = record;
+    if (targetId === "org-1" || targetId === "redefluir") {
+      const org1Rec = localBankDb["org-1"] || {};
+      org1Rec.platformFeePercent = feeVal;
+      localBankDb["org-1"] = org1Rec;
+      const fluirRec = localBankDb["redefluir"] || {};
+      fluirRec.platformFeePercent = feeVal;
+      localBankDb["redefluir"] = fluirRec;
+    }
+    saveBankDataDb(localBankDb);
     res.json({ success: true, platformFeePercent: feeVal });
   } catch (err) {
     console.error("Erro ao atualizar taxa da plataforma:", err);
