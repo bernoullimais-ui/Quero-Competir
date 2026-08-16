@@ -1468,8 +1468,8 @@ export default function PublicAthleteRegistration() {
                 <FileCheck2 size={36} />
               </div>
               <h2 className="text-xl md:text-2xl font-extrabold text-slate-800">Inscrição Concluída com Sucesso!</h2>
-              <p className="text-slate-500 text-sm mt-2 max-w-sm mx-auto">
-                As informações obrigatórias foram submetidas eletronicamente. O organizador possui até 24h pós fim das inscrições para validar a documentação.
+              <p className="text-slate-500 text-sm mt-2 max-w-md mx-auto">
+                As informações obrigatórias foram submetidas eletronicamente. Caso haja alguma dúvida ou divergência nas informações o organizador fará contato.
               </p>
 
               <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-left mt-8 max-w-md mx-auto space-y-3">
