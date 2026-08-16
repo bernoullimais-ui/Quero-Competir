@@ -6778,8 +6778,8 @@ router6.post("/organizations/:id/create-recipient", requireAuth, async (req, res
       }
     } catch (_) {
     }
-    const existingFinData = parseFinDataFromDescription(org?.description);
-    const existingRecipientId = org?.pagarme_recipient_id || existingFinData?.pagarmeRecipientId;
+    const finData = getFinDataFromOrg(org);
+    const existingRecipientId = org?.pagarme_recipient_id || finData?.pagarmeRecipientId;
     let recipientId = null;
     let recipientStatus = "active";
     const bankAccountPayload = {
