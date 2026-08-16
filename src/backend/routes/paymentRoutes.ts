@@ -209,18 +209,90 @@ router.post("/organizations/:id/create-recipient", requireAuth, async (req, res)
 router.get("/admin/organizations", requireAuth, async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const { data: orgs, error } = await supabase
-      .from("organizations")
-      .select("id, name, subdomain, pagarme_recipient_id, pagarme_recipient_status, platform_fee_percent, bank_holder_name, created_at")
-      .order("created_at", { ascending: false });
+    const resultMap = new Map<string, any>();
 
-    if (error) {
-      if (error.message.includes('relation "organizations" does not exist')) {
-        return res.json([]);
+    // A. Buscar da tabela organizations no Supabase
+    try {
+      const { data: orgs } = await supabase
+        .from("organizations")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (orgs && Array.isArray(orgs)) {
+        for (const org of orgs) {
+          resultMap.set(org.id, {
+            id: org.id,
+            name: org.name || "Organização",
+            subdomain: org.subdomain || "",
+            pagarme_recipient_id: org.pagarme_recipient_id || null,
+            pagarme_recipient_status: org.pagarme_recipient_status || "not_configured",
+            platform_fee_percent: org.platform_fee_percent !== undefined && org.platform_fee_percent !== null ? Number(org.platform_fee_percent) : 10,
+            bank_holder_name: org.bank_holder_name || "",
+            created_at: org.created_at || new Date().toISOString()
+          });
+        }
       }
-      throw error;
+    } catch (e: any) {
+      console.warn("[Admin Orgs] Supabase query warning:", e.message);
     }
-    res.json(orgs || []);
+
+    // B. Buscar dos usuários organizadores em portal_accounts e accounts.json
+    try {
+      let accounts: any[] = [];
+      const { data: dbAccounts } = await supabase.from("portal_accounts").select("*");
+      if (dbAccounts && Array.isArray(dbAccounts)) {
+        accounts = dbAccounts;
+      } else {
+        const ACCOUNTS_FILE = path.join(process.cwd(), "src", "backend", "data", "accounts.json");
+        if (fs.existsSync(ACCOUNTS_FILE)) {
+          accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, "utf-8"));
+        }
+      }
+
+      const organizerAccounts = accounts.filter((a: any) => a.role === "organizer");
+      for (const acc of organizerAccounts) {
+        const targetId = acc.reference_id || acc.referenceId || acc.id;
+        if (!resultMap.has(targetId)) {
+          resultMap.set(targetId, {
+            id: targetId,
+            name: acc.name || acc.email,
+            subdomain: (acc.email || "").split("@")[0],
+            pagarme_recipient_id: null,
+            pagarme_recipient_status: "not_configured",
+            platform_fee_percent: 10,
+            bank_holder_name: "",
+            created_at: acc.created_at || acc.createdAt || new Date().toISOString()
+          });
+        }
+      }
+    } catch (e: any) {
+      console.warn("[Admin Orgs] Accounts query warning:", e.message);
+    }
+
+    // C. Buscar dos torneios (owner_id únicos)
+    try {
+      const { data: tournaments } = await supabase.from("tournaments").select("owner_id, name");
+      if (tournaments && Array.isArray(tournaments)) {
+        for (const t of tournaments) {
+          if (t.owner_id && !resultMap.has(t.owner_id)) {
+            resultMap.set(t.owner_id, {
+              id: t.owner_id,
+              name: `Organizador de (${t.name})`,
+              subdomain: "",
+              pagarme_recipient_id: null,
+              pagarme_recipient_status: "not_configured",
+              platform_fee_percent: 10,
+              bank_holder_name: "",
+              created_at: new Date().toISOString()
+            });
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn("[Admin Orgs] Tournaments query warning:", e.message);
+    }
+
+    res.json(Array.from(resultMap.values()));
   } catch (err: any) {
     console.error("Erro ao buscar lista de organizações no admin:", err);
     res.status(500).json({ error: err.message });
@@ -243,12 +315,23 @@ router.patch("/admin/organizations/:id/fee", requireAuth, async (req, res) => {
 
   try {
     const supabase = getSupabaseAdmin();
-    const { error } = await supabase
+    // Tentar atualizar
+    const { error: updateErr, data } = await supabase
       .from("organizations")
       .update({ platform_fee_percent: feeVal })
-      .eq("id", id);
+      .eq("id", id)
+      .select();
 
-    if (error) throw error;
+    if (updateErr || !data || data.length === 0) {
+      // Se a organização ainda não existia na tabela organizations, fazemos um upsert
+      await supabase
+        .from("organizations")
+        .upsert({
+          id,
+          name: "Organização",
+          platform_fee_percent: feeVal
+        });
+    }
 
     res.json({ success: true, platformFeePercent: feeVal });
   } catch (err: any) {
