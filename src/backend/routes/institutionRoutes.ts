@@ -1485,8 +1485,10 @@ router.post("/payments/webhook", async (req, res) => {
   console.log("Pagar.me Webhook recebido:", event?.type);
 
   try {
-    if (event?.type === "charge.paid" || event?.type === "order.paid") {
-      const orderCode = event.data?.code || event.data?.order?.code;
+    const isPaidEvent = event?.type === "charge.paid" || event?.type === "order.paid" || event?.type?.includes("paid") || event?.data?.status === "paid" || event?.data?.charges?.[0]?.status === "paid";
+
+    if (isPaidEvent) {
+      const orderCode = event.data?.code || event.data?.order?.code || event.data?.charges?.[0]?.code || event.data?.id;
       if (orderCode) {
         const payments = loadPayments();
         const payIndex = payments.findIndex(p => p.id === orderCode);
