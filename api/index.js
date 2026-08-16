@@ -974,7 +974,7 @@ router.get("/payments/public/:paymentId", async (req, res) => {
   }
 });
 function buildSplitRules(totalCents, organizerRecipientId, platformFeePercent = 10) {
-  const platformRecipientId = process.env.PAGARME_PLATFORM_RECIPIENT_ID || "re_cmqzdju442lzv0l9tmscp6lw7";
+  const platformRecipientId = process.env.PAGARME_PLATFORM_RECIPIENT_ID || "re_cmqgwhfdc1hp60l9t950siqs7";
   if (!organizerRecipientId || !platformRecipientId || organizerRecipientId === platformRecipientId) return void 0;
   const platformCents = Math.round(totalCents * (platformFeePercent / 100));
   const organizerCents = totalCents - platformCents;
@@ -4314,7 +4314,7 @@ router2.post("/public/athlete-subscription/:subId/complete", async (req, res) =>
   }
 });
 function buildSplitRules2(totalCents, organizerRecipientId, platformFeePercent = 10) {
-  const platformRecipientId = process.env.PAGARME_PLATFORM_RECIPIENT_ID || "re_cmqzdju442lzv0l9tmscp6lw7";
+  const platformRecipientId = process.env.PAGARME_PLATFORM_RECIPIENT_ID || "re_cmqgwhfdc1hp60l9t950siqs7";
   if (!organizerRecipientId || !platformRecipientId || organizerRecipientId === platformRecipientId) return void 0;
   const platformCents = Math.round(totalCents * (platformFeePercent / 100));
   const organizerCents = totalCents - platformCents;
