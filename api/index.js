@@ -3351,7 +3351,8 @@ function mapSettingsToFrontend(dbSettings) {
     maxEventsPerParticipant: Number(dbSettings.max_events_per_participant) || 1,
     feePricingModel: dbSettings.fee_pricing_model || "per_event",
     registrationConfig: dbSettings.registration_config || getDefaultRegistrationConfig(),
-    maxVisitorsPerAthlete: Number(dbSettings.max_visitors_per_athlete) || 0
+    maxVisitorsPerAthlete: Number(dbSettings.max_visitors_per_athlete) || 0,
+    showBracketsPublicly: dbSettings.show_brackets_publicly !== void 0 ? !!dbSettings.show_brackets_publicly : true
   };
 }
 function mapSettingsToDb(feSettings) {
@@ -3366,7 +3367,8 @@ function mapSettingsToDb(feSettings) {
     max_events_per_participant: Number(feSettings.maxEventsPerParticipant) || 1,
     fee_pricing_model: feSettings.feePricingModel || "per_event",
     registration_config: feSettings.registrationConfig || getDefaultRegistrationConfig(),
-    max_visitors_per_athlete: Number(feSettings.maxVisitorsPerAthlete) || 0
+    max_visitors_per_athlete: Number(feSettings.maxVisitorsPerAthlete) || 0,
+    show_brackets_publicly: feSettings.showBracketsPublicly !== void 0 ? !!feSettings.showBracketsPublicly : true
   };
 }
 function mapSubToFrontend(dbSub) {
@@ -3423,7 +3425,8 @@ async function getSubscriptionSettings(tournamentId) {
       status: rawSettings.status || "open",
       requireMembership: !!rawSettings.requireMembership,
       registrationConfig: hasConfig ? rawSettings.registrationConfig : getDefaultRegistrationConfig(),
-      maxVisitorsPerAthlete: Number(rawSettings.maxVisitorsPerAthlete) || 0
+      maxVisitorsPerAthlete: Number(rawSettings.maxVisitorsPerAthlete) || 0,
+      showBracketsPublicly: rawSettings.showBracketsPublicly !== void 0 ? !!rawSettings.showBracketsPublicly : true
     };
   }
   return {
@@ -3434,7 +3437,8 @@ async function getSubscriptionSettings(tournamentId) {
     status: "open",
     requireMembership: false,
     registrationConfig: getDefaultRegistrationConfig(),
-    maxVisitorsPerAthlete: 0
+    maxVisitorsPerAthlete: 0,
+    showBracketsPublicly: true
   };
 }
 async function saveSubscriptionSettings(tournamentId, payload) {

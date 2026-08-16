@@ -20,7 +20,7 @@ import {
   ExternalLink,
   Copy,
   CheckCircle2, Shield, AlertCircle,
-  Eye, Download, FileText,
+  Eye, EyeOff, Download, FileText,
   Dribbble, Swords, Waves, Footprints, Crown, Target, Zap,
   Sparkles, Share2,
   Play, SkipForward, RefreshCw,
@@ -313,6 +313,8 @@ export default function TournamentDashboard() {
 
   const loading = tLoading || cLoading || rLoading;
   const [activeTab, setActiveTab] = useState<Tab>("geral");
+  const [isSavingVisibility, setIsSavingVisibility] = useState(false);
+  const showBracketsPublicly = subSettings?.showBracketsPublicly !== undefined ? subSettings.showBracketsPublicly : true;
   const [selectedInstFilter, setSelectedInstFilter] = useState<string>("");
   const [showPayLinkModal, setShowPayLinkModal] = useState(false);
   const [selectedRegForLink, setSelectedRegForLink] = useState<any>(null);
@@ -2166,10 +2168,78 @@ export default function TournamentDashboard() {
 
         {activeTab === "tabela" && (
           <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
-              <div className="space-y-1">
-                <h3 className="text-xl font-bold text-slate-800">Chaveamento e Balizamento do Torneio</h3>
-                <p className="text-slate-500 text-xs">Selecione a categoria ou prova para visualizar os confrontos e raias.</p>
+            {/* Card de Configuração de Divulgação Pública das Chaves/Balizamento */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-300">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                  showBracketsPublicly ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+                }`}>
+                  {showBracketsPublicly ? <Eye size={20} /> : <EyeOff size={20} />}
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2 flex-wrap">
+                    Divulgação na Página do Evento
+                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                      showBracketsPublicly
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-amber-50 text-amber-700 border-amber-200"
+                    }`}>
+                      {showBracketsPublicly ? "Exibição Pública Ativa" : "Omitido do Público"}
+                    </span>
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {showBracketsPublicly
+                      ? "Os participantes e o público conseguem visualizar as baterias, raias e tabelas na página do evento."
+                      : "A divulgação está oculta. Apenas você (organizador) consegue visualizar e editar esta área."}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={isSavingVisibility}
+                onClick={async () => {
+                  const nextVal = !showBracketsPublicly;
+                  setIsSavingVisibility(true);
+                  try {
+                    const res = await fetch(`/api/tournaments/${id}/subscription-settings`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ ...subSettings, showBracketsPublicly: nextVal }),
+                    });
+                    if (!res.ok) throw new Error("Erro ao salvar visibilidade");
+                    success(nextVal ? "Divulgação pública liberada na página do evento!" : "Divulgação omitida da página do evento.");
+                    refreshSubSettings();
+                  } catch (err: any) {
+                    error("Erro ao alterar divulgação: " + err.message);
+                  } finally {
+                    setIsSavingVisibility(false);
+                  }
+                }}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer shrink-0 shadow-xs ${
+                  showBracketsPublicly
+                    ? "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200"
+                }`}
+              >
+                {showBracketsPublicly ? (
+                  <>
+                    <EyeOff size={16} /> Omitir Divulgação Pública
+                  </>
+                ) : (
+                  <>
+                    <Eye size={16} /> Liberar Divulgação Pública 🔓
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
+                <div className="space-y-1">
+                  <h3 className="text-xl font-bold text-slate-800">Chaveamento e Balizamento do Torneio</h3>
+                  <p className="text-slate-500 text-xs">Selecione a categoria ou prova para visualizar os confrontos e raias.</p>
+                </div>
               </div>
               
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">

@@ -3011,7 +3011,8 @@ function mapSettingsToFrontend(dbSettings: any) {
     maxEventsPerParticipant: Number(dbSettings.max_events_per_participant) || 1,
     feePricingModel: dbSettings.fee_pricing_model || "per_event",
     registrationConfig: dbSettings.registration_config || getDefaultRegistrationConfig(),
-    maxVisitorsPerAthlete: Number(dbSettings.max_visitors_per_athlete) || 0
+    maxVisitorsPerAthlete: Number(dbSettings.max_visitors_per_athlete) || 0,
+    showBracketsPublicly: dbSettings.show_brackets_publicly !== undefined ? !!dbSettings.show_brackets_publicly : true
   };
 }
 
@@ -3027,7 +3028,8 @@ function mapSettingsToDb(feSettings: any) {
     max_events_per_participant: Number(feSettings.maxEventsPerParticipant) || 1,
     fee_pricing_model: feSettings.feePricingModel || "per_event",
     registration_config: feSettings.registrationConfig || getDefaultRegistrationConfig(),
-    max_visitors_per_athlete: Number(feSettings.maxVisitorsPerAthlete) || 0
+    max_visitors_per_athlete: Number(feSettings.maxVisitorsPerAthlete) || 0,
+    show_brackets_publicly: feSettings.showBracketsPublicly !== undefined ? !!feSettings.showBracketsPublicly : true
   };
 }
 
@@ -3121,7 +3123,8 @@ async function getSubscriptionSettings(tournamentId: string) {
       status: rawSettings.status || "open",
       requireMembership: !!rawSettings.requireMembership,
       registrationConfig: hasConfig ? rawSettings.registrationConfig : getDefaultRegistrationConfig(),
-      maxVisitorsPerAthlete: Number(rawSettings.maxVisitorsPerAthlete) || 0
+      maxVisitorsPerAthlete: Number(rawSettings.maxVisitorsPerAthlete) || 0,
+      showBracketsPublicly: rawSettings.showBracketsPublicly !== undefined ? !!rawSettings.showBracketsPublicly : true
     };
   }
   return {
@@ -3132,7 +3135,8 @@ async function getSubscriptionSettings(tournamentId: string) {
     status: "open",
     requireMembership: false,
     registrationConfig: getDefaultRegistrationConfig(),
-    maxVisitorsPerAthlete: 0
+    maxVisitorsPerAthlete: 0,
+    showBracketsPublicly: true
   };
 }
 

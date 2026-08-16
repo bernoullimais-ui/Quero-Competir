@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Trophy, Calendar, MapPin, Users, LayoutGrid, Timer, TrendingUp, MessageSquare, Info, Sparkles, Clock } from "lucide-react";
+import { Trophy, Calendar, MapPin, Users, LayoutGrid, Timer, TrendingUp, MessageSquare, Info, Sparkles, Clock, EyeOff } from "lucide-react";
 import { motion } from "motion/react";
 import TournamentBracket from "./TournamentBracket.tsx";
 import SwimmingBalizamento from "./SwimmingBalizamento.tsx";
@@ -257,6 +257,7 @@ export default function PublicTournamentView() {
   const [onlyWithAthletes, setOnlyWithAthletes] = useState<boolean>(true);
   const [athleteSubs, setAthleteSubs] = useState<any[]>([]);
   const [selfRegEnabled, setSelfRegEnabled] = useState(false);
+  const [showBracketsPublicly, setShowBracketsPublicly] = useState<boolean>(true);
 
   useEffect(() => {
     // Verificar se o usuário conectado é organizador para fins de moderação
@@ -284,10 +285,11 @@ export default function PublicTournamentView() {
 
         const realId = tData.id || id;
 
-        const [cData, subsData, pubSettings] = await Promise.all([
+        const [cData, subsData, pubSettings, subSettings] = await Promise.all([
           fetch(`/api/tournaments/${realId}/categories`).then(r => r.json()),
           fetch(`/api/tournaments/${realId}/athlete-subscriptions`).then(r => r.ok ? r.json() : []),
           fetch(`/api/tournaments/${realId}/public-settings`).then(r => r.ok ? r.json() : null),
+          fetch(`/api/tournaments/${realId}/subscription-settings`).then(r => r.ok ? r.json() : null),
         ]);
 
         const catsList = Array.isArray(cData) ? cData : [];
@@ -295,6 +297,9 @@ export default function PublicTournamentView() {
         setAthleteSubs(Array.isArray(subsData) ? subsData : []);
         if (pubSettings && !pubSettings.error) {
           setSelfRegEnabled(true);
+        }
+        if (subSettings && subSettings.showBracketsPublicly !== undefined) {
+          setShowBracketsPublicly(subSettings.showBracketsPublicly);
         }
         setLoading(false);
       })
@@ -447,7 +452,24 @@ export default function PublicTournamentView() {
 
         {activeTab === "tabela" && (
           <div className="space-y-6 animate-in fade-in duration-500">
-            {categories.length > 0 ? (
+            {!showBracketsPublicly ? (
+              <div className="bg-white p-12 text-center rounded-3xl border border-slate-200 shadow-sm space-y-4 my-6">
+                <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-2 border border-amber-100 shadow-xs">
+                  <EyeOff size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800">
+                  {getDynamicTabLabel(categories, tournament)} em Elaboração / Omitido 🔒
+                </h3>
+                <p className="text-slate-500 text-sm max-w-md mx-auto leading-relaxed">
+                  O organizador do evento ainda não liberou a divulgação pública dos balizamentos, chaves e tabelas para esta competição.
+                </p>
+                <div className="pt-2">
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs">
+                    <Clock size={14} /> Volte em breve para conferir a programação oficial liberada.
+                  </span>
+                </div>
+              </div>
+            ) : categories.length > 0 ? (
               <>
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 bg-white rounded-3xl border border-slate-200 shadow-sm">
                   <div>
