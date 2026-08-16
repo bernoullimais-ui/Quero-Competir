@@ -2209,12 +2209,16 @@ export default function TournamentDashboard() {
                   setShowBracketsPubliclyState(nextVal);
                   setIsSavingVisibility(true);
                   try {
-                    const res = await fetch(`/api/tournaments/${id}/subscription-settings`, {
-                      method: "POST",
+                    const res = await fetch(`/api/tournaments/${id}/brackets-visibility`, {
+                      method: "PATCH",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ ...subSettings, showBracketsPublicly: nextVal }),
+                      body: JSON.stringify({ showBracketsPublicly: nextVal }),
                     });
                     if (!res.ok) throw new Error("Erro ao salvar visibilidade");
+                    const data = await res.json();
+                    if (data && data.showBracketsPublicly !== undefined) {
+                      setShowBracketsPubliclyState(!!data.showBracketsPublicly);
+                    }
                     success(nextVal ? "Divulgação pública liberada na página do evento!" : "Divulgação omitida da página do evento.");
                     refreshSubSettings();
                   } catch (err: any) {

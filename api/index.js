@@ -3340,6 +3340,13 @@ function getDefaultRegistrationConfig() {
 }
 function mapSettingsToFrontend(dbSettings) {
   if (!dbSettings) return null;
+  const regConfig = dbSettings.registration_config || getDefaultRegistrationConfig();
+  let showBrackets = true;
+  if (regConfig.show_brackets_publicly !== void 0) {
+    showBrackets = !!regConfig.show_brackets_publicly;
+  } else if (dbSettings.show_brackets_publicly !== void 0) {
+    showBrackets = !!dbSettings.show_brackets_publicly;
+  }
   return {
     deadline: dbSettings.deadline || "",
     feeType: dbSettings.fee_type || "free",
@@ -3350,12 +3357,18 @@ function mapSettingsToFrontend(dbSettings) {
     allowIndependent: !!dbSettings.allow_independent,
     maxEventsPerParticipant: Number(dbSettings.max_events_per_participant) || 1,
     feePricingModel: dbSettings.fee_pricing_model || "per_event",
-    registrationConfig: dbSettings.registration_config || getDefaultRegistrationConfig(),
+    registrationConfig: regConfig,
     maxVisitorsPerAthlete: Number(dbSettings.max_visitors_per_athlete) || 0,
-    showBracketsPublicly: dbSettings.show_brackets_publicly !== void 0 ? !!dbSettings.show_brackets_publicly : true
+    showBracketsPublicly: showBrackets
   };
 }
 function mapSettingsToDb(feSettings) {
+  const regConfig = {
+    ...feSettings.registrationConfig || getDefaultRegistrationConfig()
+  };
+  if (feSettings.showBracketsPublicly !== void 0) {
+    regConfig.show_brackets_publicly = !!feSettings.showBracketsPublicly;
+  }
   return {
     deadline: feSettings.deadline || "",
     fee_type: feSettings.feeType || "free",
@@ -3366,7 +3379,7 @@ function mapSettingsToDb(feSettings) {
     allow_independent: !!feSettings.allowIndependent,
     max_events_per_participant: Number(feSettings.maxEventsPerParticipant) || 1,
     fee_pricing_model: feSettings.feePricingModel || "per_event",
-    registration_config: feSettings.registrationConfig || getDefaultRegistrationConfig(),
+    registration_config: regConfig,
     max_visitors_per_athlete: Number(feSettings.maxVisitorsPerAthlete) || 0,
     show_brackets_publicly: feSettings.showBracketsPublicly !== void 0 ? !!feSettings.showBracketsPublicly : true
   };
@@ -3556,6 +3569,45 @@ router2.post("/:id/subscription-settings", async (req, res) => {
     const saved = await saveSubscriptionSettings(tournamentId, req.body);
     res.json(saved);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+router2.patch("/:id/brackets-visibility", async (req, res) => {
+  try {
+    const { showBracketsPublicly } = req.body;
+    const tData2 = await findTournamentByIdOrSlug(req.params.id);
+    if (!tData2) return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
+    const tournamentId = tData2.id;
+    const supabase = getSupabaseAdmin();
+    const isPublic = !!showBracketsPublicly;
+    const currentRules = tData2.rules_config || {};
+    const updatedRules = { ...currentRules, show_brackets_publicly: isPublic };
+    await supabase.from("tournaments").update({ rules_config: updatedRules }).eq("id", tournamentId);
+    const { data: existingSettings } = await supabase.from("tournament_subscription_settings").select("*").eq("tournament_id", tournamentId).maybeSingle();
+    if (existingSettings) {
+      const currentRegConfig = existingSettings.registration_config || {};
+      await supabase.from("tournament_subscription_settings").update({
+        registration_config: { ...currentRegConfig, show_brackets_publicly: isPublic }
+      }).eq("tournament_id", tournamentId);
+    } else {
+      await supabase.from("tournament_subscription_settings").insert({
+        tournament_id: tournamentId,
+        registration_config: { ...getDefaultRegistrationConfig(), show_brackets_publicly: isPublic }
+      });
+    }
+    const db = loadDb();
+    if (!db.settings) db.settings = {};
+    db.settings[tournamentId] = {
+      ...db.settings[tournamentId] || {},
+      showBracketsPublicly: isPublic
+    };
+    if (req.params.id !== tournamentId) {
+      db.settings[req.params.id] = db.settings[tournamentId];
+    }
+    saveDb(db);
+    res.json({ success: true, showBracketsPublicly: isPublic });
+  } catch (err) {
+    console.error("Erro ao alterar visibilidade p\xFAblica:", err);
     res.status(500).json({ error: err.message });
   }
 });
