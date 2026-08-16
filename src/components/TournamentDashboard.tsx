@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient.ts";
 import SwimmingBalizamento from "./SwimmingBalizamento.tsx";
+import StaffManagement from "./StaffManagement.tsx";
 
 export const getSportIcon = (sportName: string, size = 24) => {
   const name = (sportName || "").toLowerCase();
@@ -214,7 +215,7 @@ const formatCurrency = (val: number) => {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
 };
 
-type Tab = "geral" | "modalidades" | "inscricoes" | "financeiro" | "configuracoes" | "tabela" | "escala" | "arbitragem" | "estatisticas" | "classificacao" | "comunidade" | "comunicacao";
+type Tab = "geral" | "modalidades" | "inscricoes" | "financeiro" | "configuracoes" | "tabela" | "escala" | "arbitragem" | "estatisticas" | "classificacao" | "comunidade" | "comunicacao" | "checkin";
 
 const parseLocalTime = (scheduledTime: string) => {
   const regexMatch = scheduledTime.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
@@ -1401,6 +1402,7 @@ export default function TournamentDashboard() {
           { id: "classificacao", label: "Classificação", icon: TrendingUp },
           { id: "estatisticas", label: "Estatísticas", icon: BarChart3 },
           { id: "arbitragem", label: "Arbitragem", icon: Shield },
+          { id: "checkin", label: "🎟️ Check-in Presencial", icon: ShieldCheck },
           { id: "comunidade", label: "Comunidade & Mural", icon: MessageSquare },
           { id: "comunicacao", label: "💬 Comunicação", icon: MessageSquare }
         ].map(tab => (
@@ -3431,8 +3433,33 @@ export default function TournamentDashboard() {
         )}
 
         {activeTab === "arbitragem" && (
-          <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar a arbitragem deste torneio.</div>}>
-            <TournamentScheduler tournamentId={id!} mode="refereeing" />
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 text-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
+                  <ShieldCheck size={20} className="text-emerald-400" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm">Scanner de Check-in em Tempo Real</h4>
+                  <p className="text-xs text-indigo-200">Realize a chamada e validação de atletas por QR Code ou protocolo de inscrição.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveTab("checkin")}
+                className="px-4 py-2 bg-white text-indigo-900 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-indigo-50 transition shrink-0 cursor-pointer shadow-sm"
+              >
+                Abrir Scanner de Check-in 🎟️
+              </button>
+            </div>
+            <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar a arbitragem deste torneio.</div>}>
+              <TournamentScheduler tournamentId={id!} mode="refereeing" />
+            </ErrorBoundary>
+          </div>
+        )}
+
+        {activeTab === "checkin" && (
+          <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar o scanner de check-in.</div>}>
+            <StaffManagement />
           </ErrorBoundary>
         )}
 
