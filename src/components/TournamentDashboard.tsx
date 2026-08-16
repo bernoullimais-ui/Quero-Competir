@@ -24,7 +24,7 @@ import {
   Dribbble, Swords, Waves, Footprints, Crown, Target, Zap,
   Sparkles, Share2,
   Play, SkipForward, RefreshCw,
-  DollarSign, CreditCard, QrCode, ArrowRight, Loader2
+  DollarSign, CreditCard, QrCode, ArrowRight, Loader2, Search
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient.ts";
 import SwimmingBalizamento from "./SwimmingBalizamento.tsx";
@@ -333,6 +333,8 @@ export default function TournamentDashboard() {
     }
   }, [subSettings]);
   const [selectedInstFilter, setSelectedInstFilter] = useState<string>("");
+  const [finSearch, setFinSearch] = useState<string>("");
+  const [finStatusFilter, setFinStatusFilter] = useState<string>("all");
   const [showPayLinkModal, setShowPayLinkModal] = useState(false);
   const [selectedRegForLink, setSelectedRegForLink] = useState<any>(null);
   const [payLinkDeadline, setPayLinkDeadline] = useState("");
@@ -2153,9 +2155,35 @@ export default function TournamentDashboard() {
 
                     {/* Tabela de Atletas */}
                     <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-                      <div>
-                        <h4 className="font-bold text-slate-800 text-md">Taxas por Atleta (Inscrições Individuais)</h4>
-                        <p className="text-slate-400 text-xs mt-0.5">Pagamento das taxas de inscrição dos atletas individuais.</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                          <h4 className="font-bold text-slate-800 text-md">Taxas por Atleta (Inscrições Individuais)</h4>
+                          <p className="text-slate-400 text-xs mt-0.5">Pagamento das taxas de inscrição dos atletas individuais.</p>
+                        </div>
+
+                        {/* Filtros da Tabela Financeira de Atletas */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="relative min-w-[200px]">
+                            <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                            <input
+                              type="text"
+                              value={finSearch}
+                              onChange={e => setFinSearch(e.target.value)}
+                              placeholder="Procurar atleta..."
+                              className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs font-semibold text-slate-700 bg-white focus:border-indigo-400 focus:outline-none"
+                            />
+                          </div>
+
+                          <select
+                            value={finStatusFilter}
+                            onChange={e => setFinStatusFilter(e.target.value)}
+                            className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 bg-white focus:border-indigo-400 focus:outline-none cursor-pointer"
+                          >
+                            <option value="all">Todos os Status</option>
+                            <option value="pending">⏳ Apenas Pendentes</option>
+                            <option value="paid">✅ Apenas Pagos</option>
+                          </select>
+                        </div>
                       </div>
 
                       <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
@@ -2223,7 +2251,37 @@ export default function TournamentDashboard() {
                                  }
                                });
 
-                               return Array.from(tableGroupMap.values()).map((g: any) => {
+                               let finalGroups = Array.from(tableGroupMap.values());
+
+                               if (finSearch.trim()) {
+                                 const term = finSearch.toLowerCase().trim();
+                                 finalGroups = finalGroups.filter((g: any) => {
+                                   const inst = institutions.find((i: any) => i.id === g.institutionId);
+                                   return (
+                                     (g.athleteName || "").toLowerCase().includes(term) ||
+                                     (inst?.name || "").toLowerCase().includes(term) ||
+                                     g.categoryNames.some((c: string) => c.toLowerCase().includes(term))
+                                   );
+                                 });
+                               }
+
+                               if (finStatusFilter === "pending") {
+                                 finalGroups = finalGroups.filter((g: any) => g.paymentStatus !== "paid");
+                               } else if (finStatusFilter === "paid") {
+                                 finalGroups = finalGroups.filter((g: any) => g.paymentStatus === "paid");
+                               }
+
+                               if (finalGroups.length === 0) {
+                                 return (
+                                   <tr>
+                                     <td colSpan={5} className="py-8 text-center text-slate-400 italic">
+                                       Nenhum atleta localizado para os filtros declarados.
+                                     </td>
+                                   </tr>
+                                 );
+                               }
+
+                               return finalGroups.map((g: any) => {
                                  const inst = institutions.find((i: any) => i.id === g.institutionId);
                                  const isPaid = g.paymentStatus === "paid";
                                  const actualFee = hasAFee ? g.fee : 0;
@@ -2294,7 +2352,7 @@ export default function TournamentDashboard() {
                                    </tr>
                                  );
                                });
-                            })()}
+                             })()}
                           </tbody>
                         </table>
                       </div>
