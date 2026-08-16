@@ -193,7 +193,6 @@ export default function PublicAthleteRegistration() {
             setCurrentStep("success");
           }
         }
-        setLoading(false);
       })
       .catch((err) => {
         console.error(err);
@@ -201,6 +200,29 @@ export default function PublicAthleteRegistration() {
         setLoading(false);
       });
   }, [subId]);
+
+  // Polling automático para detectar pagamento verificado em tempo real (Webhook / Pagar.me)
+  useEffect(() => {
+    if (currentStep !== "payment" || !subId || paymentConfirmed) return;
+
+    const interval = setInterval(() => {
+      fetch(`/api/tournaments/public/athlete-subscription/${subId}?t=${Date.now()}`)
+        .then(res => {
+          if (!res.ok) return null;
+          return res.json();
+        })
+        .then(resData => {
+          if (resData?.subscription?.paymentStatus === "paid") {
+            setPaymentConfirmed(true);
+            toastSuccess("Pagamento confirmado com sucesso! 🎉");
+            setCurrentStep("success");
+          }
+        })
+        .catch(() => {});
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [currentStep, subId, paymentConfirmed]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();

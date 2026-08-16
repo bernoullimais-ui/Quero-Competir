@@ -1907,10 +1907,19 @@ export default function TournamentDashboard() {
               const tPendente = tPrevisto - tPago;
 
               // Athlete calculations
-              const hasAFee = fType.includes("athlete");
+              const hasAFee = fType === "by_individual_self" || fType === "by_team_and_athlete_parent" || fType.includes("athlete") || fType.includes("individual") || aFee > 0;
               const compSubs = athleteSubs.filter((s: any) => s.isCompleted);
-              const aPrevisto = hasAFee ? compSubs.length * aFee : 0;
-              const aPago = hasAFee ? compSubs.filter((s: any) => s.paymentStatus === "paid").length * aFee : 0;
+
+              const getSubFee = (s: any) => {
+                if (s.totalFee !== undefined && s.totalFee !== null && Number(s.totalFee) > 0) return Number(s.totalFee);
+                if (s.athleteFee !== undefined && s.athleteFee !== null && Number(s.athleteFee) > 0) return Number(s.athleteFee);
+                const numCats = Array.isArray(s.categoryIds) ? s.categoryIds.length : (s.categoryId ? 1 : 1);
+                const model = subSettings?.feePricingModel || "per_event";
+                return model === "fixed_package" ? aFee : (aFee * numCats);
+              };
+
+              const aPrevisto = compSubs.reduce((sum, s) => sum + getSubFee(s), 0);
+              const aPago = compSubs.reduce((sum, s) => s.paymentStatus === "paid" ? sum + getSubFee(s) : sum, 0);
               const aPendente = aPrevisto - aPago;
 
               const totalPrev = tPrevisto + aPrevisto;
@@ -2122,7 +2131,7 @@ export default function TournamentDashboard() {
                                 const inst = institutions.find((i: any) => i.id === sub.institutionId);
                                 const cat = categories.find((c: any) => c.id === sub.categoryId);
                                 const isPaid = sub.paymentStatus === "paid";
-                                const actualFee = hasAFee ? aFee : 0;
+                                const actualFee = getSubFee(sub);
 
                                 return (
                                   <tr key={sub.id} className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50/50 duration-100">
