@@ -6570,10 +6570,14 @@ router6.get("/admin/organizations", requireAuth, async (req, res) => {
       const { data: orgs } = await supabase.from("organizations").select("*").order("created_at", { ascending: false });
       if (orgs && Array.isArray(orgs)) {
         for (const org of orgs) {
+          let displayName = org.name || "Organiza\xE7\xE3o";
+          if (org.id === "org-1" || org.subdomain === "redefluir" || org.name === "Organizador Principal" || org.name.toLowerCase().includes("fluir")) {
+            displayName = "Rede Fluir (Organizador Principal)";
+          }
           resultMap.set(org.id, {
             id: org.id,
-            name: org.name || "Organiza\xE7\xE3o",
-            subdomain: org.subdomain || "",
+            name: displayName,
+            subdomain: org.subdomain || "redefluir",
             pagarme_recipient_id: org.pagarme_recipient_id || null,
             pagarme_recipient_status: org.pagarme_recipient_status || "not_configured",
             platform_fee_percent: org.platform_fee_percent !== void 0 && org.platform_fee_percent !== null ? Number(org.platform_fee_percent) : 10,
@@ -6600,9 +6604,13 @@ router6.get("/admin/organizations", requireAuth, async (req, res) => {
       for (const acc of organizerAccounts) {
         const targetId = acc.reference_id || acc.referenceId || acc.id;
         if (!resultMap.has(targetId)) {
+          let displayName = acc.name || acc.email;
+          if (targetId === "org-1" || acc.email?.includes("fluir") || displayName.toLowerCase().includes("fluir") || displayName === "Organizador Principal") {
+            displayName = "Rede Fluir (Organizador Principal)";
+          }
           resultMap.set(targetId, {
             id: targetId,
-            name: acc.name || acc.email,
+            name: displayName,
             subdomain: (acc.email || "").split("@")[0],
             pagarme_recipient_id: null,
             pagarme_recipient_status: "not_configured",
@@ -6620,9 +6628,13 @@ router6.get("/admin/organizations", requireAuth, async (req, res) => {
       if (tournaments && Array.isArray(tournaments)) {
         for (const t of tournaments) {
           if (t.owner_id && !resultMap.has(t.owner_id)) {
+            let displayName = `Organizador de (${t.name})`;
+            if (t.owner_id === "org-1" || t.name.toLowerCase().includes("fluir")) {
+              displayName = "Rede Fluir (Organizador Principal)";
+            }
             resultMap.set(t.owner_id, {
               id: t.owner_id,
-              name: `Organizador de (${t.name})`,
+              name: displayName,
               subdomain: "",
               pagarme_recipient_id: null,
               pagarme_recipient_status: "not_configured",
