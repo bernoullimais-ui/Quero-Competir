@@ -575,6 +575,73 @@ router.patch("/admin/organizations/:id/fee", requireAuth, async (req, res) => {
   }
 });
 
+// 5. Obter Parâmetros Globais do SaaS (Somente Super Admin)
+router.get("/admin/global-config", requireAuth, async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const localBankDb = loadBankDataDb();
+    const globalLocal = localBankDb["__GLOBAL__"] || {};
+
+    let globalFee = globalLocal.platformFeePercent;
+    let maintMode = globalLocal.maintenanceMode || false;
+
+    try {
+      const { data: org } = await supabase.from("organizations").select("*").limit(1).maybeSingle();
+      if (org) {
+        const finData = getFinDataFromOrg(org);
+        if (finData.globalPlatformFeePercent !== undefined) {
+          globalFee = finData.globalPlatformFeePercent;
+        }
+        if (finData.maintenanceMode !== undefined) {
+          maintMode = finData.maintenanceMode;
+        }
+      }
+    } catch (_) {}
+
+    if (globalFee === undefined || globalFee === null) globalFee = 10;
+
+    res.json({
+      platformFeePercent: Number(globalFee),
+      maintenanceMode: Boolean(maintMode)
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6. Atualizar Parâmetros Globais do SaaS (Somente Super Admin)
+router.patch("/admin/global-config", requireAuth, async (req, res) => {
+  const { platformFeePercent, maintenanceMode } = req.body;
+  const feeVal = Number(platformFeePercent);
+  if (isNaN(feeVal) || feeVal < 0 || feeVal > 100) {
+    return res.status(400).json({ error: "Percentual inválido." });
+  }
+
+  try {
+    const supabase = getSupabaseAdmin();
+
+    try {
+      const { data: org } = await supabase.from("organizations").select("*").limit(1).maybeSingle();
+      if (org) {
+        const newDesc = embedFinDataInDescription(org.description, { globalPlatformFeePercent: feeVal, maintenanceMode: Boolean(maintenanceMode) });
+        await supabase.from("organizations").update({ description: newDesc }).eq("id", org.id);
+      }
+    } catch (_) {}
+
+    const localBankDb = loadBankDataDb();
+    localBankDb["__GLOBAL__"] = {
+      platformFeePercent: feeVal,
+      maintenanceMode: Boolean(maintenanceMode),
+      updatedAt: new Date().toISOString()
+    };
+    saveBankDataDb(localBankDb);
+
+    res.json({ success: true, platformFeePercent: feeVal, maintenanceMode: Boolean(maintenanceMode) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 4. Webhook Unificado do Pagar.me (Assíncrono para PIX, Boleto e Cartão)
 router.post("/webhook", async (req, res) => {
   try {

@@ -36,14 +36,18 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
 
   const getHeaders = (extraHeaders: any = {}) => {
     const headersObj: any = { ...extraHeaders };
-    const savedUser = localStorage.getItem("currentUser");
-    if (savedUser) {
-      try {
-        const user = JSON.parse(savedUser);
-        if (user && user.token) {
-          headersObj["Authorization"] = `Bearer ${user.token}`;
-        }
-      } catch (e) {}
+    let token = localStorage.getItem("token");
+    if (!token) {
+      const savedUser = localStorage.getItem("currentUser");
+      if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser);
+          if (user && user.token) token = user.token;
+        } catch (e) {}
+      }
+    }
+    if (token) {
+      headersObj["Authorization"] = `Bearer ${token}`;
     }
     return headersObj;
   };
@@ -51,6 +55,23 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [editingFees, setEditingFees] = useState<Record<string, number>>({});
   const [savingFeeId, setSavingFeeId] = useState<string | null>(null);
+
+  const fetchGlobalConfig = async () => {
+    try {
+      const res = await fetch("/api/payments/admin/global-config", { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.platformFeePercent !== undefined) {
+          setSaasFeePercent(Number(data.platformFeePercent));
+        }
+        if (data.maintenanceMode !== undefined) {
+          setMaintenanceMode(Boolean(data.maintenanceMode));
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching global config:", err);
+    }
+  };
 
   const fetchOrganizations = async () => {
     try {
@@ -93,7 +114,7 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
       if (Array.isArray(tData)) setTournaments(tData);
       if (Array.isArray(aData)) setAthletes(aData);
 
-      await fetchOrganizations();
+      await Promise.all([fetchOrganizations(), fetchGlobalConfig()]);
     } catch (err: any) {
       setError("Erro ao carregar dados do painel: " + err.message);
     } finally {
@@ -119,12 +140,13 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
       const data = await res.json();
       if (res.ok && data.success) {
         toastSuccess(`Taxa da organização atualizada para ${feeVal}%!`);
-        fetchOrganizations();
+        setEditingFees(prev => ({ ...prev, [orgId]: feeVal }));
+        setOrganizations(prev => prev.map(o => o.id === orgId ? { ...o, platform_fee_percent: feeVal } : o));
       } else {
         toastError(data.error || "Erro ao atualizar taxa.");
       }
     } catch (err: any) {
-      toastError(err.message);
+      toastError("Erro ao salvar taxa: " + err.message);
     } finally {
       setSavingFeeId(null);
     }
@@ -186,10 +208,25 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
     }
   };
 
-  const saveSaasConfig = (e: React.FormEvent) => {
+  const saveSaasConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaasConfigSaved(true);
-    setTimeout(() => setSaasConfigSaved(false), 3000);
+    try {
+      const res = await fetch("/api/payments/admin/global-config", {
+        method: "PATCH",
+        headers: getHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ platformFeePercent: saasFeePercent, maintenanceMode })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSaasConfigSaved(true);
+        toastSuccess(`Taxa Global do SaaS atualizada para ${saasFeePercent}%!`);
+        setTimeout(() => setSaasConfigSaved(false), 3000);
+      } else {
+        toastError(data.error || "Erro ao salvar parâmetros globais.");
+      }
+    } catch (err: any) {
+      toastError("Erro ao conectar com servidor: " + err.message);
+    }
   };
 
   return (
