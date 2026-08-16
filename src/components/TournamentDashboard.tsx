@@ -1202,20 +1202,19 @@ export default function TournamentDashboard() {
     }
   };
 
-  const handleToggleAthletePayment = async (subId: string, currentStatus: string) => {
+  const handleToggleAthletePayment = async (subIds: string | string[], currentStatus: string) => {
     const newStatus = currentStatus === "paid" ? "pending" : "paid";
+    const ids = Array.isArray(subIds) ? subIds : [subIds];
     try {
-      const res = await fetch(`/api/tournaments/${id}/athlete-subscriptions/${subId}/payment`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentStatus: newStatus })
-      });
-      if (res.ok) {
-        toastSuccess("Status de pagamento do atleta atualizado!");
-        refreshAthleteSubs();
-      } else {
-        toastError("Erro ao atualizar status de pagamento.");
-      }
+      await Promise.all(ids.map(subId => 
+        fetch(`/api/tournaments/${id}/athlete-subscriptions/${subId}/payment`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paymentStatus: newStatus })
+        })
+      ));
+      toastSuccess("Status de pagamento do atleta atualizado!");
+      refreshAthleteSubs();
     } catch (err) {
       toastError("Erro ao conectar com o servidor.");
     }
@@ -1906,20 +1905,63 @@ export default function TournamentDashboard() {
               const tPago = registrations.reduce((sum, r) => r.status === "confirmed" ? sum + (tFee * (r.modalityCount || 0)) : sum, 0);
               const tPendente = tPrevisto - tPago;
 
-              // Athlete calculations
+              // Athlete calculations (grouped by unique athlete to avoid fee duplication on multi-category registrations)
               const hasAFee = fType === "by_individual_self" || fType === "by_team_and_athlete_parent" || fType.includes("athlete") || fType.includes("individual") || aFee > 0;
               const compSubs = athleteSubs.filter((s: any) => s.isCompleted);
 
-              const getSubFee = (s: any) => {
-                if (s.totalFee !== undefined && s.totalFee !== null && Number(s.totalFee) > 0) return Number(s.totalFee);
-                if (s.athleteFee !== undefined && s.athleteFee !== null && Number(s.athleteFee) > 0) return Number(s.athleteFee);
-                const numCats = Array.isArray(s.categoryIds) ? s.categoryIds.length : (s.categoryId ? 1 : 1);
-                const model = subSettings?.feePricingModel || "per_event";
-                return model === "fixed_package" ? aFee : (aFee * numCats);
-              };
+              const groupedAthleteMap = new Map<string, {
+                key: string;
+                athleteName: string;
+                document?: string;
+                institutionId?: string;
+                categoryNames: string[];
+                subIds: string[];
+                paymentStatus: string;
+                fee: number;
+              }>();
 
-              const aPrevisto = compSubs.reduce((sum, s) => sum + getSubFee(s), 0);
-              const aPago = compSubs.reduce((sum, s) => s.paymentStatus === "paid" ? sum + getSubFee(s) : sum, 0);
+              compSubs.forEach((s: any) => {
+                const key = (s.document || s.athleteName || s.id).toLowerCase().trim();
+                const cat = categories.find((c: any) => c.id === s.categoryId);
+                const catName = cat?.name || "Sem Categoria";
+
+                if (!groupedAthleteMap.has(key)) {
+                  let fee = 0;
+                  if (s.totalFee !== undefined && s.totalFee !== null && Number(s.totalFee) > 0) {
+                    fee = Number(s.totalFee);
+                  } else if (s.athleteFee !== undefined && s.athleteFee !== null && Number(s.athleteFee) > 0) {
+                    fee = Number(s.athleteFee);
+                  } else {
+                    fee = hasAFee ? aFee : 0;
+                  }
+
+                  groupedAthleteMap.set(key, {
+                    key,
+                    athleteName: s.athleteName,
+                    document: s.document,
+                    institutionId: s.institutionId,
+                    categoryNames: [catName],
+                    subIds: [s.id],
+                    paymentStatus: s.paymentStatus || "pending",
+                    fee
+                  });
+                } else {
+                  const existing = groupedAthleteMap.get(key)!;
+                  if (!existing.categoryNames.includes(catName)) {
+                    existing.categoryNames.push(catName);
+                  }
+                  if (!existing.subIds.includes(s.id)) {
+                    existing.subIds.push(s.id);
+                  }
+                  if (s.paymentStatus === "paid") {
+                    existing.paymentStatus = "paid";
+                  }
+                }
+              });
+
+              const allGroupedAthletes = Array.from(groupedAthleteMap.values());
+              const aPrevisto = allGroupedAthletes.reduce((sum, g) => sum + (hasAFee ? g.fee : 0), 0);
+              const aPago = allGroupedAthletes.reduce((sum, g) => g.paymentStatus === "paid" ? sum + (hasAFee ? g.fee : 0) : sum, 0);
               const aPendente = aPrevisto - aPago;
 
               const totalPrev = tPrevisto + aPrevisto;
@@ -2127,44 +2169,83 @@ export default function TournamentDashboard() {
                                 );
                               }
 
-                              return completedFiltered.map((sub: any) => {
-                                const inst = institutions.find((i: any) => i.id === sub.institutionId);
-                                const cat = categories.find((c: any) => c.id === sub.categoryId);
-                                const isPaid = sub.paymentStatus === "paid";
-                                const actualFee = getSubFee(sub);
+                               // Group filtered athlete subscriptions by unique athlete for table display
+                               const tableGroupMap = new Map<string, any>();
+                               completedFiltered.forEach((s: any) => {
+                                 const key = (s.document || s.athleteName || s.id).toLowerCase().trim();
+                                 const cat = categories.find((c: any) => c.id === s.categoryId);
+                                 const catName = cat?.name || "Sem Categoria";
 
-                                return (
-                                  <tr key={sub.id} className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50/50 duration-100">
-                                    <td className="py-3.5 font-bold text-slate-800">
-                                      {sub.athleteName}
-                                    </td>
-                                    <td className="py-3.5 text-slate-500 font-medium">
-                                      <div className="max-w-[180px] truncate">{inst?.name || "Desconhecida"}</div>
-                                      <div className="text-[10px] text-slate-400 uppercase font-bold mt-0.5">{cat?.name || "Sem Categoria"}</div>
-                                    </td>
-                                    <td className="py-3.5 text-right font-bold text-slate-800">
-                                      {formatCurrency(actualFee)}
-                                    </td>
-                                    <td className="py-3.5 text-center">
-                                      <select
-                                        disabled={!hasAFee}
-                                        value={sub.paymentStatus || "pending"}
-                                        onChange={e => handleToggleAthletePayment(sub.id, sub.paymentStatus)}
-                                        className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-black uppercase outline-none transition ${
-                                          !hasAFee 
-                                            ? "bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed" 
-                                            : isPaid 
-                                              ? "bg-emerald-50 border-emerald-250 text-emerald-600 cursor-pointer" 
-                                              : "bg-red-50 border-red-200 text-red-650 cursor-pointer"
-                                        }`}
-                                      >
-                                        <option value="paid">Pago</option>
-                                        <option value="pending">Pendente</option>
-                                      </select>
-                                    </td>
-                                  </tr>
-                                );
-                              });
+                                 if (!tableGroupMap.has(key)) {
+                                   let fee = 0;
+                                   if (s.totalFee !== undefined && s.totalFee !== null && Number(s.totalFee) > 0) {
+                                     fee = Number(s.totalFee);
+                                   } else if (s.athleteFee !== undefined && s.athleteFee !== null && Number(s.athleteFee) > 0) {
+                                     fee = Number(s.athleteFee);
+                                   } else {
+                                     fee = hasAFee ? aFee : 0;
+                                   }
+
+                                   tableGroupMap.set(key, {
+                                     key,
+                                     athleteName: s.athleteName,
+                                     institutionId: s.institutionId,
+                                     categoryNames: [catName],
+                                     subIds: [s.id],
+                                     paymentStatus: s.paymentStatus || "pending",
+                                     fee
+                                   });
+                                 } else {
+                                   const existing = tableGroupMap.get(key)!;
+                                   if (!existing.categoryNames.includes(catName)) {
+                                     existing.categoryNames.push(catName);
+                                   }
+                                   if (!existing.subIds.includes(s.id)) {
+                                     existing.subIds.push(s.id);
+                                   }
+                                   if (s.paymentStatus === "paid") {
+                                     existing.paymentStatus = "paid";
+                                   }
+                                 }
+                               });
+
+                               return Array.from(tableGroupMap.values()).map((g: any) => {
+                                 const inst = institutions.find((i: any) => i.id === g.institutionId);
+                                 const isPaid = g.paymentStatus === "paid";
+                                 const actualFee = hasAFee ? g.fee : 0;
+
+                                 return (
+                                   <tr key={g.key} className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50/50 duration-100">
+                                     <td className="py-3.5 font-bold text-slate-800">
+                                       {g.athleteName}
+                                     </td>
+                                     <td className="py-3.5 text-slate-500 font-medium">
+                                       <div className="max-w-[220px] truncate">{inst?.name || "Desconhecida"}</div>
+                                       <div className="text-[10px] text-slate-400 uppercase font-bold mt-0.5">{g.categoryNames.join(" • ")}</div>
+                                     </td>
+                                     <td className="py-3.5 text-right font-bold text-slate-800">
+                                       {formatCurrency(actualFee)}
+                                     </td>
+                                     <td className="py-3.5 text-center">
+                                       <select
+                                         disabled={!hasAFee}
+                                         value={g.paymentStatus || "pending"}
+                                         onChange={e => handleToggleAthletePayment(g.subIds, g.paymentStatus)}
+                                         className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-black uppercase outline-none transition ${
+                                           !hasAFee 
+                                             ? "bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed" 
+                                             : isPaid 
+                                               ? "bg-emerald-50 border-emerald-250 text-emerald-600 cursor-pointer" 
+                                               : "bg-red-50 border-red-200 text-red-650 cursor-pointer"
+                                         }`}
+                                       >
+                                         <option value="paid">Pago</option>
+                                         <option value="pending">Pendente</option>
+                                       </select>
+                                     </td>
+                                   </tr>
+                                 );
+                               });
                             })()}
                           </tbody>
                         </table>
