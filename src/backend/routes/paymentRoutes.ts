@@ -31,6 +31,78 @@ function saveBankDataDb(data: Record<string, any>) {
   } catch (e) {}
 }
 
+// Helper to parse financial data embedded in org.description
+function getFinDataFromOrg(org: any) {
+  const fin: any = {
+    platformFeePercent: 10,
+    pagarmeRecipientId: null,
+    pagarmeRecipientStatus: "not_configured",
+    holderName: "",
+    holderDocument: "",
+    bankCode: "341",
+    bankBranch: "",
+    bankAccount: "",
+    bankAccountType: "checking",
+    holderEmail: "",
+    holderPhone: ""
+  };
+
+  if (!org) return fin;
+
+  if (org.platform_fee_percent !== undefined && org.platform_fee_percent !== null) {
+    fin.platformFeePercent = Number(org.platform_fee_percent);
+  }
+  if (org.pagarme_recipient_id) fin.pagarmeRecipientId = org.pagarme_recipient_id;
+  if (org.pagarme_recipient_status) fin.pagarmeRecipientStatus = org.pagarme_recipient_status;
+  if (org.bank_holder_name) fin.holderName = org.bank_holder_name;
+  if (org.bank_holder_document) fin.holderDocument = org.bank_holder_document;
+  if (org.bank_code) fin.bankCode = org.bank_code;
+  if (org.bank_branch) fin.bankBranch = org.bank_branch;
+  if (org.bank_account) fin.bankAccount = org.bank_account;
+
+  if (org.description && typeof org.description === "string" && org.description.includes("__FIN_DATA__:")) {
+    try {
+      const parts = org.description.split("__FIN_DATA__:");
+      const jsonStr = parts[1];
+      const parsed = JSON.parse(jsonStr);
+      if (parsed) {
+        if (parsed.platformFeePercent !== undefined) fin.platformFeePercent = Number(parsed.platformFeePercent);
+        if (parsed.pagarmeRecipientId) fin.pagarmeRecipientId = parsed.pagarmeRecipientId;
+        if (parsed.pagarmeRecipientStatus) fin.pagarmeRecipientStatus = parsed.pagarmeRecipientStatus;
+        if (parsed.holderName) fin.holderName = parsed.holderName;
+        if (parsed.holderDocument) fin.holderDocument = parsed.holderDocument;
+        if (parsed.bankCode) fin.bankCode = parsed.bankCode;
+        if (parsed.bankBranch) fin.bankBranch = parsed.bankBranch;
+        if (parsed.bankAccount) fin.bankAccount = parsed.bankAccount;
+        if (parsed.bankAccountType) fin.bankAccountType = parsed.bankAccountType;
+        if (parsed.holderEmail) fin.holderEmail = parsed.holderEmail;
+        if (parsed.holderPhone) fin.holderPhone = parsed.holderPhone;
+      }
+    } catch (_) {}
+  }
+
+  return fin;
+}
+
+// Helper to embed financial data into org description string for Supabase persistence
+function embedFinDataInDescription(currentDescription: string | null | undefined, finDataPatch: Record<string, any>): string {
+  let baseDesc = currentDescription || "";
+  let finObj: Record<string, any> = {};
+
+  if (baseDesc.includes("__FIN_DATA__:")) {
+    const parts = baseDesc.split("__FIN_DATA__:");
+    baseDesc = parts[0].trim();
+    try {
+      finObj = JSON.parse(parts[1]);
+    } catch (_) {}
+  }
+
+  finObj = { ...finObj, ...finDataPatch };
+  const encoded = `__FIN_DATA__:${JSON.stringify(finObj)}`;
+
+  return baseDesc ? `${baseDesc}\n\n${encoded}` : encoded;
+}
+
 // Helper function to call Pagar.me API v5
 async function callPagarMe(endpoint: string, method: string, body: any) {
   const secretKey = process.env.PAGARME_SECRET_KEY;
@@ -72,13 +144,22 @@ router.get("/organizations/:id/recipient-status", requireAuth, async (req, res) 
         .eq("id", targetId)
         .maybeSingle();
       org = data;
+      if (!org && (targetId === "org-1" || targetId === "redefluir")) {
+        const { data: fallbackOrg } = await supabase
+          .from("organizations")
+          .select("*")
+          .limit(1)
+          .maybeSingle();
+        org = fallbackOrg;
+      }
     } catch (_) {}
 
+    const finData = getFinDataFromOrg(org);
     const localBankDb = loadBankDataDb();
     const localData = localBankDb[targetId] || localBankDb["org-1"] || {};
 
-    let recipientId = org?.pagarme_recipient_id || localData.pagarmeRecipientId || null;
-    let liveStatus = org?.pagarme_recipient_status || localData.pagarmeRecipientStatus || "not_configured";
+    let recipientId = finData.pagarmeRecipientId || org?.pagarme_recipient_id || localData.pagarmeRecipientId || null;
+    let liveStatus = finData.pagarmeRecipientStatus || org?.pagarme_recipient_status || localData.pagarmeRecipientStatus || "not_configured";
     let pagarmeDetails: any = null;
 
     if (recipientId && process.env.PAGARME_SECRET_KEY) {
@@ -88,10 +169,11 @@ router.get("/organizations/:id/recipient-status", requireAuth, async (req, res) 
           liveStatus = pagarmeDetails.status;
           
           if (org && liveStatus !== org.pagarme_recipient_status) {
+            const newDesc = embedFinDataInDescription(org.description, { pagarmeRecipientStatus: liveStatus });
             await supabase
               .from("organizations")
-              .update({ pagarme_recipient_status: liveStatus })
-              .eq("id", targetId);
+              .update({ pagarme_recipient_status: liveStatus, description: newDesc })
+              .eq("id", org.id);
           }
         }
       } catch (err: any) {
@@ -99,20 +181,28 @@ router.get("/organizations/:id/recipient-status", requireAuth, async (req, res) 
       }
     }
 
+    let fee = finData.platformFeePercent;
+    if (fee === undefined || fee === null || fee === 10) {
+      if (localData.platformFeePercent !== undefined) {
+        fee = Number(localData.platformFeePercent);
+      }
+    }
+    if (fee === undefined || fee === null) fee = 10;
+
     res.json({
       pagarmeRecipientId: recipientId,
       pagarmeRecipientStatus: liveStatus,
-      platformFeePercent: org?.platform_fee_percent !== undefined && org?.platform_fee_percent !== null ? Number(org.platform_fee_percent) : (localData.platformFeePercent || 10),
+      platformFeePercent: fee,
       bankData: {
-        holderName: org?.bank_holder_name || localData.holderName || "",
-        holderDocument: org?.bank_holder_document || localData.holderDocument || "",
-        holderType: org?.bank_holder_type || localData.holderType || "individual",
-        bankCode: org?.bank_code || localData.bankCode || "341",
-        bankBranch: org?.bank_branch || localData.bankBranch || "",
-        bankAccount: org?.bank_account || localData.bankAccount || "",
-        bankAccountType: org?.bank_account_type || localData.bankAccountType || "checking",
-        holderEmail: org?.bank_holder_email || localData.holderEmail || "",
-        holderPhone: org?.bank_holder_phone || localData.holderPhone || ""
+        holderName: finData.holderName || org?.bank_holder_name || localData.holderName || "",
+        holderDocument: finData.holderDocument || org?.bank_holder_document || localData.holderDocument || "",
+        holderType: finData.holderType || org?.bank_holder_type || localData.holderType || "individual",
+        bankCode: finData.bankCode || org?.bank_code || localData.bankCode || "341",
+        bankBranch: finData.bankBranch || org?.bank_branch || localData.bankBranch || "",
+        bankAccount: finData.bankAccount || org?.bank_account || localData.bankAccount || "",
+        bankAccountType: finData.bankAccountType || org?.bank_account_type || localData.bankAccountType || "checking",
+        holderEmail: finData.holderEmail || org?.bank_holder_email || localData.holderEmail || "",
+        holderPhone: finData.holderPhone || org?.bank_holder_phone || localData.holderPhone || ""
       },
       pagarmeDetails
     });
@@ -186,9 +276,35 @@ router.post("/organizations/:id/create-recipient", requireAuth, async (req, res)
       recipientStatus = "active";
     }
 
-    // 1. Salvar no Supabase (com upsert seguro)
+    // 1. Buscar org existente em Supabase
+    let org: any = null;
+    try {
+      const { data } = await supabase.from("organizations").select("*").eq("id", id).maybeSingle();
+      org = data;
+      if (!org && (id === "org-1" || id === "redefluir")) {
+        const { data: fallback } = await supabase.from("organizations").select("*").limit(1).maybeSingle();
+        org = fallback;
+      }
+    } catch (_) {}
+
+    const orgIdToUse = org?.id || id;
+    const newDesc = embedFinDataInDescription(org?.description, {
+      pagarmeRecipientId: recipientId,
+      pagarmeRecipientStatus: recipientStatus,
+      holderName,
+      holderDocument: cleanDoc,
+      holderType: holderType || (cleanDoc.length === 11 ? "individual" : "corporation"),
+      bankCode,
+      bankBranch: cleanBranch,
+      bankAccount: accountFull,
+      bankAccountType: bankAccountType || "checking",
+      holderEmail: holderEmail || "",
+      holderPhone: cleanPhone || ""
+    });
+
     const dbPayload = {
-      id: id,
+      id: orgIdToUse,
+      description: newDesc,
       pagarme_recipient_id: recipientId,
       pagarme_recipient_status: recipientStatus,
       bank_holder_name: holderName,
@@ -208,14 +324,11 @@ router.post("/organizations/:id/create-recipient", requireAuth, async (req, res)
         .upsert(dbPayload);
 
       if (updateErr) {
-        console.warn("Aviso ao salvar organização no Supabase (tentando update restrito):", updateErr.message);
+        console.warn("Aviso ao salvar organização no Supabase (atualizando apenas description):", updateErr.message);
         await supabase
           .from("organizations")
-          .update({
-            pagarme_recipient_id: recipientId,
-            pagarme_recipient_status: recipientStatus
-          })
-          .eq("id", id);
+          .update({ description: newDesc })
+          .eq("id", orgIdToUse);
       }
     } catch (e: any) {
       console.warn("Exceção Supabase ao salvar recebedor:", e.message);
@@ -392,6 +505,7 @@ router.get("/admin/organizations", requireAuth, async (req, res) => {
 router.patch("/admin/organizations/:id/fee", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { platformFeePercent } = req.body;
+  const targetId = id || "org-1";
 
   if (platformFeePercent === undefined || isNaN(Number(platformFeePercent))) {
     return res.status(400).json({ error: "Percentual inválido." });
@@ -404,36 +518,46 @@ router.patch("/admin/organizations/:id/fee", requireAuth, async (req, res) => {
 
   try {
     const supabase = getSupabaseAdmin();
-    // 1. Salvar no Supabase
+    let org: any = null;
     try {
-      const { error: updateErr, data } = await supabase
-        .from("organizations")
-        .update({ platform_fee_percent: feeVal })
-        .eq("id", id)
-        .select();
+      const { data } = await supabase.from("organizations").select("*").eq("id", targetId).maybeSingle();
+      org = data;
+      if (!org && (targetId === "org-1" || targetId === "redefluir")) {
+        const { data: fallback } = await supabase.from("organizations").select("*").limit(1).maybeSingle();
+        org = fallback;
+      }
+    } catch (_) {}
 
-      if (updateErr || !data || data.length === 0) {
+    const orgIdToUse = org?.id || targetId;
+    const newDesc = embedFinDataInDescription(org?.description, { platformFeePercent: feeVal });
+
+    // 1. Salvar no Supabase (coluna direta + description)
+    try {
+      const { error: updateErr } = await supabase
+        .from("organizations")
+        .update({
+          platform_fee_percent: feeVal,
+          description: newDesc
+        })
+        .eq("id", orgIdToUse);
+
+      if (updateErr) {
         await supabase
           .from("organizations")
-          .upsert({
-            id,
-            name: "Organização",
-            platform_fee_percent: feeVal
-          });
+          .update({ description: newDesc })
+          .eq("id", orgIdToUse);
       }
     } catch (e: any) {
-      console.warn("Aviso ao salvar fee no Supabase:", e.message);
+      console.warn("Exceção ao salvar fee no Supabase:", e.message);
     }
 
-    // 2. Salvar no JSON local bank_details.json (garante persistência 100%)
+    // 2. Salvar no JSON local bank_details.json
     const localBankDb = loadBankDataDb();
-    const targetId = id || "org-1";
-
-    const record = localBankDb[targetId] || {};
+    const record = localBankDb[orgIdToUse] || {};
     record.platformFeePercent = feeVal;
-    localBankDb[targetId] = record;
+    localBankDb[orgIdToUse] = record;
 
-    if (targetId === "org-1" || targetId === "redefluir") {
+    if (orgIdToUse === "org-1" || targetId === "org-1" || targetId === "redefluir") {
       const org1Rec = localBankDb["org-1"] || {};
       org1Rec.platformFeePercent = feeVal;
       localBankDb["org-1"] = org1Rec;
