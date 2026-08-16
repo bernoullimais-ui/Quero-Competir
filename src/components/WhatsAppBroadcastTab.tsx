@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   MessageCircle, Send, Users, CheckCircle2, Clock, Filter,
   AlertCircle, ChevronDown, Image, FileText, X, Loader2,
-  History, Settings2, Eye, Hash, Trophy, Building2
+  History, Settings2, Eye, Hash, Trophy, Building2, User, Phone, Search
 } from "lucide-react";
 
 const VARIABLE_TAGS = [
@@ -36,6 +36,13 @@ export default function WhatsAppBroadcastTab({
   const [filter, setFilter] = useState("all");
   const [categoryId, setCategoryId] = useState("");
   const [institutionId, setInstitutionId] = useState("");
+  const [subId, setSubId] = useState("");
+  const [customPhone, setCustomPhone] = useState("");
+  const [recipientName, setRecipientName] = useState("");
+  const [athleteSearch, setAthleteSearch] = useState("");
+  const [athletes, setAthletes] = useState<any[]>([]);
+  const [athletesLoading, setAthletesLoading] = useState(false);
+
   const [message, setMessage] = useState("");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
@@ -53,7 +60,39 @@ export default function WhatsAppBroadcastTab({
   const [logs, setLogs] = useState<any[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
 
-  const headers = { "Content-Type": "application/json", ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) };
+  const headers = useMemo(() => ({ "Content-Type": "application/json", ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) }), [authToken]);
+
+  // Carrega atletas do torneio se o filtro for atleta específico
+  useEffect(() => {
+    if (filter === "specific_athlete" && athletes.length === 0) {
+      setAthletesLoading(true);
+      fetch(`/api/tournaments/${tournamentId}/athlete-subscriptions`, { headers })
+        .then(res => res.json())
+        .then(data => setAthletes(Array.isArray(data) ? data : []))
+        .catch(() => {})
+        .finally(() => setAthletesLoading(false));
+    }
+  }, [filter, tournamentId, athletes.length, headers]);
+
+  // Deduplica lista de atletas para seleção por nome/telefone
+  const uniqueAthletes = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const a of athletes) {
+      const key = a.id;
+      if (!map.has(key)) map.set(key, a);
+    }
+    return Array.from(map.values());
+  }, [athletes]);
+
+  const filteredAthletes = useMemo(() => {
+    if (!athleteSearch.trim()) return uniqueAthletes;
+    const term = athleteSearch.toLowerCase();
+    return uniqueAthletes.filter(a =>
+      (a.athlete_name || a.athleteName || "").toLowerCase().includes(term) ||
+      (a.parent_phone || a.parentPhone || a.additional_data?.phone || "").includes(term) ||
+      (a.document || "").includes(term)
+    );
+  }, [uniqueAthletes, athleteSearch]);
 
   // Load logs
   const loadLogs = useCallback(async () => {
@@ -63,7 +102,7 @@ export default function WhatsAppBroadcastTab({
       if (res.ok) setLogs(await res.json());
     } catch { /* ignore */ }
     finally { setLogsLoading(false); }
-  }, [tournamentId]);
+  }, [tournamentId, headers]);
 
   useEffect(() => { if (activeSection === "history") loadLogs(); }, [activeSection, loadLogs]);
 
@@ -92,10 +131,6 @@ export default function WhatsAppBroadcastTab({
       let mediaName: string | undefined;
 
       if (mediaFile) {
-        // Upload da mídia antes do envio
-        const formData = new FormData();
-        formData.append("file", mediaFile);
-        // Use Supabase storage via a rota de upload existente, ou envie a URL base64 direto
         mediaUrl = mediaPreview || undefined;
         mediaName = mediaFile.name;
       }
@@ -106,6 +141,8 @@ export default function WhatsAppBroadcastTab({
         message,
         ...(filter === "by_category" && categoryId ? { categoryId } : {}),
         ...(filter === "by_institution" && institutionId ? { institutionId } : {}),
+        ...(filter === "specific_athlete" && subId ? { subId } : {}),
+        ...(filter === "custom_phone" ? { customPhone, recipientName } : {}),
         ...(mediaUrl ? { mediaUrl, mediaName } : {}),
       };
 
@@ -115,7 +152,7 @@ export default function WhatsAppBroadcastTab({
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro no disparo");
+      if (!res.ok) throw new Error(data.error || "Erro no envio da mensagem");
       setSendResult(data);
       loadLogs();
     } catch (e: any) {
@@ -145,6 +182,8 @@ export default function WhatsAppBroadcastTab({
     { value: "pending", label: "Apenas pendentes", icon: Clock },
     { value: "by_category", label: "Por prova/categoria", icon: Trophy },
     { value: "by_institution", label: "Por clube/instituição", icon: Building2 },
+    { value: "specific_athlete", label: "Atleta específico", icon: User },
+    { value: "custom_phone", label: "Digitar número avulso", icon: Phone },
   ];
 
   const msgTypeLabel: Record<string, string> = {
@@ -236,6 +275,66 @@ export default function WhatsAppBroadcastTab({
                   <option key={i.id} value={i.id}>{i.name}</option>
                 ))}
               </select>
+            )}
+            {filter === "specific_athlete" && (
+              <div className="mt-3 space-y-2">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={athleteSearch}
+                    onChange={e => setAthleteSearch(e.target.value)}
+                    placeholder="Buscar por nome, telefone ou documento..."
+                    className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-slate-700 bg-white"
+                  />
+                </div>
+                {athletesLoading ? (
+                  <div className="flex items-center justify-center py-3 text-slate-400 gap-2 text-xs">
+                    <Loader2 size={14} className="animate-spin" /> Carregando inscritos...
+                  </div>
+                ) : (
+                  <select
+                    value={subId}
+                    onChange={e => setSubId(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 bg-white"
+                  >
+                    <option value="">Selecione um atleta ({filteredAthletes.length} inscritos)...</option>
+                    {filteredAthletes.map((a: any) => {
+                      const name = a.athlete_name || a.athleteName || "Atleta";
+                      const phone = a.parent_phone || a.parentPhone || a.additional_data?.phone || "Sem telefone";
+                      return (
+                        <option key={a.id} value={a.id}>
+                          {name} — 📞 {phone}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+              </div>
+            )}
+            {filter === "custom_phone" && (
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Telefone WhatsApp</label>
+                  <input
+                    type="text"
+                    value={customPhone}
+                    onChange={e => setCustomPhone(e.target.value)}
+                    placeholder="Ex: (71) 99914-1491"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Nome do Contato (opcional)</label>
+                  <input
+                    type="text"
+                    value={recipientName}
+                    onChange={e => setRecipientName(e.target.value)}
+                    placeholder="Ex: João da Silva"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 bg-white"
+                  />
+                </div>
+              </div>
             )}
           </div>
 
@@ -341,7 +440,14 @@ export default function WhatsAppBroadcastTab({
 
           <button
             onClick={handleBroadcast}
-            disabled={!message.trim() || sending}
+            disabled={
+              !message.trim() ||
+              sending ||
+              (filter === "by_category" && !categoryId) ||
+              (filter === "by_institution" && !institutionId) ||
+              (filter === "specific_athlete" && !subId) ||
+              (filter === "custom_phone" && !customPhone.trim())
+            }
             className="w-full bg-green-600 text-white py-3 rounded-2xl font-black text-sm hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 shadow-lg shadow-green-600/20"
           >
             {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}

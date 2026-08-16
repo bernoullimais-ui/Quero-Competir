@@ -33,9 +33,12 @@ router.post("/send-test", requireAuth, async (req, res) => {
 router.post("/broadcast", requireAuth, async (req, res) => {
   const {
     tournamentId,
-    filter,          // 'all' | 'confirmed' | 'pending' | 'by_category' | 'by_institution'
+    filter,          // 'all' | 'confirmed' | 'pending' | 'by_category' | 'by_institution' | 'specific_athlete' | 'custom_phone'
     categoryId,
     institutionId,
+    subId,
+    customPhone,
+    recipientName,
     message,
     mediaUrl,
     mediaName,
@@ -58,6 +61,32 @@ router.post("/broadcast", requireAuth, async (req, res) => {
     return res.status(404).json({ error: "Torneio não encontrado" });
   }
 
+  if (filter === "custom_phone") {
+    if (!customPhone) {
+      return res.status(400).json({ error: "Número de telefone não informado." });
+    }
+    const personalizedMessage = message
+      .replace(/\{nome_atleta\}/g, recipientName || "Atleta")
+      .replace(/\{torneio\}/g, tournament.name || "");
+
+    const result = await sendWhatsAppMessage({
+      phone: customPhone,
+      message: personalizedMessage,
+      media: mediaUrl,
+      mediaName,
+      orgId: tournament.organization_id,
+      tournamentId,
+      messageType: "broadcast",
+      athleteName: recipientName || "Contato Avulso",
+      sentBy: "organizer",
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
+    return res.json({ success: true, sent: 1, errors: 0, total: 1 });
+  }
+
   // Monta query de inscrições
   let query = supabase
     .from("athlete_subscriptions")
@@ -72,6 +101,8 @@ router.post("/broadcast", requireAuth, async (req, res) => {
     query = query.eq("category_id", categoryId);
   } else if (filter === "by_institution" && institutionId) {
     query = query.eq("institution_id", institutionId);
+  } else if (filter === "specific_athlete" && subId) {
+    query = query.eq("id", subId);
   }
 
   const { data: subscriptions, error } = await query;
