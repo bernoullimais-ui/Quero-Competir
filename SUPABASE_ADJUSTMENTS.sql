@@ -68,4 +68,19 @@ CREATE POLICY "Public Full Access" ON match_visitors FOR ALL USING (true) WITH C
 ALTER TABLE portal_accounts DROP CONSTRAINT IF EXISTS portal_accounts_role_check;
 ALTER TABLE portal_accounts ADD CONSTRAINT portal_accounts_role_check CHECK (role IN ('super_admin', 'organizer', 'institution', 'guardian', 'venue'));
 
+-- 6. Colunas de dados bancários e recebedor Pagar.me na tabela de organizações
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS bank_holder_name TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS bank_holder_document TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS bank_holder_type TEXT DEFAULT 'individual';
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS bank_code TEXT DEFAULT '341';
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS bank_branch TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS bank_account TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS bank_account_type TEXT DEFAULT 'checking';
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS bank_holder_email TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS bank_holder_phone TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS pagarme_recipient_id TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS pagarme_recipient_status TEXT DEFAULT 'not_configured';
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS platform_fee_percent NUMERIC DEFAULT 10;
+
+
 

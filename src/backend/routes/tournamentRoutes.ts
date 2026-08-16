@@ -185,6 +185,10 @@ router.get("/organization", requireAuth, async (req, res) => {
       orgData.subdomain = orgData.subdomain || "redefluir";
     }
 
+    if (orgData.description && typeof orgData.description === "string" && orgData.description.includes("__FIN_DATA__:")) {
+      orgData.description = orgData.description.split("__FIN_DATA__:")[0].trim();
+    }
+
     res.json(orgData);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -207,6 +211,15 @@ router.put("/organization", requireAuth, async (req, res) => {
       // Fallback
       const { data: existing } = await supabase.from('organizations').select('id').limit(1).maybeSingle();
       orgId = existing?.id || null;
+    }
+
+    if (orgId) {
+      const { data: currentOrg } = await supabase.from('organizations').select('description').eq('id', orgId).maybeSingle();
+      if (currentOrg?.description && typeof currentOrg.description === "string" && currentOrg.description.includes("__FIN_DATA__:")) {
+        const finPart = currentOrg.description.split("__FIN_DATA__:")[1];
+        const userDesc = (payload.description || "").split("__FIN_DATA__:")[0].trim();
+        payload.description = userDesc ? `${userDesc}\n\n__FIN_DATA__:${finPart}` : `__FIN_DATA__:${finPart}`;
+      }
     }
     
     let result;

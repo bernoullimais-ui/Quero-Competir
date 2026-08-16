@@ -37,8 +37,8 @@ function getLocalBankRecord(id: string) {
     return db[id];
   }
   
-  if (id === "org-1" || id === "organizador" || id === "redefluir" || id.includes("fluir")) {
-    return db["organizador"] || db["org-1"] || db["redefluir"] || db["__PRIMARY_ORG__"] || {};
+  if (id === "org-1" || id === "organizador" || id === "redefluir" || id.includes("fluir") || id === "470275a0-cc3c-49f1-b61e-0f19850a6a4e") {
+    return db["470275a0-cc3c-49f1-b61e-0f19850a6a4e"] || db["organizador"] || db["org-1"] || db["redefluir"] || db["__PRIMARY_ORG__"] || {};
   }
   
   const keys = Object.keys(db);
@@ -53,10 +53,11 @@ function getLocalBankRecord(id: string) {
 function saveBankRecord(id: string, record: any) {
   const db = loadBankDataDb();
   db[id] = { ...db[id], ...record };
-  if (id === "org-1" || id === "organizador" || id === "redefluir" || id.includes("fluir")) {
+  if (id === "org-1" || id === "organizador" || id === "redefluir" || id.includes("fluir") || id === "470275a0-cc3c-49f1-b61e-0f19850a6a4e") {
     db["org-1"] = { ...db["org-1"], ...record };
     db["organizador"] = { ...db["organizador"], ...record };
     db["redefluir"] = { ...db["redefluir"], ...record };
+    db["470275a0-cc3c-49f1-b61e-0f19850a6a4e"] = { ...db["470275a0-cc3c-49f1-b61e-0f19850a6a4e"], ...record };
     db["__PRIMARY_ORG__"] = { ...db["__PRIMARY_ORG__"], ...record };
   }
   saveBankDataDb(db);
