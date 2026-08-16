@@ -70,6 +70,7 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
   const [configMode, setConfigMode] = useState<"full_form" | "existing_id">("full_form");
   const [existingRecipientIdInput, setExistingRecipientIdInput] = useState("");
   const [linkingId, setLinkingId] = useState(false);
+  const [forceCreateNew, setForceCreateNew] = useState(false);
 
   // Bank Form State
   const [holderName, setHolderName] = useState("");
@@ -204,7 +205,8 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
           bankAccountDigit,
           bankAccountType,
           holderEmail,
-          holderPhone
+          holderPhone,
+          forceCreateNew
         })
       });
 
@@ -333,7 +335,19 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
         {pagarmeRecipientId && (
           <div className="p-4 bg-slate-100/70 rounded-xl text-xs text-slate-600 flex items-center justify-between font-mono">
             <span>ID do Recebedor Pagar.me: <strong className="text-slate-800">{pagarmeRecipientId}</strong></span>
-            <span className="text-slate-400 font-sans">Split Ativo</span>
+            <div className="flex items-center gap-3 font-sans">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfigMode("existing_id");
+                  setExistingRecipientIdInput("");
+                }}
+                className="px-3 py-1 bg-white hover:bg-slate-200 text-indigo-600 border border-slate-200 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+              >
+                Substituir Recebedor
+              </button>
+              <span className="text-slate-400">Split Ativo</span>
+            </div>
           </div>
         )}
       </div>
@@ -593,6 +607,20 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
                 />
               </div>
+            </div>
+
+            <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl flex items-start gap-3">
+              <input
+                type="checkbox"
+                id="forceCreateNewCheckbox"
+                checked={forceCreateNew}
+                onChange={(e) => setForceCreateNew(e.target.checked)}
+                className="mt-0.5 w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+              />
+              <label htmlFor="forceCreateNewCheckbox" className="text-xs text-slate-700 cursor-pointer select-none">
+                <span className="font-bold text-amber-900 block">Gerar NOVO ID de Recebedor no Pagar.me (Substituir Atual)</span>
+                Marque esta opção se desejar registrar um novo recebedor do zero no Pagar.me, em vez de apenas atualizar a conta bancária do recebedor já existente.
+              </label>
             </div>
 
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between">

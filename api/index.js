@@ -6756,7 +6756,8 @@ router6.post("/organizations/:id/create-recipient", requireAuth, async (req, res
     bankAccountDigit,
     bankAccountType,
     holderEmail,
-    holderPhone
+    holderPhone,
+    forceCreateNew
   } = req.body;
   if (!holderName || !holderDocument || !bankCode || !bankBranch || !bankAccount) {
     return res.status(400).json({ error: "Preencha todos os campos obrigat\xF3rios dos dados banc\xE1rios." });
@@ -6792,7 +6793,7 @@ router6.post("/organizations/:id/create-recipient", requireAuth, async (req, res
       type: bankAccountType === "savings" ? "savings" : "checking"
     };
     if (process.env.PAGARME_SECRET_KEY) {
-      if (existingRecipientId && existingRecipientId.startsWith("re_") && !existingRecipientId.startsWith("re_simulated_")) {
+      if (!forceCreateNew && existingRecipientId && existingRecipientId.startsWith("re_") && !existingRecipientId.startsWith("re_simulated_")) {
         try {
           const pgRecipient = await callPagarMe3(`/recipients/${existingRecipientId}/default-bank-account`, "PATCH", bankAccountPayload);
           recipientId = existingRecipientId;
@@ -6831,7 +6832,7 @@ router6.post("/organizations/:id/create-recipient", requireAuth, async (req, res
       }
     } else {
       console.warn("PAGARME_SECRET_KEY n\xE3o configurada. Simulando cria\xE7\xE3o de recebedor.");
-      recipientId = existingRecipientId || `re_simulated_${Math.random().toString(36).substring(2, 11)}`;
+      recipientId = (forceCreateNew ? null : existingRecipientId) || `re_simulated_${Math.random().toString(36).substring(2, 11)}`;
       recipientStatus = "active";
     }
     const orgIdToUse = org?.id || id;

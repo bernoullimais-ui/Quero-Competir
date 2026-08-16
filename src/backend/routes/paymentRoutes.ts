@@ -264,7 +264,8 @@ router.post("/organizations/:id/create-recipient", requireAuth, async (req, res)
     bankAccountDigit,
     bankAccountType,
     holderEmail,
-    holderPhone
+    holderPhone,
+    forceCreateNew
   } = req.body;
 
   if (!holderName || !holderDocument || !bankCode || !bankBranch || !bankAccount) {
@@ -308,7 +309,7 @@ router.post("/organizations/:id/create-recipient", requireAuth, async (req, res)
     };
 
     if (process.env.PAGARME_SECRET_KEY) {
-      if (existingRecipientId && existingRecipientId.startsWith("re_") && !existingRecipientId.startsWith("re_simulated_")) {
+      if (!forceCreateNew && existingRecipientId && existingRecipientId.startsWith("re_") && !existingRecipientId.startsWith("re_simulated_")) {
         // Tentar atualizar conta bancária do recebedor já existente no Pagar.me
         try {
           const pgRecipient = await callPagarMe(`/recipients/${existingRecipientId}/default-bank-account`, "PATCH", bankAccountPayload);
@@ -330,7 +331,7 @@ router.post("/organizations/:id/create-recipient", requireAuth, async (req, res)
           }
         }
       } else {
-        // Criar novo recebedor no Pagar.me
+        // Criar novo recebedor no Pagar.me (substituição total)
         const recipientPayload = {
           name: holderName,
           email: holderEmail || "financeiro@querocompetir.com.br",
@@ -350,7 +351,7 @@ router.post("/organizations/:id/create-recipient", requireAuth, async (req, res)
       }
     } else {
       console.warn("PAGARME_SECRET_KEY não configurada. Simulando criação de recebedor.");
-      recipientId = existingRecipientId || `re_simulated_${Math.random().toString(36).substring(2, 11)}`;
+      recipientId = (forceCreateNew ? null : existingRecipientId) || `re_simulated_${Math.random().toString(36).substring(2, 11)}`;
       recipientStatus = "active";
     }
 
