@@ -4509,6 +4509,14 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
     // Fluxo Real Integrado ao Pagar.me v5
     const cleanDoc = (sub.document || "00000000000").replace(/\D/g, "");
     const docToUse = cleanDoc.length === 11 || cleanDoc.length === 14 ? cleanDoc : "00000000000";
+    const defaultAddress = {
+      line_1: "Rua Central, 100, Centro",
+      zip_code: "40000000",
+      city: "Salvador",
+      state: "BA",
+      country: "BR"
+    };
+
     const customer = {
       name: parentName || sub.athleteName || "Responsável",
       email: "financeiro@querocompetir.com.br",
@@ -4520,7 +4528,8 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
           area_code: "71",
           number: (parentPhone || "999999999").replace(/\D/g, "").slice(-9)
         }
-      }
+      },
+      address: defaultAddress
     };
 
     const items = [];
@@ -4663,7 +4672,8 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
                   holder_name: String(cardData.holder_name || cardData.name || customer.name),
                   exp_month: Number(cardData.exp_month || cardData.expiry?.split("/")[0] || 1),
                   exp_year: parseYear(cardData.exp_year, cardData.expiry),
-                  cvv: String(cardData.cvv)
+                  cvv: String(cardData.cvv),
+                  billing_address: defaultAddress
                 }
               })
             });
@@ -4691,7 +4701,8 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
           holder_name: String(cardData.holder_name || cardData.name || customer.name),
           exp_month: Number(cardData.exp_month || cardData.expiry?.split("/")[0] || 1),
           exp_year: parseYear(cardData.exp_year, cardData.expiry),
-          cvv: String(cardData.cvv)
+          cvv: String(cardData.cvv),
+          billing_address: defaultAddress
         };
       } else {
         return res.status(400).json({ error: "Dados do cartão incompletos ou tokenização indisponível." });
