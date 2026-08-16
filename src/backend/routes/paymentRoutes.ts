@@ -766,22 +766,40 @@ router.post("/webhook", async (req, res) => {
     console.log("[Pagar.me Webhook Event Received]", event?.type || "Unknown event");
 
     const eventType = event?.type;
-    const charge = event?.data;
-    const orderCode = charge?.code || charge?.order?.code;
+    const data = event?.data;
 
-    if (!orderCode) {
-      return res.json({ received: true, note: "Nenhum código de pedido especificado no webhook." });
+    // Extrair códigos de identificação
+    const orderCode = data?.code || data?.order?.code;
+    const orderId = data?.order?.id || data?.id;
+    const chargeId = data?.charges?.[0]?.id || data?.id;
+
+    if (!orderCode && !orderId && !chargeId) {
+      return res.json({ received: true, note: "Nenhum código ou ID de pedido especificado no webhook." });
     }
 
-    if (eventType === "charge.paid" || eventType === "order.paid") {
-      const supabase = getSupabaseAdmin();
+    const supabase = getSupabaseAdmin();
 
+    if (eventType === "charge.paid" || eventType === "order.paid") {
       // 1. Verificar se é uma inscrição de atleta (athlete_subscriptions)
-      const { data: sub } = await supabase
-        .from("athlete_subscriptions")
-        .select("id, tournament_id, document, athlete_name")
-        .eq("id", orderCode)
-        .maybeSingle();
+      let sub: any = null;
+
+      if (orderCode) {
+        const { data: dbSub } = await supabase
+          .from("athlete_subscriptions")
+          .select("id, tournament_id, document, athlete_name")
+          .eq("id", orderCode)
+          .maybeSingle();
+        sub = dbSub;
+      }
+
+      if (!sub && orderId) {
+        const { data: dbSub } = await supabase
+          .from("athlete_subscriptions")
+          .select("id, tournament_id, document, athlete_name")
+          .filter("additional_data->>pagarmeOrderId", "eq", orderId)
+          .maybeSingle();
+        sub = dbSub;
+      }
 
       if (sub) {
         console.log(`[Pagar.me Webhook] Inscrição de atleta ${sub.id} PAGA com sucesso.`);
@@ -805,14 +823,14 @@ router.post("/webhook", async (req, res) => {
           }
         } catch (_) {}
 
-        return res.json({ received: true, status: "updated_athlete_subscription" });
+        return res.json({ received: true, status: "updated_athlete_subscription", subId: sub.id });
       }
 
       // 2. Verificar se é um pagamento institucional (inst_payments)
       try {
         if (fs.existsSync(INST_PAYMENTS_FILE)) {
           const payments = JSON.parse(fs.readFileSync(INST_PAYMENTS_FILE, "utf-8"));
-          const idx = payments.findIndex((p: any) => p.id === orderCode);
+          const idx = payments.findIndex((p: any) => p.id === orderCode || p.pagarmeOrderId === orderId || p.pagarmeChargeId === chargeId);
           if (idx !== -1) {
             payments[idx].status = "paid";
             payments[idx].paidAt = new Date().toISOString();
@@ -834,8 +852,8 @@ router.post("/webhook", async (req, res) => {
                 .eq("id", reg.id);
             }
 
-            console.log(`[Pagar.me Webhook] Pagamento de instituição ${orderCode} PAGO com sucesso.`);
-            return res.json({ received: true, status: "updated_institution_payment" });
+            console.log(`[Pagar.me Webhook] Pagamento de instituição ${pay.id} PAGO com sucesso.`);
+            return res.json({ received: true, status: "updated_institution_payment", payId: pay.id });
           }
         }
       } catch (err: any) {

@@ -7050,14 +7050,24 @@ router6.post("/webhook", async (req, res) => {
     const event = req.body;
     console.log("[Pagar.me Webhook Event Received]", event?.type || "Unknown event");
     const eventType = event?.type;
-    const charge = event?.data;
-    const orderCode = charge?.code || charge?.order?.code;
-    if (!orderCode) {
-      return res.json({ received: true, note: "Nenhum c\xF3digo de pedido especificado no webhook." });
+    const data = event?.data;
+    const orderCode = data?.code || data?.order?.code;
+    const orderId = data?.order?.id || data?.id;
+    const chargeId = data?.charges?.[0]?.id || data?.id;
+    if (!orderCode && !orderId && !chargeId) {
+      return res.json({ received: true, note: "Nenhum c\xF3digo ou ID de pedido especificado no webhook." });
     }
+    const supabase = getSupabaseAdmin();
     if (eventType === "charge.paid" || eventType === "order.paid") {
-      const supabase = getSupabaseAdmin();
-      const { data: sub } = await supabase.from("athlete_subscriptions").select("id, tournament_id, document, athlete_name").eq("id", orderCode).maybeSingle();
+      let sub = null;
+      if (orderCode) {
+        const { data: dbSub } = await supabase.from("athlete_subscriptions").select("id, tournament_id, document, athlete_name").eq("id", orderCode).maybeSingle();
+        sub = dbSub;
+      }
+      if (!sub && orderId) {
+        const { data: dbSub } = await supabase.from("athlete_subscriptions").select("id, tournament_id, document, athlete_name").filter("additional_data->>pagarmeOrderId", "eq", orderId).maybeSingle();
+        sub = dbSub;
+      }
       if (sub) {
         console.log(`[Pagar.me Webhook] Inscri\xE7\xE3o de atleta ${sub.id} PAGA com sucesso.`);
         await supabase.from("athlete_subscriptions").update({ payment_status: "paid" }).eq("id", sub.id);
@@ -7074,12 +7084,12 @@ router6.post("/webhook", async (req, res) => {
           }
         } catch (_) {
         }
-        return res.json({ received: true, status: "updated_athlete_subscription" });
+        return res.json({ received: true, status: "updated_athlete_subscription", subId: sub.id });
       }
       try {
         if (fs5.existsSync(INST_PAYMENTS_FILE2)) {
           const payments = JSON.parse(fs5.readFileSync(INST_PAYMENTS_FILE2, "utf-8"));
-          const idx = payments.findIndex((p) => p.id === orderCode);
+          const idx = payments.findIndex((p) => p.id === orderCode || p.pagarmeOrderId === orderId || p.pagarmeChargeId === chargeId);
           if (idx !== -1) {
             payments[idx].status = "paid";
             payments[idx].paidAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -7089,8 +7099,8 @@ router6.post("/webhook", async (req, res) => {
             if (reg) {
               await supabase.from("tournament_registrations").update({ status: "confirmed" }).eq("id", reg.id);
             }
-            console.log(`[Pagar.me Webhook] Pagamento de institui\xE7\xE3o ${orderCode} PAGO com sucesso.`);
-            return res.json({ received: true, status: "updated_institution_payment" });
+            console.log(`[Pagar.me Webhook] Pagamento de institui\xE7\xE3o ${pay.id} PAGO com sucesso.`);
+            return res.json({ received: true, status: "updated_institution_payment", payId: pay.id });
           }
         }
       } catch (err) {
