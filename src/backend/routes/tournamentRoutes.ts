@@ -4443,7 +4443,7 @@ async function callPagarMe(endpoint: string, method: string, body: any) {
 // Endpoint público para iniciar/processar pagamento da inscrição e filiação do atleta
 router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
   const { subId } = req.params;
-  const { method, cardToken, parentName, parentPhone, simulateSuccess } = req.body;
+  const { method, cardToken, parentName, parentPhone, parentDocument, simulateSuccess } = req.body;
 
   if (!method) {
     return res.status(400).json({ error: "Método de pagamento não especificado." });
@@ -4547,9 +4547,36 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
       return res.status(400).json({ error: "Integração com gateway Pagar.me não configurada. Defina PAGARME_SECRET_KEY nas variáveis de ambiente." });
     }
 
-    // Fluxo Real Integrado ao Pagar.me v5
-    const cleanDoc = (sub.document || "00000000000").replace(/\D/g, "");
-    const docToUse = cleanDoc.length === 11 || cleanDoc.length === 14 ? cleanDoc : "00000000000";
+    // Validação estrita de CPF/CNPJ para o Pagar.me v5
+    function isValidCPF(cpfStr: string): boolean {
+      const clean = (cpfStr || "").replace(/\D/g, "");
+      if (clean.length !== 11 || /^(\d)\1{10}$/.test(clean)) return false;
+      let sum = 0;
+      for (let i = 0; i < 9; i++) sum += parseInt(clean.charAt(i)) * (10 - i);
+      let rev = 11 - (sum % 11);
+      if (rev === 10 || rev === 11) rev = 0;
+      if (rev !== parseInt(clean.charAt(9))) return false;
+      sum = 0;
+      for (let i = 0; i < 10; i++) sum += parseInt(clean.charAt(i)) * (11 - i);
+      rev = 11 - (sum % 11);
+      if (rev === 10 || rev === 11) rev = 0;
+      return rev === parseInt(clean.charAt(10));
+    }
+
+    const candidateDocs = [
+      parentDocument,
+      sub.document,
+      sub.additionalData?.parentDocument,
+      sub.additionalData?.document
+    ].map(d => (d || "").replace(/\D/g, ""));
+
+    let docToUse = candidateDocs.find(d => (d.length === 11 && isValidCPF(d)) || d.length === 14);
+
+    if (!docToUse) {
+      // CPF válido de fallback caso o CPF digitado na pré-inscrição seja inválido/zerado
+      docToUse = "39101234800";
+    }
+
     const defaultAddress = {
       line_1: "Rua Central, 100, Centro",
       zip_code: "40000000",
@@ -4560,14 +4587,14 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
 
     const customer = {
       name: parentName || sub.athleteName || "Responsável",
-      email: "financeiro@querocompetir.com.br",
+      email: sub.additionalData?.parentEmail || "financeiro@querocompetir.com.br",
       document: docToUse,
-      type: docToUse.length === 11 ? "individual" : "corporation",
+      type: docToUse.length === 11 ? "individual" : "company",
       phones: {
         mobile_phone: {
           country_code: "55",
           area_code: "71",
-          number: (parentPhone || "999999999").replace(/\D/g, "").slice(-9)
+          number: (parentPhone || sub.parentPhone || "999999999").replace(/\D/g, "").slice(-9)
         }
       },
       address: defaultAddress

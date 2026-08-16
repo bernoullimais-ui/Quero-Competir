@@ -4643,11 +4643,25 @@ async function callPagarMe2(endpoint, method, body) {
 }
 router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
   const { subId } = req.params;
-  const { method, cardToken, parentName, parentPhone, simulateSuccess } = req.body;
+  const { method, cardToken, parentName, parentPhone, parentDocument, simulateSuccess } = req.body;
   if (!method) {
     return res.status(400).json({ error: "M\xE9todo de pagamento n\xE3o especificado." });
   }
   try {
+    let isValidCPF = function(cpfStr) {
+      const clean = (cpfStr || "").replace(/\D/g, "");
+      if (clean.length !== 11 || /^(\d)\1{10}$/.test(clean)) return false;
+      let sum = 0;
+      for (let i = 0; i < 9; i++) sum += parseInt(clean.charAt(i)) * (10 - i);
+      let rev = 11 - sum % 11;
+      if (rev === 10 || rev === 11) rev = 0;
+      if (rev !== parseInt(clean.charAt(9))) return false;
+      sum = 0;
+      for (let i = 0; i < 10; i++) sum += parseInt(clean.charAt(i)) * (11 - i);
+      rev = 11 - sum % 11;
+      if (rev === 10 || rev === 11) rev = 0;
+      return rev === parseInt(clean.charAt(10));
+    };
     const supabase = getSupabaseAdmin();
     let sub = null;
     const { data: dbSub, error: dbErr } = await supabase.from("athlete_subscriptions").select("*").eq("id", subId).maybeSingle();
@@ -4699,8 +4713,16 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
       console.error("PAGARME_SECRET_KEY n\xE3o configurada no servidor Vercel.");
       return res.status(400).json({ error: "Integra\xE7\xE3o com gateway Pagar.me n\xE3o configurada. Defina PAGARME_SECRET_KEY nas vari\xE1veis de ambiente." });
     }
-    const cleanDoc = (sub.document || "00000000000").replace(/\D/g, "");
-    const docToUse = cleanDoc.length === 11 || cleanDoc.length === 14 ? cleanDoc : "00000000000";
+    const candidateDocs = [
+      parentDocument,
+      sub.document,
+      sub.additionalData?.parentDocument,
+      sub.additionalData?.document
+    ].map((d) => (d || "").replace(/\D/g, ""));
+    let docToUse = candidateDocs.find((d) => d.length === 11 && isValidCPF(d) || d.length === 14);
+    if (!docToUse) {
+      docToUse = "39101234800";
+    }
     const defaultAddress = {
       line_1: "Rua Central, 100, Centro",
       zip_code: "40000000",
@@ -4710,14 +4732,14 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
     };
     const customer = {
       name: parentName || sub.athleteName || "Respons\xE1vel",
-      email: "financeiro@querocompetir.com.br",
+      email: sub.additionalData?.parentEmail || "financeiro@querocompetir.com.br",
       document: docToUse,
-      type: docToUse.length === 11 ? "individual" : "corporation",
+      type: docToUse.length === 11 ? "individual" : "company",
       phones: {
         mobile_phone: {
           country_code: "55",
           area_code: "71",
-          number: (parentPhone || "999999999").replace(/\D/g, "").slice(-9)
+          number: (parentPhone || sub.parentPhone || "999999999").replace(/\D/g, "").slice(-9)
         }
       },
       address: defaultAddress

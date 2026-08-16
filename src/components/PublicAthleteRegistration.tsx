@@ -1287,6 +1287,32 @@ export default function PublicAthleteRegistration() {
                       </p>
                     </div>
 
+                    {/* Cartão de Identificação do Atleta e Responsável */}
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2 mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-indigo-600 tracking-wider">Identificação da Inscrição</span>
+                        <span className="text-[10px] font-bold text-slate-400">Protocolo: {subId?.slice(0, 8).toUpperCase()}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase">Atleta / Participante</span>
+                          <span className="font-extrabold text-slate-800">{data?.subscription?.athleteName || athleteName || "Atleta"}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase">Responsável</span>
+                          <span className="font-extrabold text-slate-800">{data?.subscription?.parentName || parentName || "Responsável"}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase">Clube / Entidade</span>
+                          <span className="font-bold text-slate-700">{institution?.name || "Independente"}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-bold text-slate-400 uppercase">Torneio</span>
+                          <span className="font-bold text-slate-700">{tournament?.name || "Torneio"}</span>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Pricing Display */}
                     <div className="bg-indigo-50/50 rounded-2xl p-5 border border-indigo-100 mb-6 space-y-4">
                       {athleteFee > 0 && (
