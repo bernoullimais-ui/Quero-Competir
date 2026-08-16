@@ -50,6 +50,64 @@ const getLaneOrder = (numLanes: number): number[] => {
   }
 };
 
+const getDynamicTabLabel = (categories: any[], tournament: any): string => {
+  let hasColetivo = false;
+  let hasNatacao = false;
+  let hasLutas = false;
+
+  const tourName = (tournament?.name || "").toLowerCase();
+  if (tourName.includes("natação") || tourName.includes("natacao")) hasNatacao = true;
+  if (
+    tourName.includes("judô") ||
+    tourName.includes("judo") ||
+    tourName.includes("jiu") ||
+    tourName.includes("karate") ||
+    tourName.includes("luta")
+  ) hasLutas = true;
+
+  if (categories && categories.length > 0) {
+    categories.forEach((cat) => {
+      const st = cat.rules_config?.sport_type;
+      const catName = (cat.name || "").toLowerCase();
+
+      if (
+        st === "swimming" ||
+        catName.includes("natação") ||
+        catName.includes("natacao") ||
+        catName.includes("swim")
+      ) {
+        hasNatacao = true;
+      } else if (
+        st === "combat" ||
+        catName.includes("judô") ||
+        catName.includes("judo") ||
+        catName.includes("jiu") ||
+        catName.includes("karate") ||
+        catName.includes("karatê") ||
+        catName.includes("luta") ||
+        catName.includes("taekwondo")
+      ) {
+        hasLutas = true;
+      } else {
+        hasColetivo = true;
+      }
+    });
+  } else {
+    const st = tournament?.sport_type || "";
+    if (st === "swimming") hasNatacao = true;
+    else if (st === "combat") hasLutas = true;
+    else hasColetivo = true;
+  }
+
+  const parts: string[] = [];
+  if (hasColetivo) parts.push("Tabela");
+  if (hasNatacao) parts.push("Balizamento");
+  if (hasLutas) parts.push("Chaves");
+
+  if (parts.length === 0) return "Tabela/Balizamento/Chaves";
+  return parts.join("/");
+};
+
 const handlePrintAllSumulas = (displayCats: any[], athleteSubs: any[], tournament: any) => {
   const printWindow = window.open("", "_blank");
   if (!printWindow) return;
@@ -328,7 +386,7 @@ export default function PublicTournamentView() {
                 activeTab === "tabela" ? "bg-white text-indigo-700 shadow-sm" : "text-indigo-100 hover:text-white hover:bg-white/10"
               }`}
             >
-              <LayoutGrid size={16} /> Tabela/Chave/Balizamento
+              <LayoutGrid size={16} /> {getDynamicTabLabel(categories, tournament)}
             </button>
             <button
               onClick={() => setActiveTab("classificacao")}
@@ -371,8 +429,8 @@ export default function PublicTournamentView() {
               <>
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 bg-white rounded-3xl border border-slate-200 shadow-sm">
                   <div>
-                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Tabela & Balizamento do Torneio</h2>
-                    <p className="text-slate-500 text-sm font-medium">Selecione a prova ou veja a ordem geral de balizamento.</p>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">{getDynamicTabLabel(categories, tournament)} do Torneio</h2>
+                    <p className="text-slate-500 text-sm font-medium">Selecione a modalidade ou veja a programação completa.</p>
                   </div>
                   
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
