@@ -948,13 +948,13 @@ function buildSplitRules(totalCents, organizerRecipientId, platformFeePercent = 
       amount: organizerCents,
       recipient_id: organizerRecipientId,
       type: "flat",
-      options: { charge_processing_fee: false, liable: false }
+      options: { charge_processing_fee: false, charge_remainder_fee: false, liable: false }
     },
     {
       amount: platformCents,
       recipient_id: platformRecipientId,
       type: "flat",
-      options: { charge_processing_fee: true, liable: true }
+      options: { charge_processing_fee: true, charge_remainder_fee: true, liable: true }
     }
   ];
 }
@@ -1081,12 +1081,21 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
           throw pgErr;
         }
       }
-      const charge = pgOrder.charges?.[0];
-      const transaction = charge?.last_transaction || charge?.transactions?.[0];
+      let charge = pgOrder.charges?.[0];
+      let transaction = charge?.last_transaction || charge?.transactions?.[0];
+      if ((charge?.status === "failed" || !transaction?.qr_code) && splitRules && orderPayload.payments[0].split) {
+        const gwErr = charge?.last_transaction?.gateway_response?.errors?.[0]?.message || charge?.status || "failed";
+        console.warn("[Pagar.me Institution Pix Charge Failed] Tentando criar cobran\xE7a Pix sem split. Erro gateway:", gwErr);
+        delete orderPayload.payments[0].split;
+        pgOrder = await callPagarMe("/orders", "POST", orderPayload);
+        charge = pgOrder.charges?.[0];
+        transaction = charge?.last_transaction || charge?.transactions?.[0];
+      }
       const qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || pgOrder?.qr_code || "";
       const qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || (qrCode ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}` : "");
       if (!qrCode) {
-        return res.status(400).json({ error: "O gateway Pagar.me n\xE3o retornou a chave Pix para esta transa\xE7\xE3o." });
+        const errMsg = charge?.last_transaction?.gateway_response?.errors?.[0]?.message || "O gateway Pagar.me n\xE3o retornou a chave Pix para esta transa\xE7\xE3o.";
+        return res.status(400).json({ error: errMsg });
       }
       payments[payIndex].pagarmeOrderId = pgOrder.id;
       payments[payIndex].pagarmeChargeId = charge?.id;
@@ -4299,13 +4308,13 @@ function buildSplitRules2(totalCents, organizerRecipientId, platformFeePercent =
       amount: organizerCents,
       recipient_id: organizerRecipientId,
       type: "flat",
-      options: { charge_processing_fee: false, liable: false }
+      options: { charge_processing_fee: false, charge_remainder_fee: false, liable: false }
     },
     {
       amount: platformCents,
       recipient_id: platformRecipientId,
       type: "flat",
-      options: { charge_processing_fee: true, liable: true }
+      options: { charge_processing_fee: true, charge_remainder_fee: true, liable: true }
     }
   ];
 }
@@ -4460,12 +4469,21 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
           throw pgErr;
         }
       }
-      const charge = pgOrder.charges?.[0];
-      const transaction = charge?.last_transaction || charge?.transactions?.[0];
+      let charge = pgOrder.charges?.[0];
+      let transaction = charge?.last_transaction || charge?.transactions?.[0];
+      if ((charge?.status === "failed" || !transaction?.qr_code) && splitRules && orderPayload.payments[0].split) {
+        const gwErr = charge?.last_transaction?.gateway_response?.errors?.[0]?.message || charge?.status || "failed";
+        console.warn("[Pagar.me Pix Charge Failed] Tentando criar cobran\xE7a Pix sem split. Erro gateway:", gwErr);
+        delete orderPayload.payments[0].split;
+        pgOrder = await callPagarMe2("/orders", "POST", orderPayload);
+        charge = pgOrder.charges?.[0];
+        transaction = charge?.last_transaction || charge?.transactions?.[0];
+      }
       const qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || pgOrder?.qr_code || "";
       const qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || (qrCode ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}` : "");
       if (!qrCode) {
-        return res.status(400).json({ error: "O gateway Pagar.me n\xE3o retornou a chave Pix para esta transa\xE7\xE3o." });
+        const errMsg = charge?.last_transaction?.gateway_response?.errors?.[0]?.message || "O gateway Pagar.me n\xE3o retornou a chave Pix para esta transa\xE7\xE3o.";
+        return res.status(400).json({ error: errMsg });
       }
       const currentAdditional = sub.additionalData || {};
       const updatedAdditional = {
