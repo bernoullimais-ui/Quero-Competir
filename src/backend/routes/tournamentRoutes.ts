@@ -4331,7 +4331,8 @@ function buildSplitRules(
 
 // Helper function to call Pagar.me API v5
 async function callPagarMe(endpoint: string, method: string, body: any) {
-  const secretKey = process.env.PAGARME_SECRET_KEY;
+  const rawKey = process.env.PAGARME_SECRET_KEY || "";
+  const secretKey = rawKey.replace(/[\s\u2028\u2029]+/g, "").trim();
   if (!secretKey) {
     throw new Error("PAGARME_SECRET_KEY não configurada no arquivo de ambiente.");
   }
@@ -4349,8 +4350,8 @@ async function callPagarMe(endpoint: string, method: string, body: any) {
   
   const data = await response.json();
   if (!response.ok) {
-    console.error("Pagar.me API Error details:", data);
-    throw new Error(data.message || "Erro retornado pela API do Pagar.me");
+    const detailMsg = data?.message || (data?.errors ? JSON.stringify(data.errors) : JSON.stringify(data));
+    throw new Error(detailMsg);
   }
   return data;
 }

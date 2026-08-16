@@ -995,7 +995,8 @@ function buildSplitRules(totalCents, organizerRecipientId, platformFeePercent = 
   ];
 }
 async function callPagarMe(endpoint, method, body) {
-  const secretKey = process.env.PAGARME_SECRET_KEY;
+  const rawKey = process.env.PAGARME_SECRET_KEY || "";
+  const secretKey = rawKey.replace(/[\s\u2028\u2029]+/g, "").trim();
   if (!secretKey) {
     throw new Error("PAGARME_SECRET_KEY n\xE3o configurada no arquivo de ambiente.");
   }
@@ -1011,8 +1012,8 @@ async function callPagarMe(endpoint, method, body) {
   });
   const data = await response.json();
   if (!response.ok) {
-    console.error("Pagar.me API Error details:", data);
-    throw new Error(data.message || "Erro retornado pela API do Pagar.me");
+    const detailMsg = data?.message || (data?.errors ? JSON.stringify(data.errors) : JSON.stringify(data));
+    throw new Error(detailMsg);
   }
   return data;
 }
@@ -4335,7 +4336,8 @@ function buildSplitRules2(totalCents, organizerRecipientId, platformFeePercent =
   ];
 }
 async function callPagarMe2(endpoint, method, body) {
-  const secretKey = process.env.PAGARME_SECRET_KEY;
+  const rawKey = process.env.PAGARME_SECRET_KEY || "";
+  const secretKey = rawKey.replace(/[\s\u2028\u2029]+/g, "").trim();
   if (!secretKey) {
     throw new Error("PAGARME_SECRET_KEY n\xE3o configurada no arquivo de ambiente.");
   }
@@ -4351,8 +4353,8 @@ async function callPagarMe2(endpoint, method, body) {
   });
   const data = await response.json();
   if (!response.ok) {
-    console.error("Pagar.me API Error details:", data);
-    throw new Error(data.message || "Erro retornado pela API do Pagar.me");
+    const detailMsg = data?.message || (data?.errors ? JSON.stringify(data.errors) : JSON.stringify(data));
+    throw new Error(detailMsg);
   }
   return data;
 }
@@ -6494,7 +6496,8 @@ function embedFinDataInDescription(currentDescription, finDataPatch) {
 ${encoded}` : encoded;
 }
 async function callPagarMe3(endpoint, method, body) {
-  const secretKey = process.env.PAGARME_SECRET_KEY;
+  const rawKey = process.env.PAGARME_SECRET_KEY || "";
+  const secretKey = rawKey.replace(/[\s\u2028\u2029]+/g, "").trim();
   if (!secretKey) {
     throw new Error("PAGARME_SECRET_KEY n\xE3o configurada no servidor.");
   }
@@ -6510,8 +6513,8 @@ async function callPagarMe3(endpoint, method, body) {
   });
   const data = await response.json();
   if (!response.ok) {
-    console.error("[Pagar.me Error]", data);
-    throw new Error(data.message || (data.errors ? JSON.stringify(data.errors) : "Erro na API do Pagar.me"));
+    const detailMsg = data?.message || (data?.errors ? JSON.stringify(data.errors) : JSON.stringify(data));
+    throw new Error(detailMsg);
   }
   return data;
 }
