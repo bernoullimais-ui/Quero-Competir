@@ -297,9 +297,11 @@ router.post("/organizations/:id/create-recipient", requireAuth, async (req, res)
     let recipientId: string | null = null;
     let recipientStatus = "active";
 
+    const holderTypeForPagarMe = (holderType === "corporation" || holderType === "company" || cleanDoc.length > 11) ? "company" : "individual";
+
     const bankAccountPayload = {
       holder_name: holderName,
-      holder_type: cleanDoc.length === 11 ? "individual" : "corporation",
+      holder_type: holderTypeForPagarMe,
       holder_document: cleanDoc,
       bank: bankCode,
       branch_number: cleanBranch,
@@ -336,7 +338,7 @@ router.post("/organizations/:id/create-recipient", requireAuth, async (req, res)
           name: holderName,
           email: holderEmail || "financeiro@querocompetir.com.br",
           document: cleanDoc,
-          type: cleanDoc.length === 11 ? "individual" : "corporation",
+          type: holderTypeForPagarMe,
           default_bank_account: bankAccountPayload,
           transfer_settings: {
             transfer_enabled: true,
