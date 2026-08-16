@@ -126,7 +126,13 @@ export default function PublicPaymentPage() {
         if (data.paid) {
           setSuccess(true);
         } else if (activeTab === "pix") {
-          setPixData({ qrCode: data.qrCode, qrCodeUrl: data.qrCodeUrl });
+          const code = data.qrCode || "";
+          const url = data.qrCodeUrl || (code ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(code)}` : "");
+          if (code) {
+            setPixData({ qrCode: code, qrCodeUrl: url });
+          } else {
+            setPayError("Não foi possível obter a chave Pix. Tente novamente.");
+          }
         } else if (activeTab === "boleto") {
           setBoletoData({ barcode: data.barcode, pdfUrl: data.pdfUrl });
         }

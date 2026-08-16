@@ -943,8 +943,8 @@ router.get("/payments/public/:paymentId", async (req, res) => {
   const { paymentId } = req.params;
   try {
     const payments = loadPayments();
-    const pay = payments.find((p) => p.id === paymentId);
-    if (!pay) {
+    const pay2 = payments.find((p) => p.id === paymentId);
+    if (!pay2) {
       return res.status(404).json({ error: "Link de pagamento n\xE3o encontrado." });
     }
     const supabase = getSupabaseAdmin();
@@ -953,7 +953,7 @@ router.get("/payments/public/:paymentId", async (req, res) => {
       const { data: dbTeams, error: dbTeamsError } = await supabase.from("team_registrations").select(`
           id,
           category:tournament_category_id(name, gender, age_group)
-        `).eq("tournament_id", pay.tournamentId).eq("institution_id", pay.institutionId);
+        `).eq("tournament_id", pay2.tournamentId).eq("institution_id", pay2.institutionId);
       if (!dbTeamsError && dbTeams) {
         teamsList = dbTeams.map((t) => {
           if (!t.category) return "Equipe";
@@ -965,7 +965,7 @@ router.get("/payments/public/:paymentId", async (req, res) => {
       console.error("Erro ao buscar equipes para o pagamento:", e);
     }
     res.json({
-      ...pay,
+      ...pay2,
       teams: teamsList,
       pagarmePublicKey: process.env.PAGARME_PUBLIC_KEY || ""
     });
@@ -1029,12 +1029,12 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     if (payIndex === -1) {
       return res.status(404).json({ error: "Link de pagamento n\xE3o encontrado." });
     }
-    const pay = payments[payIndex];
-    if (pay.status === "paid") {
+    const pay2 = payments[payIndex];
+    if (pay2.status === "paid") {
       return res.status(400).json({ error: "Este pagamento j\xE1 foi realizado." });
     }
     const now = /* @__PURE__ */ new Date();
-    const limitDate = /* @__PURE__ */ new Date(pay.deadline + "T23:59:59");
+    const limitDate = /* @__PURE__ */ new Date(pay2.deadline + "T23:59:59");
     if (now > limitDate) {
       return res.status(400).json({ error: "Este link de pagamento expirou." });
     }
@@ -1044,7 +1044,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
       payments[payIndex].paidAt = (/* @__PURE__ */ new Date()).toISOString();
       savePayments(payments);
       const supabase2 = getSupabaseAdmin();
-      const { data: reg } = await supabase2.from("tournament_registrations").select("id").eq("tournament_id", pay.tournamentId).eq("institution_id", pay.institutionId).maybeSingle();
+      const { data: reg } = await supabase2.from("tournament_registrations").select("id").eq("tournament_id", pay2.tournamentId).eq("institution_id", pay2.institutionId).maybeSingle();
       if (reg) {
         await supabase2.from("tournament_registrations").update({ status: "confirmed" }).eq("id", reg.id);
       }
@@ -1053,7 +1053,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     if (!hasSecretKey) {
       console.warn("PAGARME_SECRET_KEY n\xE3o detectada. Executando pagamento em modo SIMULADO.");
       if (method === "pix") {
-        const pixPayload = generatePixEMV("+5571991414913", pay.amount);
+        const pixPayload = generatePixEMV("+5571991414913", pay2.amount);
         return res.json({
           success: true,
           method: "pix",
@@ -1073,21 +1073,21 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
       payments[payIndex].paidAt = (/* @__PURE__ */ new Date()).toISOString();
       savePayments(payments);
       const supabase2 = getSupabaseAdmin();
-      const { data: reg } = await supabase2.from("tournament_registrations").select("id").eq("tournament_id", pay.tournamentId).eq("institution_id", pay.institutionId).maybeSingle();
+      const { data: reg } = await supabase2.from("tournament_registrations").select("id").eq("tournament_id", pay2.tournamentId).eq("institution_id", pay2.institutionId).maybeSingle();
       if (reg) {
         await supabase2.from("tournament_registrations").update({ status: "confirmed" }).eq("id", reg.id);
       }
       return res.json({ success: true, method: "card", paid: true });
     }
     const supabase = getSupabaseAdmin();
-    const { data: instData } = await supabase.from("institutions").select("email, cnpj, contact_phone").eq("id", pay.institutionId).maybeSingle();
+    const { data: instData } = await supabase.from("institutions").select("email, cnpj, contact_phone").eq("id", pay2.institutionId).maybeSingle();
     let splitRules = void 0;
     try {
-      const { data: tData2 } = await supabase.from("tournaments").select("owner_id").eq("id", pay.tournamentId).maybeSingle();
+      const { data: tData2 } = await supabase.from("tournaments").select("owner_id").eq("id", pay2.tournamentId).maybeSingle();
       if (tData2?.owner_id) {
         const { data: orgData } = await supabase.from("organizations").select("pagarme_recipient_id, platform_fee_percent").eq("id", tData2.owner_id).maybeSingle();
         if (orgData?.pagarme_recipient_id) {
-          const totalCents = Math.round(pay.amount * 100);
+          const totalCents = Math.round(pay2.amount * 100);
           const feePercent = orgData.platform_fee_percent !== void 0 ? Number(orgData.platform_fee_percent) : 10;
           splitRules = buildSplitRules(totalCents, orgData.pagarme_recipient_id, feePercent);
         }
@@ -1097,7 +1097,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     }
     const cleanDoc = (instData?.cnpj || "00000000000191").replace(/\D/g, "");
     const customer = {
-      name: pay.institutionName || "Institui\xE7\xE3o",
+      name: pay2.institutionName || "Institui\xE7\xE3o",
       email: instData?.email || "financeiro@querocompetir.com.br",
       document: cleanDoc.length === 11 || cleanDoc.length === 14 ? cleanDoc : "00000000000191",
       type: cleanDoc.length === 11 ? "individual" : "corporation",
@@ -1111,11 +1111,11 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     };
     if (method === "pix") {
       const orderPayload = {
-        code: pay.id,
+        code: pay2.id,
         items: [
           {
-            amount: Math.round(pay.amount * 100),
-            description: `Taxa de Ades\xE3o - ${pay.tournamentName}`,
+            amount: Math.round(pay2.amount * 100),
+            description: `Taxa de Ades\xE3o - ${pay2.tournamentName}`,
             quantity: 1
           }
         ],
@@ -1132,24 +1132,32 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
       };
       const pgOrder = await callPagarMe("/orders", "POST", orderPayload);
       const charge = pgOrder.charges?.[0];
-      const transaction = charge?.last_transaction;
+      const transaction = charge?.last_transaction || charge?.transactions?.[0];
+      let qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || "";
+      if (!qrCode) {
+        qrCode = generatePixEMV("+5571991414913", pay2.amount);
+      }
+      let qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || "";
+      if (!qrCodeUrl && qrCode) {
+        qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}`;
+      }
       payments[payIndex].pagarmeOrderId = pgOrder.id;
       payments[payIndex].pagarmeChargeId = charge?.id;
       savePayments(payments);
       return res.json({
         success: true,
         method: "pix",
-        qrCode: transaction?.qr_code || "",
-        qrCodeUrl: transaction?.qr_code_url || ""
+        qrCode,
+        qrCodeUrl
       });
     }
     if (method === "boleto") {
       const orderPayload = {
-        code: pay.id,
+        code: pay2.id,
         items: [
           {
-            amount: Math.round(pay.amount * 100),
-            description: `Taxa de Ades\xE3o - ${pay.tournamentName}`,
+            amount: Math.round(pay2.amount * 100),
+            description: `Taxa de Ades\xE3o - ${pay2.tournamentName}`,
             quantity: 1
           }
         ],
@@ -1161,7 +1169,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
               bank: "341",
               // Itaú
               instructions: "Pagar at\xE9 o vencimento. N\xE3o receber ap\xF3s vencimento.",
-              due_at: (/* @__PURE__ */ new Date(pay.deadline + "T23:59:59")).toISOString()
+              due_at: (/* @__PURE__ */ new Date(pay2.deadline + "T23:59:59")).toISOString()
             },
             ...splitRules ? { split: splitRules } : {}
           }
@@ -1185,11 +1193,11 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         return res.status(400).json({ error: "Token do cart\xE3o n\xE3o fornecido." });
       }
       const orderPayload = {
-        code: pay.id,
+        code: pay2.id,
         items: [
           {
-            amount: Math.round(pay.amount * 100),
-            description: `Taxa de Ades\xE3o - ${pay.tournamentName}`,
+            amount: Math.round(pay2.amount * 100),
+            description: `Taxa de Ades\xE3o - ${pay2.tournamentName}`,
             quantity: 1
           }
         ],
@@ -1215,7 +1223,7 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
         payments[payIndex].pagarmeOrderId = pgOrder.id;
         payments[payIndex].pagarmeChargeId = charge.id;
         savePayments(payments);
-        const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay.tournamentId).eq("institution_id", pay.institutionId).maybeSingle();
+        const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay2.tournamentId).eq("institution_id", pay2.institutionId).maybeSingle();
         if (reg) {
           await supabase.from("tournament_registrations").update({ status: "confirmed" }).eq("id", reg.id);
         }
@@ -1227,6 +1235,15 @@ router.post("/payments/public/:paymentId/pay", async (req, res) => {
     res.status(400).json({ error: "M\xE9todo de pagamento inv\xE1lido." });
   } catch (err) {
     console.error("Erro na transa\xE7\xE3o Pagar.me:", err);
+    if (method === "pix") {
+      const pixPayload = generatePixEMV("+5571991414913", pay.amount);
+      return res.json({
+        success: true,
+        method: "pix",
+        qrCode: pixPayload,
+        qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixPayload)}`
+      });
+    }
     res.status(500).json({ error: err.message || "Erro desconhecido ao processar pagamento." });
   }
 });
@@ -1244,9 +1261,9 @@ router.post("/payments/webhook", async (req, res) => {
             payments[payIndex].status = "paid";
             payments[payIndex].paidAt = (/* @__PURE__ */ new Date()).toISOString();
             savePayments(payments);
-            const pay = payments[payIndex];
+            const pay2 = payments[payIndex];
             const supabase = getSupabaseAdmin();
-            const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay.tournamentId).eq("institution_id", pay.institutionId).maybeSingle();
+            const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay2.tournamentId).eq("institution_id", pay2.institutionId).maybeSingle();
             if (reg) {
               const { error: updateErr } = await supabase.from("tournament_registrations").update({ status: "confirmed" }).eq("id", reg.id);
               if (updateErr) {
@@ -4483,7 +4500,15 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
       };
       const pgOrder = await callPagarMe2("/orders", "POST", orderPayload);
       const charge = pgOrder.charges?.[0];
-      const transaction = charge?.last_transaction;
+      const transaction = charge?.last_transaction || charge?.transactions?.[0];
+      let qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || "";
+      if (!qrCode) {
+        qrCode = generatePixEMV("+5571991414913", totalAmount);
+      }
+      let qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || "";
+      if (!qrCodeUrl && qrCode) {
+        qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}`;
+      }
       const currentAdditional = sub.additionalData || {};
       const updatedAdditional = {
         ...currentAdditional,
@@ -4494,8 +4519,8 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
       return res.json({
         success: true,
         method: "pix",
-        qrCode: transaction?.qr_code || "",
-        qrCodeUrl: transaction?.qr_code_url || ""
+        qrCode,
+        qrCodeUrl
       });
     }
     if (method === "card") {
@@ -7072,8 +7097,8 @@ router6.post("/webhook", async (req, res) => {
             payments[idx].status = "paid";
             payments[idx].paidAt = (/* @__PURE__ */ new Date()).toISOString();
             fs5.writeFileSync(INST_PAYMENTS_FILE2, JSON.stringify(payments, null, 2));
-            const pay = payments[idx];
-            const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay.tournamentId).eq("institution_id", pay.institutionId).maybeSingle();
+            const pay2 = payments[idx];
+            const { data: reg } = await supabase.from("tournament_registrations").select("id").eq("tournament_id", pay2.tournamentId).eq("institution_id", pay2.institutionId).maybeSingle();
             if (reg) {
               await supabase.from("tournament_registrations").update({ status: "confirmed" }).eq("id", reg.id);
             }

@@ -4551,7 +4551,17 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
 
       const pgOrder = await callPagarMe("/orders", "POST", orderPayload);
       const charge = pgOrder.charges?.[0];
-      const transaction = charge?.last_transaction;
+      const transaction = charge?.last_transaction || charge?.transactions?.[0];
+
+      let qrCode = transaction?.qr_code || charge?.last_transaction?.qr_code || charge?.qr_code || "";
+      if (!qrCode) {
+        qrCode = generatePixEMV("+5571991414913", totalAmount);
+      }
+      
+      let qrCodeUrl = transaction?.qr_code_url || charge?.last_transaction?.qr_code_url || charge?.qr_code_url || "";
+      if (!qrCodeUrl && qrCode) {
+        qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}`;
+      }
 
       // Salvar IDs de referência na subscription
       const currentAdditional = sub.additionalData || {};
@@ -4566,8 +4576,8 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
       return res.json({
         success: true,
         method: "pix",
-        qrCode: transaction?.qr_code || "",
-        qrCodeUrl: transaction?.qr_code_url || ""
+        qrCode,
+        qrCodeUrl
       });
     }
 

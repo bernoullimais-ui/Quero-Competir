@@ -455,7 +455,13 @@ export default function PublicAthleteRegistration() {
           setPaymentConfirmed(true);
           await executeCompleteSubscription();
         } else if (paymentMethod === "pix") {
-          setPixData({ qrCode: resData.qrCode, qrCodeUrl: resData.qrCodeUrl });
+          const code = resData.qrCode || "";
+          const url = resData.qrCodeUrl || (code ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(code)}` : "");
+          if (code) {
+            setPixData({ qrCode: code, qrCodeUrl: url });
+          } else {
+            throw new Error("Servidor não retornou uma chave Pix válida.");
+          }
         }
       } else {
         throw new Error(resData.error || "Erro ao processar o pagamento.");
