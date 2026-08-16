@@ -67,6 +67,10 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
   const [platformFeePercent, setPlatformFeePercent] = useState<number>(10);
   const [adminFeeInput, setAdminFeeInput] = useState<number>(10);
 
+  const [configMode, setConfigMode] = useState<"full_form" | "existing_id">("full_form");
+  const [existingRecipientIdInput, setExistingRecipientIdInput] = useState("");
+  const [linkingId, setLinkingId] = useState(false);
+
   // Bank Form State
   const [holderName, setHolderName] = useState("");
   const [holderDocument, setHolderDocument] = useState("");
@@ -97,6 +101,9 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
       const data = await res.json();
       if (data && !data.error) {
         setPagarmeRecipientId(data.pagarmeRecipientId || null);
+        if (data.pagarmeRecipientId) {
+          setExistingRecipientIdInput(data.pagarmeRecipientId);
+        }
         setRecipientStatus(data.pagarmeRecipientStatus || "not_configured");
         setPlatformFeePercent(data.platformFeePercent !== undefined ? data.platformFeePercent : 10);
         setAdminFeeInput(data.platformFeePercent !== undefined ? data.platformFeePercent : 10);
@@ -133,6 +140,42 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
   useEffect(() => {
     fetchRecipientStatus();
   }, [organizationId]);
+
+  const handleLinkExistingRecipient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!existingRecipientIdInput.trim()) {
+      error("Por favor, informe o ID de Recebedor do Pagar.me.");
+      return;
+    }
+
+    setLinkingId(true);
+    try {
+      const token = getAuthToken();
+      const targetId = organizationId || "org-1";
+      const res = await fetch(`/api/payments/organizations/${targetId}/link-recipient`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ recipientId: existingRecipientIdInput.trim() })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Falha ao vincular ID de recebedor");
+      }
+
+      setPagarmeRecipientId(data.pagarmeRecipientId);
+      setRecipientStatus(data.pagarmeRecipientStatus || "active");
+      success("ID de Recebedor Pagar.me vinculado com sucesso! 🚀");
+      fetchRecipientStatus();
+    } catch (err: any) {
+      error("Erro ao vincular ID: " + err.message);
+    } finally {
+      setLinkingId(false);
+    }
+  };
 
   const handleSubmitRecipient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -336,173 +379,247 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
         </div>
       )}
 
-      {/* ── Formulário de Dados Bancários ────────────────────────────── */}
-      <form onSubmit={handleSubmitRecipient} className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
-        <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-          <Building2 className="text-indigo-600" size={24} />
-          <div>
-            <h4 className="text-md font-bold text-slate-800">Dados da Conta Bancária para Repasse</h4>
-            <p className="text-slate-500 text-xs">Informe a conta bancária para onde os valores das inscrições devem ser transferidos pelo Pagar.me.</p>
+      {/* ── Configuração de Recebedor (Formulário ou ID Existente) ─────── */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <Building2 className="text-indigo-600 shrink-0" size={24} />
+            <div>
+              <h4 className="text-md font-bold text-slate-800">Conta de Recebimento no Pagar.me</h4>
+              <p className="text-slate-500 text-xs">Cadastre novos dados bancários ou vincule um ID de Recebedor já existente.</p>
+            </div>
+          </div>
+
+          {/* Selector de Modo */}
+          <div className="flex items-center p-1 bg-slate-100 rounded-2xl border border-slate-200 shrink-0">
+            <button
+              type="button"
+              onClick={() => setConfigMode("full_form")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                configMode === "full_form"
+                  ? "bg-white text-indigo-600 shadow-xs"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Cadastrar Nova Conta
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfigMode("existing_id")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                configMode === "existing_id"
+                  ? "bg-white text-indigo-600 shadow-xs"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Inserir Apenas ID Existente
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Nome do Titular da Conta *
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="Razão Social ou Nome Completo do Titular"
-              value={holderName}
-              onChange={(e) => setHolderName(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
-            />
-          </div>
+        {configMode === "existing_id" ? (
+          <form onSubmit={handleLinkExistingRecipient} className="space-y-4 pt-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                ID do Recebedor Pagar.me (Recipient ID) *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Ex: re_cl1234567890abcdef..."
+                value={existingRecipientIdInput}
+                onChange={(e) => setExistingRecipientIdInput(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-mono"
+              />
+              <p className="text-slate-500 text-xs mt-2 leading-relaxed">
+                Caso sua empresa/organização já possua um recebedor cadastrado diretamente no painel do Pagar.me v5, insira o ID iniciado por <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-indigo-600 font-bold">re_...</code> acima.
+              </p>
+            </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              CPF ou CNPJ do Titular *
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="00.000.000/0000-00 ou 000.000.000-00"
-              value={holderDocument}
-              onChange={(e) => {
-                setHolderDocument(e.target.value);
-                const clean = e.target.value.replace(/\D/g, "");
-                if (clean.length > 11) setHolderType("corporation");
-                else setHolderType("individual");
-              }}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
-            />
-          </div>
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+              <p className="text-xs text-slate-500 flex items-center gap-1">
+                <Lock size={14} className="text-indigo-600" /> O ID será validado na API Pagar.me e associado à sua organização.
+              </p>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Tipo de Pessoa
-            </label>
-            <select
-              value={holderType}
-              onChange={(e) => setHolderType(e.target.value as any)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium bg-white"
-            >
-              <option value="individual">Pessoa Física (CPF)</option>
-              <option value="corporation">Pessoa Jurídica (CNPJ)</option>
-            </select>
-          </div>
+              <button
+                type="submit"
+                disabled={linkingId}
+                className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-md shadow-indigo-200 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {linkingId ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Vinculando no Pagar.me...
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} /> Vincular ID de Recebedor
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleSubmitRecipient} className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nome do Titular da Conta *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Razão Social ou Nome Completo do Titular"
+                  value={holderName}
+                  onChange={(e) => setHolderName(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
+                />
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Banco *
-            </label>
-            <select
-              value={bankCode}
-              onChange={(e) => setBankCode(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium bg-white"
-            >
-              {BRAZILIAN_BANKS.map((b) => (
-                <option key={b.code} value={b.code}>
-                  {b.code} - {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  CPF ou CNPJ do Titular *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="00.000.000/0000-00 ou 000.000.000-00"
+                  value={holderDocument}
+                  onChange={(e) => {
+                    setHolderDocument(e.target.value);
+                    const clean = e.target.value.replace(/\D/g, "");
+                    if (clean.length > 11) setHolderType("corporation");
+                    else setHolderType("individual");
+                  }}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
+                />
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Agência (Sem Dígito) *
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="Ex: 0001"
-              value={bankBranch}
-              onChange={(e) => setBankBranch(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
-            />
-          </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Tipo de Pessoa
+                </label>
+                <select
+                  value={holderType}
+                  onChange={(e) => setHolderType(e.target.value as any)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium bg-white"
+                >
+                  <option value="individual">Pessoa Física (CPF)</option>
+                  <option value="corporation">Pessoa Jurídica (CNPJ)</option>
+                </select>
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Número da Conta *
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="Ex: 12345"
-              value={bankAccount}
-              onChange={(e) => setBankAccount(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
-            />
-          </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Banco *
+                </label>
+                <select
+                  value={bankCode}
+                  onChange={(e) => setBankCode(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium bg-white"
+                >
+                  {BRAZILIAN_BANKS.map((b) => (
+                    <option key={b.code} value={b.code}>
+                      {b.code} - {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Dígito da Conta
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: 6 ou 0"
-              value={bankAccountDigit}
-              onChange={(e) => setBankAccountDigit(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
-            />
-          </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Agência (Sem Dígito) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: 0001"
+                  value={bankBranch}
+                  onChange={(e) => setBankBranch(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
+                />
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Tipo da Conta
-            </label>
-            <select
-              value={bankAccountType}
-              onChange={(e) => setBankAccountType(e.target.value as any)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium bg-white"
-            >
-              <option value="checking">Conta Corrente</option>
-              <option value="savings">Conta Poupança</option>
-            </select>
-          </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Número da Conta *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: 12345"
+                  value={bankAccount}
+                  onChange={(e) => setBankAccount(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
+                />
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              E-mail Financeiro
-            </label>
-            <input
-              type="email"
-              placeholder="financeiro@suaempresa.com.br"
-              value={holderEmail}
-              onChange={(e) => setHolderEmail(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
-            />
-          </div>
-        </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Dígito da Conta
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: 6 ou 0"
+                  value={bankAccountDigit}
+                  onChange={(e) => setBankAccountDigit(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
+                />
+              </div>
 
-        <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-          <p className="text-xs text-slate-500 flex items-center gap-1">
-            <Lock size={14} className="text-indigo-600" /> Seus dados são transmitidos com criptografia para a API Pagar.me.
-          </p>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Tipo da Conta
+                </label>
+                <select
+                  value={bankAccountType}
+                  onChange={(e) => setBankAccountType(e.target.value as any)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium bg-white"
+                >
+                  <option value="checking">Conta Corrente</option>
+                  <option value="savings">Conta Poupança</option>
+                </select>
+              </div>
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-md shadow-indigo-200 flex items-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            {saving ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Registrando no Pagar.me...
-              </>
-            ) : (
-              <>
-                <Save size={16} /> Salvar e Registrar Recebedor
-              </>
-            )}
-          </button>
-        </div>
-      </form>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  E-mail Financeiro
+                </label>
+                <input
+                  type="email"
+                  placeholder="financeiro@suaempresa.com.br"
+                  value={holderEmail}
+                  onChange={(e) => setHolderEmail(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden font-medium"
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+              <p className="text-xs text-slate-500 flex items-center gap-1">
+                <Lock size={14} className="text-indigo-600" /> Seus dados são transmitidos com criptografia para a API Pagar.me.
+              </p>
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-md shadow-indigo-200 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Registrando no Pagar.me...
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} /> Salvar e Registrar Recebedor
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 };

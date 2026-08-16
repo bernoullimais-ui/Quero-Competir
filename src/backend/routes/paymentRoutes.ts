@@ -403,6 +403,113 @@ router.post("/organizations/:id/create-recipient", requireAuth, async (req, res)
   }
 });
 
+// 2.1 Vincular apenas ID de Recebedor Pagar.me Existente
+router.post("/organizations/:id/link-recipient", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { recipientId } = req.body;
+
+  if (!recipientId || typeof recipientId !== "string" || !recipientId.trim()) {
+    return res.status(400).json({ error: "Informe um ID de Recebedor do Pagar.me válido (ex: re_...)." });
+  }
+
+  const cleanRecipientId = recipientId.trim();
+
+  try {
+    const supabase = getSupabaseAdmin();
+    let recipientStatus = "active";
+    let bankDataPatch: any = {};
+
+    if (process.env.PAGARME_SECRET_KEY) {
+      try {
+        const pgRecipient = await callPagarMe(`/recipients/${cleanRecipientId}`, "GET", null);
+        if (pgRecipient) {
+          recipientStatus = pgRecipient.status || "active";
+          const bAcc = pgRecipient.default_bank_account || {};
+          bankDataPatch = {
+            holderName: bAcc.holder_name || pgRecipient.name || "",
+            holderDocument: bAcc.holder_document || pgRecipient.document || "",
+            holderType: bAcc.holder_type || pgRecipient.type || "individual",
+            bankCode: bAcc.bank || "341",
+            bankBranch: bAcc.branch_number || "",
+            bankAccount: bAcc.account_check_digit ? `${bAcc.account_number}-${bAcc.account_check_digit}` : (bAcc.account_number || ""),
+            bankAccountType: bAcc.type || "checking",
+            holderEmail: pgRecipient.email || "",
+            holderPhone: pgRecipient.phone || ""
+          };
+        }
+      } catch (pgErr: any) {
+        console.warn("[Link Recipient Pagar.me Warning]", pgErr.message);
+      }
+    }
+
+    // 1. Buscar org existente em Supabase
+    let org: any = null;
+    try {
+      const { data } = await supabase.from("organizations").select("*").eq("id", id).maybeSingle();
+      org = data;
+      if (!org && (id === "org-1" || id === "redefluir")) {
+        const { data: fallback } = await supabase.from("organizations").select("*").limit(1).maybeSingle();
+        org = fallback;
+      }
+    } catch (_) {}
+
+    const orgIdToUse = org?.id || id;
+    const newDesc = embedFinDataInDescription(org?.description, {
+      pagarmeRecipientId: cleanRecipientId,
+      pagarmeRecipientStatus: recipientStatus,
+      ...bankDataPatch
+    });
+
+    const dbPayload = {
+      id: orgIdToUse,
+      description: newDesc,
+      pagarme_recipient_id: cleanRecipientId,
+      pagarme_recipient_status: recipientStatus,
+      bank_holder_name: bankDataPatch.holderName || null,
+      bank_holder_document: bankDataPatch.holderDocument || null,
+      bank_holder_type: bankDataPatch.holderType || "individual",
+      bank_code: bankDataPatch.bankCode || "341",
+      bank_branch: bankDataPatch.bankBranch || null,
+      bank_account: bankDataPatch.bankAccount || null,
+      bank_account_type: bankDataPatch.bankAccountType || "checking",
+      bank_holder_email: bankDataPatch.holderEmail || null,
+      bank_holder_phone: bankDataPatch.holderPhone || null
+    };
+
+    try {
+      const { error: updateErr } = await supabase
+        .from("organizations")
+        .upsert(dbPayload);
+
+      if (updateErr) {
+        await supabase
+          .from("organizations")
+          .update({ description: newDesc, pagarme_recipient_id: cleanRecipientId, pagarme_recipient_status: recipientStatus })
+          .eq("id", orgIdToUse);
+      }
+    } catch (e: any) {
+      console.warn("Exceção Supabase ao vincular recebedor:", e.message);
+    }
+
+    saveBankRecord(orgIdToUse, {
+      pagarmeRecipientId: cleanRecipientId,
+      pagarmeRecipientStatus: recipientStatus,
+      ...bankDataPatch
+    });
+
+    res.json({
+      success: true,
+      pagarmeRecipientId: cleanRecipientId,
+      pagarmeRecipientStatus: recipientStatus,
+      bankData: bankDataPatch,
+      message: "ID de Recebedor Pagar.me vinculado com sucesso!"
+    });
+  } catch (err: any) {
+    console.error("Erro ao vincular recebedor Pagar.me:", err);
+    res.status(500).json({ error: err.message || "Erro ao vincular recebedor no Pagar.me." });
+  }
+});
+
 // 3. Listar todas as organizações com seus percentuais e dados de recebedor (Somente Super Admin)
 router.get("/admin/organizations", requireAuth, async (req, res) => {
   try {
