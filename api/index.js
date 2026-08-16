@@ -4365,7 +4365,13 @@ async function callPagarMe2(endpoint, method, body) {
   });
   const data = await response.json();
   if (!response.ok) {
-    const detailMsg = data?.message || (data?.errors ? JSON.stringify(data.errors) : JSON.stringify(data));
+    let detailMsg = data?.message || "Erro no gateway Pagar.me";
+    if (data?.errors && typeof data.errors === "object") {
+      const errList = Object.entries(data.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" | ");
+      if (errList) {
+        detailMsg = `${detailMsg} (${errList})`;
+      }
+    }
     throw new Error(detailMsg);
   }
   return data;
@@ -4530,13 +4536,42 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
     }
     if (method === "card") {
       const cardData = req.body.card;
-      const cardToken2 = req.body.cardToken;
+      let cardToken2 = req.body.cardToken;
+      if ((!cardToken2 || !cardToken2.startsWith("tok_")) && cardData?.number) {
+        const publicKey = process.env.PAGARME_PUBLIC_KEY;
+        if (publicKey) {
+          try {
+            const tokenResp = await fetch(`https://api.pagar.me/core/v5/tokens?appId=${publicKey}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "accept": "application/json" },
+              body: JSON.stringify({
+                type: "card",
+                card: {
+                  number: String(cardData.number).replace(/\s/g, ""),
+                  holder_name: String(cardData.holder_name || cardData.name || customer.name),
+                  exp_month: Number(cardData.exp_month || cardData.expiry?.split("/")[0]),
+                  exp_year: Number(cardData.exp_year || (cardData.expiry?.split("/")[1] ? "20" + cardData.expiry.split("/")[1] : 2029)),
+                  cvv: String(cardData.cvv)
+                }
+              })
+            });
+            const tokenData = await tokenResp.json();
+            if (tokenResp.ok && tokenData?.id) {
+              cardToken2 = tokenData.id;
+            }
+          } catch (tErr) {
+            console.warn("[Card Tokenization Server Exception]", tErr.message);
+          }
+        }
+      }
       let creditCardPayload = {
         operation_type: "auth_and_capture",
         installments: 1,
         statement_descriptor: "QUEROCOMPETIR"
       };
-      if (cardData && cardData.number) {
+      if (cardToken2 && cardToken2.startsWith("tok_")) {
+        creditCardPayload.card_token = cardToken2;
+      } else if (cardData && cardData.number) {
         creditCardPayload.card = {
           number: String(cardData.number).replace(/\s/g, ""),
           holder_name: String(cardData.holder_name || cardData.name || customer.name),
@@ -4544,10 +4579,8 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
           exp_year: Number(cardData.exp_year || (cardData.expiry?.split("/")[1] ? "20" + cardData.expiry.split("/")[1] : 2029)),
           cvv: String(cardData.cvv)
         };
-      } else if (cardToken2) {
-        creditCardPayload.card_token = cardToken2;
       } else {
-        return res.status(400).json({ error: "Dados ou token do cart\xE3o n\xE3o fornecidos." });
+        return res.status(400).json({ error: "Dados do cart\xE3o incompletos ou tokeniza\xE7\xE3o indispon\xEDvel." });
       }
       const orderPayload = {
         code: sub.id,
@@ -7191,25 +7224,34 @@ router6.post("/tokenize-card", async (req, res) => {
     const publicKey = process.env.PAGARME_PUBLIC_KEY;
     if (publicKey) {
       try {
-        const tokenRes = await callPagarMe3(`/tokens?appId=${publicKey}`, "POST", {
-          type: "card",
-          card: {
-            number: String(number).replace(/\s/g, ""),
-            holder_name: String(holder_name),
-            exp_month: Number(exp_month),
-            exp_year: Number(exp_year),
-            cvv: String(cvv)
-          }
+        const tokenResp = await fetch(`https://api.pagar.me/core/v5/tokens?appId=${publicKey}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "accept": "application/json"
+          },
+          body: JSON.stringify({
+            type: "card",
+            card: {
+              number: String(number).replace(/\s/g, ""),
+              holder_name: String(holder_name),
+              exp_month: Number(exp_month),
+              exp_year: Number(exp_year),
+              cvv: String(cvv)
+            }
+          })
         });
-        if (tokenRes?.id) {
-          return res.json({ id: tokenRes.id });
+        const tokenData = await tokenResp.json();
+        if (tokenResp.ok && tokenData?.id) {
+          return res.json({ id: tokenData.id });
+        } else {
+          console.warn("[Card Tokenization Error Response]", tokenData);
         }
       } catch (err) {
         console.warn("[Card Tokenization Gateway Warning]", err.message);
       }
     }
-    const fallbackToken = "tok_" + Math.random().toString(36).substring(2, 15);
-    return res.json({ id: fallbackToken });
+    return res.status(400).json({ error: "Chave p\xFAblica Pagar.me n\xE3o configurada para tokeniza\xE7\xE3o de cart\xE3o." });
   } catch (err) {
     res.status(500).json({ error: err.message || "Erro ao tokenizar cart\xE3o." });
   }

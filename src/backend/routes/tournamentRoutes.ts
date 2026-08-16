@@ -4385,7 +4385,15 @@ async function callPagarMe(endpoint: string, method: string, body: any) {
   
   const data = await response.json();
   if (!response.ok) {
-    const detailMsg = data?.message || (data?.errors ? JSON.stringify(data.errors) : JSON.stringify(data));
+    let detailMsg = data?.message || "Erro no gateway Pagar.me";
+    if (data?.errors && typeof data.errors === "object") {
+      const errList = Object.entries(data.errors)
+        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+        .join(" | ");
+      if (errList) {
+        detailMsg = `${detailMsg} (${errList})`;
+      }
+    }
     throw new Error(detailMsg);
   }
   return data;
@@ -4621,7 +4629,36 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
 
     if (method === "card") {
       const cardData = req.body.card;
-      const cardToken = req.body.cardToken;
+      let cardToken = req.body.cardToken;
+
+      // Se não temos cardToken real do Pagar.me e temos cardData, tenta tokenizar via Pagar.me público
+      if ((!cardToken || !cardToken.startsWith("tok_")) && cardData?.number) {
+        const publicKey = process.env.PAGARME_PUBLIC_KEY;
+        if (publicKey) {
+          try {
+            const tokenResp = await fetch(`https://api.pagar.me/core/v5/tokens?appId=${publicKey}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "accept": "application/json" },
+              body: JSON.stringify({
+                type: "card",
+                card: {
+                  number: String(cardData.number).replace(/\s/g, ""),
+                  holder_name: String(cardData.holder_name || cardData.name || customer.name),
+                  exp_month: Number(cardData.exp_month || cardData.expiry?.split("/")[0]),
+                  exp_year: Number(cardData.exp_year || (cardData.expiry?.split("/")[1] ? ("20" + cardData.expiry.split("/")[1]) : 2029)),
+                  cvv: String(cardData.cvv)
+                }
+              })
+            });
+            const tokenData = await tokenResp.json();
+            if (tokenResp.ok && tokenData?.id) {
+              cardToken = tokenData.id;
+            }
+          } catch (tErr: any) {
+            console.warn("[Card Tokenization Server Exception]", tErr.message);
+          }
+        }
+      }
 
       let creditCardPayload: any = {
         operation_type: "auth_and_capture",
@@ -4629,7 +4666,9 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
         statement_descriptor: "QUEROCOMPETIR"
       };
 
-      if (cardData && cardData.number) {
+      if (cardToken && cardToken.startsWith("tok_")) {
+        creditCardPayload.card_token = cardToken;
+      } else if (cardData && cardData.number) {
         creditCardPayload.card = {
           number: String(cardData.number).replace(/\s/g, ""),
           holder_name: String(cardData.holder_name || cardData.name || customer.name),
@@ -4637,10 +4676,8 @@ router.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
           exp_year: Number(cardData.exp_year || (cardData.expiry?.split("/")[1] ? ("20" + cardData.expiry.split("/")[1]) : 2029)),
           cvv: String(cardData.cvv)
         };
-      } else if (cardToken) {
-        creditCardPayload.card_token = cardToken;
       } else {
-        return res.status(400).json({ error: "Dados ou token do cartão não fornecidos." });
+        return res.status(400).json({ error: "Dados do cartão incompletos ou tokenização indisponível." });
       }
 
       const orderPayload: any = {

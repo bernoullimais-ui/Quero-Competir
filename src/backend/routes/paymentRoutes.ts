@@ -900,27 +900,36 @@ router.post("/tokenize-card", async (req, res) => {
     const publicKey = process.env.PAGARME_PUBLIC_KEY;
     if (publicKey) {
       try {
-        const tokenRes = await callPagarMe(`/tokens?appId=${publicKey}`, "POST", {
-          type: "card",
-          card: {
-            number: String(number).replace(/\s/g, ""),
-            holder_name: String(holder_name),
-            exp_month: Number(exp_month),
-            exp_year: Number(exp_year),
-            cvv: String(cvv)
-          }
+        const tokenResp = await fetch(`https://api.pagar.me/core/v5/tokens?appId=${publicKey}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "accept": "application/json"
+          },
+          body: JSON.stringify({
+            type: "card",
+            card: {
+              number: String(number).replace(/\s/g, ""),
+              holder_name: String(holder_name),
+              exp_month: Number(exp_month),
+              exp_year: Number(exp_year),
+              cvv: String(cvv)
+            }
+          })
         });
-        if (tokenRes?.id) {
-          return res.json({ id: tokenRes.id });
+
+        const tokenData = await tokenResp.json();
+        if (tokenResp.ok && tokenData?.id) {
+          return res.json({ id: tokenData.id });
+        } else {
+          console.warn("[Card Tokenization Error Response]", tokenData);
         }
       } catch (err: any) {
         console.warn("[Card Tokenization Gateway Warning]", err.message);
       }
     }
 
-    // Fallback: Se não houver public key ou gateway falhar no sandbox, gera token seguro de transação
-    const fallbackToken = "tok_" + Math.random().toString(36).substring(2, 15);
-    return res.json({ id: fallbackToken });
+    return res.status(400).json({ error: "Chave pública Pagar.me não configurada para tokenização de cartão." });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Erro ao tokenizar cartão." });
   }
