@@ -6414,6 +6414,33 @@ function saveBankDataDb(data) {
   } catch (e) {
   }
 }
+function getLocalBankRecord(id) {
+  const db = loadBankDataDb();
+  if (db[id] && (db[id].platformFeePercent !== void 0 || db[id].holderName || db[id].pagarmeRecipientId)) {
+    return db[id];
+  }
+  if (id === "org-1" || id === "organizador" || id === "redefluir" || id.includes("fluir")) {
+    return db["organizador"] || db["org-1"] || db["redefluir"] || db["__PRIMARY_ORG__"] || {};
+  }
+  const keys = Object.keys(db);
+  for (const k of keys) {
+    if (k !== "__GLOBAL__" && db[k] && (db[k].platformFeePercent !== void 0 || db[k].holderName || db[k].pagarmeRecipientId)) {
+      return db[k];
+    }
+  }
+  return {};
+}
+function saveBankRecord(id, record) {
+  const db = loadBankDataDb();
+  db[id] = { ...db[id], ...record };
+  if (id === "org-1" || id === "organizador" || id === "redefluir" || id.includes("fluir")) {
+    db["org-1"] = { ...db["org-1"], ...record };
+    db["organizador"] = { ...db["organizador"], ...record };
+    db["redefluir"] = { ...db["redefluir"], ...record };
+    db["__PRIMARY_ORG__"] = { ...db["__PRIMARY_ORG__"], ...record };
+  }
+  saveBankDataDb(db);
+}
 function getFinDataFromOrg(org) {
   const fin = {
     platformFeePercent: 10,
@@ -6511,53 +6538,51 @@ router6.get("/organizations/:id/recipient-status", requireAuth, async (req, res)
     try {
       const { data } = await supabase.from("organizations").select("*").eq("id", targetId).maybeSingle();
       org = data;
-      if (!org && (targetId === "org-1" || targetId === "redefluir")) {
+      if (!org) {
         const { data: fallbackOrg } = await supabase.from("organizations").select("*").limit(1).maybeSingle();
         org = fallbackOrg;
       }
     } catch (_) {
     }
     const finData = getFinDataFromOrg(org);
-    const localBankDb = loadBankDataDb();
-    const localData = localBankDb[targetId] || localBankDb["org-1"] || {};
-    let recipientId = finData.pagarmeRecipientId || org?.pagarme_recipient_id || localData.pagarmeRecipientId || null;
-    let liveStatus = finData.pagarmeRecipientStatus || org?.pagarme_recipient_status || localData.pagarmeRecipientStatus || "not_configured";
+    const localData = getLocalBankRecord(targetId);
+    let recipientId = localData.pagarmeRecipientId || finData.pagarmeRecipientId || org?.pagarme_recipient_id || null;
+    let liveStatus = localData.pagarmeRecipientStatus || finData.pagarmeRecipientStatus || org?.pagarme_recipient_status || "not_configured";
     let pagarmeDetails = null;
     if (recipientId && process.env.PAGARME_SECRET_KEY) {
       try {
-        pagarmeDetails = await callPagarMe3(`/recipients/${recipientId}`, "GET", null);
-        if (pagarmeDetails && pagarmeDetails.status) {
-          liveStatus = pagarmeDetails.status;
-          if (org && liveStatus !== org.pagarme_recipient_status) {
-            const newDesc = embedFinDataInDescription(org.description, { pagarmeRecipientStatus: liveStatus });
-            await supabase.from("organizations").update({ pagarme_recipient_status: liveStatus, description: newDesc }).eq("id", org.id);
+        const rawKey = process.env.PAGARME_SECRET_KEY || "";
+        const cleanKey = rawKey.replace(/[\s\u2028\u2029]+/g, "").trim();
+        if (cleanKey) {
+          pagarmeDetails = await callPagarMe3(`/recipients/${recipientId}`, "GET", null);
+          if (pagarmeDetails && pagarmeDetails.status) {
+            liveStatus = pagarmeDetails.status;
+            if (org && liveStatus !== org.pagarme_recipient_status) {
+              const newDesc = embedFinDataInDescription(org.description, { pagarmeRecipientStatus: liveStatus });
+              await supabase.from("organizations").update({ pagarme_recipient_status: liveStatus, description: newDesc }).eq("id", org.id);
+            }
           }
         }
       } catch (err) {
         console.warn("[Pagar.me Status Check Warning]", err.message);
       }
     }
-    let fee = finData.platformFeePercent;
-    if (fee === void 0 || fee === null || fee === 10) {
-      if (localData.platformFeePercent !== void 0) {
-        fee = Number(localData.platformFeePercent);
-      }
-    }
+    let fee = localData.platformFeePercent !== void 0 ? Number(localData.platformFeePercent) : finData.platformFeePercent;
     if (fee === void 0 || fee === null) fee = 10;
     res.json({
       pagarmeRecipientId: recipientId,
       pagarmeRecipientStatus: liveStatus,
       platformFeePercent: fee,
       bankData: {
-        holderName: finData.holderName || org?.bank_holder_name || localData.holderName || "",
-        holderDocument: finData.holderDocument || org?.bank_holder_document || localData.holderDocument || "",
-        holderType: finData.holderType || org?.bank_holder_type || localData.holderType || "individual",
-        bankCode: finData.bankCode || org?.bank_code || localData.bankCode || "341",
-        bankBranch: finData.bankBranch || org?.bank_branch || localData.bankBranch || "",
-        bankAccount: finData.bankAccount || org?.bank_account || localData.bankAccount || "",
-        bankAccountType: finData.bankAccountType || org?.bank_account_type || localData.bankAccountType || "checking",
-        holderEmail: finData.holderEmail || org?.bank_holder_email || localData.holderEmail || "",
-        holderPhone: finData.holderPhone || org?.bank_holder_phone || localData.holderPhone || ""
+        holderName: localData.holderName || finData.holderName || org?.bank_holder_name || "",
+        holderDocument: localData.holderDocument || finData.holderDocument || org?.bank_holder_document || "",
+        holderType: localData.holderType || finData.holderType || org?.bank_holder_type || "individual",
+        bankCode: localData.bankCode || finData.bankCode || org?.bank_code || "341",
+        bankBranch: localData.bankBranch || finData.bankBranch || org?.bank_branch || "",
+        bankAccount: localData.bankAccount || finData.bankAccount || org?.bank_account || "",
+        bankAccountType: localData.bankAccountType || finData.bankAccountType || org?.bank_account_type || "checking",
+        holderEmail: localData.holderEmail || finData.holderEmail || org?.bank_holder_email || "",
+        holderPhone: localData.holderPhone || finData.holderPhone || org?.bank_holder_phone || ""
       },
       pagarmeDetails
     });
@@ -6669,8 +6694,7 @@ router6.post("/organizations/:id/create-recipient", requireAuth, async (req, res
     } catch (e) {
       console.warn("Exce\xE7\xE3o Supabase ao salvar recebedor:", e.message);
     }
-    const localBankDb = loadBankDataDb();
-    const bankRecord = {
+    saveBankRecord(orgIdToUse, {
       pagarmeRecipientId: recipientId,
       pagarmeRecipientStatus: recipientStatus,
       holderName,
@@ -6681,15 +6705,8 @@ router6.post("/organizations/:id/create-recipient", requireAuth, async (req, res
       bankAccount: accountFull,
       bankAccountType: bankAccountType || "checking",
       holderEmail: holderEmail || "",
-      holderPhone: cleanPhone || "",
-      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-    };
-    localBankDb[id] = bankRecord;
-    if (id === "org-1" || id === "redefluir") {
-      localBankDb["org-1"] = bankRecord;
-      localBankDb["redefluir"] = bankRecord;
-    }
-    saveBankDataDb(localBankDb);
+      holderPhone: cleanPhone || ""
+    });
     res.json({
       success: true,
       pagarmeRecipientId: recipientId,
@@ -6726,22 +6743,17 @@ router6.get("/admin/organizations", requireAuth, async (req, res) => {
             displayName = "Rede Fluir (Organizador Principal)";
           }
           const finData = getFinDataFromOrg(org);
-          const localData = localBankDb[org.id] || localBankDb["org-1"] || {};
-          let fee = finData.platformFeePercent;
-          if (fee === void 0 || fee === null || fee === 10) {
-            if (localData.platformFeePercent !== void 0) {
-              fee = Number(localData.platformFeePercent);
-            }
-          }
+          const localData = getLocalBankRecord(org.id);
+          let fee = localData.platformFeePercent !== void 0 ? Number(localData.platformFeePercent) : finData.platformFeePercent;
           if (fee === void 0 || fee === null) fee = 10;
           resultMap.set(org.id, {
             id: org.id,
             name: displayName,
             subdomain: org.subdomain || "redefluir",
-            pagarme_recipient_id: finData.pagarmeRecipientId || org.pagarme_recipient_id || localData.pagarmeRecipientId || null,
-            pagarme_recipient_status: finData.pagarmeRecipientStatus || org.pagarme_recipient_status || localData.pagarmeRecipientStatus || "not_configured",
+            pagarme_recipient_id: localData.pagarmeRecipientId || finData.pagarmeRecipientId || org.pagarme_recipient_id || null,
+            pagarme_recipient_status: localData.pagarmeRecipientStatus || finData.pagarmeRecipientStatus || org.pagarme_recipient_status || "not_configured",
             platform_fee_percent: fee,
-            bank_holder_name: finData.holderName || org.bank_holder_name || localData.holderName || "",
+            bank_holder_name: localData.holderName || finData.holderName || org.bank_holder_name || "",
             created_at: org.created_at || (/* @__PURE__ */ new Date()).toISOString()
           });
         }
@@ -6854,19 +6866,7 @@ router6.patch("/admin/organizations/:id/fee", requireAuth, async (req, res) => {
     } catch (e) {
       console.warn("Exce\xE7\xE3o ao salvar fee no Supabase:", e.message);
     }
-    const localBankDb = loadBankDataDb();
-    const record = localBankDb[orgIdToUse] || {};
-    record.platformFeePercent = feeVal;
-    localBankDb[orgIdToUse] = record;
-    if (orgIdToUse === "org-1" || targetId === "org-1" || targetId === "redefluir") {
-      const org1Rec = localBankDb["org-1"] || {};
-      org1Rec.platformFeePercent = feeVal;
-      localBankDb["org-1"] = org1Rec;
-      const fluirRec = localBankDb["redefluir"] || {};
-      fluirRec.platformFeePercent = feeVal;
-      localBankDb["redefluir"] = fluirRec;
-    }
-    saveBankDataDb(localBankDb);
+    saveBankRecord(orgIdToUse, { platformFeePercent: feeVal });
     res.json({ success: true, platformFeePercent: feeVal });
   } catch (err) {
     console.error("Erro ao atualizar taxa da plataforma:", err);
