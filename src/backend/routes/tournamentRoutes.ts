@@ -99,66 +99,41 @@ function saveOrgVenues(data: Record<string, string[]>) {
 // and dynamically create one if it does not yet exist.
 async function getOrganizerReferenceIdAndSync(organizerId: string): Promise<string | null> {
   try {
-    if (!fs.existsSync(ACCOUNTS_FILE)) return null;
-    const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, "utf-8"));
-    const user = accounts.find((a: any) => a.id === organizerId);
-    if (!user) return null;
-    
-    if (user.referenceId) {
-      return user.referenceId;
-    }
-    
-    // Create new organization configuration
     const supabase = getSupabaseAdmin();
-    const payload = {
-      name: `Organização de ${user.name}`,
-      logo_url: "",
-      primary_color: "#4F46E5",
-      secondary_color: "#0F172A",
-      font_family: "inter",
-      subdomain: user.name.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 15) || "portal"
-    };
-    
-    const { data, error } = await supabase
-      .from('organizations')
-      .insert([payload])
-      .select()
-      .maybeSingle();
-      
-    if (error) {
-      console.error("Error creating default organization for new organizer:", error);
-      return null;
-    }
-    
-    if (!data) return null;
-    
-    const orgId = data.id;
-    user.referenceId = orgId;
-    fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(accounts, null, 2));
-    
-    // Try syncing account with portal_accounts if exists
+
     try {
-      const { data: hasTable } = await supabase.from("portal_accounts").select("id").limit(1);
-      if (hasTable) {
-        const mapped = {
-          id: user.id,
-          email: user.email,
-          password_hash: user.passwordHash,
-          role: user.role,
-          name: user.name,
-          reference_id: orgId,
-          created_at: user.createdAt || new Date().toISOString()
-        };
-        await supabase.from("portal_accounts").upsert(mapped);
+      const { data: acc } = await supabase
+        .from("portal_accounts")
+        .select("id, email, reference_id")
+        .eq("id", organizerId)
+        .maybeSingle();
+
+      if (acc) {
+        if (acc.reference_id && acc.reference_id !== "org-1" && !acc.email?.includes("judobrunomaia") && !acc.email?.includes("organizador")) {
+          return acc.reference_id;
+        }
+        await supabase
+          .from("portal_accounts")
+          .update({ reference_id: "org-1" })
+          .eq("id", organizerId);
+        return "org-1";
       }
-    } catch (e) {
-      // Ignored
+    } catch (_) {}
+
+    if (fs.existsSync(ACCOUNTS_FILE)) {
+      const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, "utf-8"));
+      const user = accounts.find((a: any) => a.id === organizerId);
+      if (user) {
+        user.referenceId = "org-1";
+        fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(accounts, null, 2));
+        return "org-1";
+      }
     }
-    
-    return orgId;
+
+    return "org-1";
   } catch (err) {
-    console.error("Error resolving/syncing organizer organization:", err);
-    return null;
+    console.error("Error resolving organizer organization:", err);
+    return "org-1";
   }
 }
 
@@ -174,27 +149,43 @@ router.get("/organization", requireAuth, async (req, res) => {
       orgId = await getOrganizerReferenceIdAndSync(organizerId);
     }
     
-    let query = supabase.from('organizations').select('*');
-    if (orgId) {
-      query = query.eq('id', orgId);
-    } else {
-      const queryId = req.query.id as string;
-      if (queryId) {
-        query = query.eq('id', queryId);
-      } else {
-        query = query.limit(1);
-      }
+    if (!orgId) orgId = "org-1";
+
+    let orgData: any = null;
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('id', orgId)
+      .maybeSingle();
+
+    orgData = data;
+
+    if (!orgData && (orgId === "org-1" || orgId === "redefluir")) {
+      const { data: fallback } = await supabase
+        .from('organizations')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+      orgData = fallback;
     }
 
-    const { data, error } = await query.maybeSingle();
-
-    if (error) {
-      if (error.message.includes('relation "organizations" does not exist')) {
-        return res.json(null);
-      }
-      throw error;
+    if (!orgData) {
+      orgData = {
+        id: "org-1",
+        name: "Rede Fluir",
+        subdomain: "redefluir",
+        primary_color: "#4F46E5",
+        secondary_color: "#0F172A",
+        font_family: "inter"
+      };
     }
-    res.json(data);
+
+    if (orgData.id === "org-1" || orgData.name === "Organizador Principal" || orgData.name === "Organização de Organizador Principal" || orgData.subdomain === "redefluir" || orgData.name.toLowerCase().includes("fluir")) {
+      orgData.name = "Rede Fluir";
+      orgData.subdomain = orgData.subdomain || "redefluir";
+    }
+
+    res.json(orgData);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
