@@ -193,6 +193,7 @@ export default function PublicAthleteRegistration() {
             setCurrentStep("success");
           }
         }
+        setLoading(false);
       })
       .catch((err) => {
         console.error(err);
