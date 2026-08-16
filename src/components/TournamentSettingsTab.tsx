@@ -125,10 +125,8 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
       const res = await fetch(`/api/tournaments/${tournamentId}/subscription-settings`);
       const data = await res.json();
       if (data && !data.error) {
-        const hasConfig = data.registrationConfig && 
-                          (data.registrationConfig.fields?.length > 0 || 
-                           data.registrationConfig.uploads?.length > 0 || 
-                           data.registrationConfig.terms?.length > 0);
+        const defaultCfg = getDefaultRegistrationConfig();
+        const incomingConfig = data.registrationConfig || {};
         setSettings({
           deadline: data.deadline || "",
           feeType: data.feeType || "free",
@@ -139,7 +137,11 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
           allowIndependent: !!data.allowIndependent,
           maxEventsPerParticipant: Number(data.maxEventsPerParticipant) || 1,
           feePricingModel: data.feePricingModel || "per_event",
-          registrationConfig: hasConfig ? data.registrationConfig : getDefaultRegistrationConfig(),
+          registrationConfig: {
+            fields: Array.isArray(incomingConfig.fields) && incomingConfig.fields.length > 0 ? incomingConfig.fields : defaultCfg.fields,
+            uploads: Array.isArray(incomingConfig.uploads) && incomingConfig.uploads.length > 0 ? incomingConfig.uploads : defaultCfg.uploads,
+            terms: Array.isArray(incomingConfig.terms) && incomingConfig.terms.length > 0 ? incomingConfig.terms : defaultCfg.terms,
+          },
           maxVisitorsPerAthlete: Number(data.maxVisitorsPerAthlete) || 0
         });
       }
@@ -445,7 +447,7 @@ export default function TournamentSettingsTab({ tournamentId }: TournamentSettin
             </div>
           )}
 
-          {(settings.feeType.includes("athlete") || settings.feeType === "by_individual_self") && (
+          {(((settings.feeType || "").includes("athlete")) || settings.feeType === "by_individual_self") && (
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Taxa por Atleta (R$)</label>
               <input 

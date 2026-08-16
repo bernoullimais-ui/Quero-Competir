@@ -2378,7 +2378,9 @@ export default function TournamentDashboard() {
         )}
 
         {activeTab === "configuracoes" && (
-          <TournamentSettingsTab tournamentId={id!} />
+          <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar as configurações deste torneio. Tente recarregar.</div>}>
+            <TournamentSettingsTab tournamentId={id!} />
+          </ErrorBoundary>
         )}
 
         {activeTab === "tabela" && (
