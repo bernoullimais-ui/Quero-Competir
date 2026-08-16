@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { Building2, Palette, Link as LinkIcon, Globe, Image as ImageIcon, Save, Phone, Mail, FileText, ExternalLink, CreditCard } from 'lucide-react';
 import { useToast } from './ui/Toast.tsx';
 import { applyBrandColors } from '../utils/theme';
