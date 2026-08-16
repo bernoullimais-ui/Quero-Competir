@@ -263,12 +263,15 @@ async function sendPreRegistrationMessage(params) {
   });
 }
 async function sendConfirmedMessage(params) {
+  const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "https://querocompetir.com.br";
+  const ticketUrl = `${baseUrl}/public/ticket/${params.subId}`;
   const template = params.orgTemplate || DEFAULT_TPL_CONFIRMED;
   const message = replaceTemplateVars(template, {
     torneio: params.tournamentName,
     nome_atleta: params.athleteName,
     provas: params.categoryNames.join(", "),
-    protocolo: params.subId.slice(0, 8).toUpperCase()
+    protocolo: params.subId.slice(0, 8).toUpperCase(),
+    link_credencial: ticketUrl
   });
   return sendWhatsAppMessage({
     phone: params.phone,
@@ -322,8 +325,9 @@ Ap\xF3s a confirma\xE7\xE3o do pagamento, sua inscri\xE7\xE3o ser\xE1 efetivada.
 
 \u{1F4CB} *Prova(s):* {provas}
 \u{1F194} *Protocolo:* {protocolo}
+\u{1F39F}\uFE0F *Sua Credencial Digital:* {link_credencial}
 
-Boa sorte e bom treino! \u{1F4AA}\u{1F3CA}`;
+Boa sorte e bom evento! \u{1F4AA}\u{1F3CA}`;
     DEFAULT_TPL_CART_RECOVERY = `\u23F3 *Lembrete de Inscri\xE7\xE3o Pendente*
 
 Ol\xE1! Identificamos que a inscri\xE7\xE3o de *{nome_atleta}* em *{torneio}* ainda n\xE3o foi paga.
@@ -5121,6 +5125,61 @@ router2.post("/:id/athlete-subscriptions/:subId/validate", async (req, res) => {
     res.json(sub);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+router2.post("/:id/check-in/:subId", async (req, res) => {
+  const { id: tournamentId, subId } = req.params;
+  try {
+    const supabase = getSupabaseAdmin();
+    let sub = null;
+    const { data: dbSub } = await supabase.from("athlete_subscriptions").select("*").eq("id", subId).maybeSingle();
+    if (dbSub) {
+      sub = mapSubToFrontend(dbSub);
+    } else {
+      const db2 = loadDb();
+      sub = db2.athleteSubscriptions.find((s) => s.id === subId);
+    }
+    if (!sub) {
+      return res.status(404).json({ error: "Inscri\xE7\xE3o n\xE3o encontrada" });
+    }
+    if (sub.paymentStatus !== "paid") {
+      return res.status(400).json({
+        success: false,
+        status: "unpaid",
+        message: "\u26D4 Inscri\xE7\xE3o pendente de pagamento. O check-in n\xE3o pode ser liberado.",
+        subscription: sub
+      });
+    }
+    if (sub.checkedInAt) {
+      return res.json({
+        success: true,
+        status: "already_checked_in",
+        message: `\u26A0\uFE0F Check-in j\xE1 realizado anteriormente \xE0s ${new Date(sub.checkedInAt).toLocaleTimeString("pt-BR")}`,
+        checkedInAt: sub.checkedInAt,
+        subscription: sub
+      });
+    }
+    const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+    try {
+      await supabase.from("athlete_subscriptions").update({ checked_in_at: nowIso }).eq("id", subId);
+    } catch {
+    }
+    const db = loadDb();
+    const idx = db.athleteSubscriptions.findIndex((s) => s.id === subId);
+    if (idx !== -1) {
+      db.athleteSubscriptions[idx].checkedInAt = nowIso;
+      saveDb(db);
+    }
+    sub.checkedInAt = nowIso;
+    return res.json({
+      success: true,
+      status: "checked_in",
+      message: "\u2705 Check-in presencial confirmado com sucesso!",
+      checkedInAt: nowIso,
+      subscription: sub
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 router2.get("/:id/team-members-all", async (req, res) => {

@@ -39,6 +39,7 @@ import PublicInvitationPage from "./components/PublicInvitationPage.tsx";
 import DrawCeremony from "./components/DrawCeremony.tsx";
 import PublicPaymentPage from "./components/PublicPaymentPage.tsx";
 import PublicOrganizationPortal from "./components/PublicOrganizationPortal.tsx";
+import PublicAthleteTicket from "./components/PublicAthleteTicket.tsx";
 
 const queryClient = new QueryClient();
 
@@ -482,6 +483,12 @@ export default function App() {
               <Route path="/public/register-athlete/:subId" element={
                 <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar inscrição individual.</div>}>
                   <PublicAthleteRegistration />
+                </ErrorBoundary>
+              } />
+
+              <Route path="/public/ticket/:subId" element={
+                <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar a credencial digital.</div>}>
+                  <PublicAthleteTicket />
                 </ErrorBoundary>
               } />
 

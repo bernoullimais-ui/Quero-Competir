@@ -5105,6 +5105,83 @@ router.post("/:id/athlete-subscriptions/:subId/validate", async (req, res) => {
   }
 });
 
+// ── POST /api/tournaments/:id/check-in/:subId ──────────────────────────────────
+// Registra o check-in presencial do atleta no evento via leitura do QR Code ou protocolo
+router.post("/:id/check-in/:subId", async (req, res) => {
+  const { id: tournamentId, subId } = req.params;
+  try {
+    const supabase = getSupabaseAdmin();
+
+    // 1. Obter a inscrição
+    let sub: any = null;
+    const { data: dbSub } = await supabase
+      .from('athlete_subscriptions')
+      .select('*')
+      .eq('id', subId)
+      .maybeSingle();
+
+    if (dbSub) {
+      sub = mapSubToFrontend(dbSub);
+    } else {
+      const db = loadDb();
+      sub = db.athleteSubscriptions.find(s => s.id === subId);
+    }
+
+    if (!sub) {
+      return res.status(404).json({ error: "Inscrição não encontrada" });
+    }
+
+    // 2. Verificar pagamento
+    if (sub.paymentStatus !== "paid") {
+      return res.status(400).json({
+        success: false,
+        status: "unpaid",
+        message: "⛔ Inscrição pendente de pagamento. O check-in não pode ser liberado.",
+        subscription: sub
+      });
+    }
+
+    // 3. Verificar se já realizou check-in
+    if (sub.checkedInAt) {
+      return res.json({
+        success: true,
+        status: "already_checked_in",
+        message: `⚠️ Check-in já realizado anteriormente às ${new Date(sub.checkedInAt).toLocaleTimeString("pt-BR")}`,
+        checkedInAt: sub.checkedInAt,
+        subscription: sub
+      });
+    }
+
+    // 4. Salvar novo check-in
+    const nowIso = new Date().toISOString();
+    try {
+      await supabase
+        .from('athlete_subscriptions')
+        .update({ checked_in_at: nowIso })
+        .eq('id', subId);
+    } catch { /* ignore fallback */ }
+
+    const db = loadDb();
+    const idx = db.athleteSubscriptions.findIndex(s => s.id === subId);
+    if (idx !== -1) {
+      db.athleteSubscriptions[idx].checkedInAt = nowIso;
+      saveDb(db);
+    }
+
+    sub.checkedInAt = nowIso;
+
+    return res.json({
+      success: true,
+      status: "checked_in",
+      message: "✅ Check-in presencial confirmado com sucesso!",
+      checkedInAt: nowIso,
+      subscription: sub
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // --- GERADOR INTELIGENTE DE TABELAS E PREVENÇÃO DE CONFLITOS ---
 router.get("/:id/team-members-all", async (req, res) => {
   const { id: tournamentId } = req.params;

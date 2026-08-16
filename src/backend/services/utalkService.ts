@@ -17,8 +17,9 @@ const DEFAULT_TPL_CONFIRMED = `✅ *Inscrição Confirmada!*
 
 📋 *Prova(s):* {provas}
 🆔 *Protocolo:* {protocolo}
+🎟️ *Sua Credencial Digital:* {link_credencial}
 
-Boa sorte e bom treino! 💪🏊`;
+Boa sorte e bom evento! 💪🏊`;
 
 const DEFAULT_TPL_CART_RECOVERY = `⏳ *Lembrete de Inscrição Pendente*
 
@@ -251,12 +252,18 @@ export async function sendConfirmedMessage(params: {
   subId: string;
   orgTemplate?: string;
 }) {
+  const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL 
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` 
+    : "https://querocompetir.com.br";
+  const ticketUrl = `${baseUrl}/public/ticket/${params.subId}`;
+
   const template = params.orgTemplate || DEFAULT_TPL_CONFIRMED;
   const message = replaceTemplateVars(template, {
     torneio: params.tournamentName,
     nome_atleta: params.athleteName,
     provas: params.categoryNames.join(", "),
     protocolo: params.subId.slice(0, 8).toUpperCase(),
+    link_credencial: ticketUrl,
   });
 
   return sendWhatsAppMessage({
