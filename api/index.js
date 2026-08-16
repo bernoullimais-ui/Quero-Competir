@@ -1975,10 +1975,44 @@ router2.get("/:id/categories", async (req, res) => {
       };
     });
     result.sort((a, b) => {
-      const orderA = a.rules_config?.display_order ?? a.display_order ?? 999;
-      const orderB = b.rules_config?.display_order ?? b.display_order ?? 999;
-      if (orderA !== orderB) return orderA - orderB;
-      return (a.created_at || "").localeCompare(b.created_at || "");
+      const orderA = a.rules_config?.display_order ?? a.display_order;
+      const orderB = b.rules_config?.display_order ?? b.display_order;
+      if (orderA !== void 0 && orderB !== void 0 && orderA !== orderB) {
+        return orderA - orderB;
+      }
+      if (orderA !== void 0 && orderB === void 0) return -1;
+      if (orderA === void 0 && orderB !== void 0) return 1;
+      const getAgeWeight = (cat) => {
+        if (cat.birth_year_max !== null && cat.birth_year_max !== void 0) {
+          return -cat.birth_year_max;
+        }
+        const match = (cat.age_group || cat.name || "").match(/\d+/);
+        return match ? parseInt(match[0], 10) : 999;
+      };
+      const ageA = getAgeWeight(a);
+      const ageB = getAgeWeight(b);
+      if (ageA !== ageB) return ageA - ageB;
+      const getStrokeWeight = (cat) => {
+        const text = (cat.name + " " + (cat.rules_config?.swim_event_label || "")).toLowerCase();
+        if (text.includes("livre") || text.includes("craw") || text.includes("free")) return 1;
+        if (text.includes("costa") || text.includes("back")) return 2;
+        if (text.includes("borbo") || text.includes("fly")) return 3;
+        if (text.includes("peito") || text.includes("breast")) return 4;
+        if (text.includes("medley")) return 5;
+        if (text.includes("revezamento") || text.includes("rev")) return 6;
+        return 7;
+      };
+      const strokeA = getStrokeWeight(a);
+      const strokeB = getStrokeWeight(b);
+      if (strokeA !== strokeB) return strokeA - strokeB;
+      const getDistance = (cat) => {
+        const match = (cat.name || "").match(/(\d+)\s*m/i) || (cat.name || "").match(/(\d+)/);
+        return match ? parseInt(match[1], 10) : 50;
+      };
+      const distA = getDistance(a);
+      const distB = getDistance(b);
+      if (distA !== distB) return distA - distB;
+      return (a.name || "").localeCompare(b.name || "");
     });
     res.json(result);
   } catch (error) {

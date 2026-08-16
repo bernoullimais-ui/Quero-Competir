@@ -1015,10 +1015,56 @@ router.get("/:id/categories", async (req, res) => {
     });
 
     result.sort((a, b) => {
-      const orderA = a.rules_config?.display_order ?? a.display_order ?? 999;
-      const orderB = b.rules_config?.display_order ?? b.display_order ?? 999;
-      if (orderA !== orderB) return orderA - orderB;
-      return (a.created_at || "").localeCompare(b.created_at || "");
+      const orderA = a.rules_config?.display_order ?? a.display_order;
+      const orderB = b.rules_config?.display_order ?? b.display_order;
+
+      if (orderA !== undefined && orderB !== undefined && orderA !== orderB) {
+        return orderA - orderB;
+      }
+      if (orderA !== undefined && orderB === undefined) return -1;
+      if (orderA === undefined && orderB !== undefined) return 1;
+
+      // Critérios Oficiais de Desempate / Ordenação Padrão:
+      // 1. Idade: dos mais novos para os mais velhos
+      const getAgeWeight = (cat: any) => {
+        if (cat.birth_year_max !== null && cat.birth_year_max !== undefined) {
+          return -cat.birth_year_max;
+        }
+        const match = (cat.age_group || cat.name || "").match(/\d+/);
+        return match ? parseInt(match[0], 10) : 999;
+      };
+
+      const ageA = getAgeWeight(a);
+      const ageB = getAgeWeight(b);
+      if (ageA !== ageB) return ageA - ageB;
+
+      // 2. Estilo: Livre (1), Costas (2), Borbo (3), Peito (4), Medley (5), Revezamento (6)
+      const getStrokeWeight = (cat: any) => {
+        const text = (cat.name + " " + (cat.rules_config?.swim_event_label || "")).toLowerCase();
+        if (text.includes("livre") || text.includes("craw") || text.includes("free")) return 1;
+        if (text.includes("costa") || text.includes("back")) return 2;
+        if (text.includes("borbo") || text.includes("fly")) return 3;
+        if (text.includes("peito") || text.includes("breast")) return 4;
+        if (text.includes("medley")) return 5;
+        if (text.includes("revezamento") || text.includes("rev")) return 6;
+        return 7;
+      };
+
+      const strokeA = getStrokeWeight(a);
+      const strokeB = getStrokeWeight(b);
+      if (strokeA !== strokeB) return strokeA - strokeB;
+
+      // 3. Distância: das mais curtas para as mais longas
+      const getDistance = (cat: any) => {
+        const match = (cat.name || "").match(/(\d+)\s*m/i) || (cat.name || "").match(/(\d+)/);
+        return match ? parseInt(match[1], 10) : 50;
+      };
+
+      const distA = getDistance(a);
+      const distB = getDistance(b);
+      if (distA !== distB) return distA - distB;
+
+      return (a.name || "").localeCompare(b.name || "");
     });
 
     res.json(result);

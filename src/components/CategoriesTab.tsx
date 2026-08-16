@@ -12,12 +12,12 @@ interface CategoriesTabProps {
 
 // ── Natação: provas pré-configuradas ─────────────────────────────────────────
 const SWIM_EVENTS = [
-  { id: "50m_borbo_fem",   label: "50M BORBO FEM",        gender: "Feminino" },
-  { id: "50m_borbo_masc",  label: "50M BORBO MASC",       gender: "Masculino" },
   { id: "50m_livre_fem",   label: "50M LIVRE FEM",        gender: "Feminino" },
   { id: "50m_livre_masc",  label: "50M LIVRE MASC",       gender: "Masculino" },
   { id: "50m_costa_fem",   label: "50M COSTA FEM",        gender: "Feminino" },
   { id: "50m_costa_masc",  label: "50M COSTA MASC",       gender: "Masculino" },
+  { id: "50m_borbo_fem",   label: "50M BORBO FEM",        gender: "Feminino" },
+  { id: "50m_borbo_masc",  label: "50M BORBO MASC",       gender: "Masculino" },
   { id: "50m_peito_fem",   label: "50M PEITO FEM",        gender: "Feminino" },
   { id: "50m_peito_masc",  label: "50M PEITO MASC",       gender: "Masculino" },
   { id: "100m_medley_fem", label: "100M MEDLEY FEM",      gender: "Feminino" },
@@ -137,6 +137,74 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
       toastError(err.message || "Falha ao reordenar");
     } finally {
       setIsSavingOrder(false);
+    }
+  };
+
+  const sortSwimmingCategoriesByDefault = (cats: any[]) => {
+    return [...cats].sort((a, b) => {
+      // 1. Idade: dos mais novos para os mais velhos
+      const getAgeWeight = (cat: any) => {
+        if (cat.birth_year_max !== null && cat.birth_year_max !== undefined) {
+          return -cat.birth_year_max;
+        }
+        const match = (cat.age_group || cat.name || "").match(/\d+/);
+        return match ? parseInt(match[0], 10) : 999;
+      };
+
+      const ageA = getAgeWeight(a);
+      const ageB = getAgeWeight(b);
+      if (ageA !== ageB) return ageA - ageB;
+
+      // 2. Estilo: Livre (1), Costas (2), Borbo (3), Peito (4), Medley (5), Revezamento (6)
+      const getStrokeWeight = (cat: any) => {
+        const text = (cat.name + " " + (cat.rules_config?.swim_event_label || "")).toLowerCase();
+        if (text.includes("livre") || text.includes("craw") || text.includes("free")) return 1;
+        if (text.includes("costa") || text.includes("back")) return 2;
+        if (text.includes("borbo") || text.includes("fly")) return 3;
+        if (text.includes("peito") || text.includes("breast")) return 4;
+        if (text.includes("medley")) return 5;
+        if (text.includes("revezamento") || text.includes("rev")) return 6;
+        return 7;
+      };
+
+      const strokeA = getStrokeWeight(a);
+      const strokeB = getStrokeWeight(b);
+      if (strokeA !== strokeB) return strokeA - strokeB;
+
+      // 3. Distância: das mais curtas para as mais longas
+      const getDistance = (cat: any) => {
+        const match = (cat.name || "").match(/(\d+)\s*m/i) || (cat.name || "").match(/(\d+)/);
+        return match ? parseInt(match[1], 10) : 50;
+      };
+
+      const distA = getDistance(a);
+      const distB = getDistance(b);
+      if (distA !== distB) return distA - distB;
+
+      return (a.name || "").localeCompare(b.name || "");
+    });
+  };
+
+  const handleApplyDefaultOfficialOrder = async () => {
+    const sorted = sortSwimmingCategoriesByDefault(categories);
+    const orderedIds = sorted.map(c => c.id).filter(Boolean);
+
+    if (orderedIds.length > 0) {
+      setIsSavingOrder(true);
+      try {
+        const res = await fetch(`/api/tournaments/${tournamentId}/categories/reorder`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderedIds }),
+        });
+        if (!res.ok) throw new Error("Erro ao salvar ordem oficial");
+        toastSuccess("Provas reordenadas pelo Padrão Oficial (Idade ➔ Estilo ➔ Distância)!");
+        refreshCategories();
+      } catch (err: any) {
+        toastError(err.message || "Erro ao reordenar provas.");
+      } finally {
+        setIsSavingOrder(false);
+      }
     }
   };
 
@@ -396,15 +464,26 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
           <h3 className="text-xl font-bold">Categorias & Provas do Torneio</h3>
           <p className="text-slate-500 text-sm">Defina as modalidades e a sequência oficial de provas do evento.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {categories.length > 1 && (
-            <button
-              onClick={() => setShowReorderModal(true)}
-              className="bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 text-sm cursor-pointer shadow-xs"
-            >
-              <ArrowUpDown size={16} />
-              Reordenar Provas 🔢
-            </button>
+            <>
+              <button
+                onClick={handleApplyDefaultOfficialOrder}
+                disabled={isSavingOrder}
+                className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 text-sm cursor-pointer shadow-xs disabled:opacity-50"
+                title="Ordenar por Idade (mais novos aos mais velhos), Estilo (Livre, Costas, Borbo, Peito, Medley) e Distância"
+              >
+                <Waves size={16} />
+                Ordenar por Padrão Oficial 🏊‍♂️
+              </button>
+              <button
+                onClick={() => setShowReorderModal(true)}
+                className="bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 text-sm cursor-pointer shadow-xs"
+              >
+                <ArrowUpDown size={16} />
+                Reordenar Provas 🔢
+              </button>
+            </>
           )}
           <button
             onClick={openAddModal}
