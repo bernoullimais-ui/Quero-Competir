@@ -4109,15 +4109,19 @@ router.get("/public/athlete-subscription/:subId", async (req, res) => {
     // Buscar todas as modalidades/categorias registradas por este atleta neste torneio
     let categoriesList: any[] = [catRes.data].filter(Boolean);
     try {
+      const targetDoc = sub.document || sub.document_number;
+      const targetName = sub.athleteName || sub.athlete_name;
+      const targetTournId = sub.tournamentId || sub.tournament_id;
+
       let subQuery = supabase
         .from('athlete_subscriptions')
         .select('category_id')
-        .eq('tournament_id', sub.tournamentId);
+        .eq('tournament_id', targetTournId);
 
-      if (sub.document) {
-        subQuery = subQuery.eq('document', sub.document);
-      } else if (sub.athleteName) {
-        subQuery = subQuery.eq('athlete_name', sub.athleteName);
+      if (targetDoc) {
+        subQuery = subQuery.eq('document', targetDoc);
+      } else if (targetName) {
+        subQuery = subQuery.eq('athlete_name', targetName);
       }
 
       const { data: siblingSubs } = await subQuery;
@@ -4129,7 +4133,7 @@ router.get("/public/athlete-subscription/:subId", async (req, res) => {
           .in('id', catIds);
 
         if (siblingCats && siblingCats.length > 0) {
-          categoriesList = siblingCats.map(c => mapCategoryToFrontend(c));
+          categoriesList = siblingCats;
         }
       }
     } catch (catErr: any) {
