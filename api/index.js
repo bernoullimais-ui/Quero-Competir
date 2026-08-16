@@ -6407,6 +6407,27 @@ import path5 from "path";
 var router6 = Router6();
 var DATA_FILE2 = path5.join(process.cwd(), "src", "backend", "data", "subscriptions.json");
 var INST_PAYMENTS_FILE2 = path5.join(process.cwd(), "src", "backend", "data", "institution_payments.json");
+var BANK_DATA_FILE = path5.join(process.cwd(), "src", "backend", "data", "bank_details.json");
+function loadBankDataDb() {
+  try {
+    const dir = path5.dirname(BANK_DATA_FILE);
+    if (!fs5.existsSync(dir)) fs5.mkdirSync(dir, { recursive: true });
+    if (!fs5.existsSync(BANK_DATA_FILE)) {
+      fs5.writeFileSync(BANK_DATA_FILE, "{}", "utf-8");
+    }
+    return JSON.parse(fs5.readFileSync(BANK_DATA_FILE, "utf-8"));
+  } catch (e) {
+    return {};
+  }
+}
+function saveBankDataDb(data) {
+  try {
+    const dir = path5.dirname(BANK_DATA_FILE);
+    if (!fs5.existsSync(dir)) fs5.mkdirSync(dir, { recursive: true });
+    fs5.writeFileSync(BANK_DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+  } catch (e) {
+  }
+}
 async function callPagarMe3(endpoint, method, body) {
   const secretKey = process.env.PAGARME_SECRET_KEY;
   if (!secretKey) {
@@ -6431,22 +6452,27 @@ async function callPagarMe3(endpoint, method, body) {
 }
 router6.get("/organizations/:id/recipient-status", requireAuth, async (req, res) => {
   const { id } = req.params;
+  const targetId = id || "org-1";
   try {
     const supabase = getSupabaseAdmin();
-    const { data: org, error } = await supabase.from("organizations").select("*").eq("id", id).maybeSingle();
-    if (error) throw error;
-    if (!org) {
-      return res.status(404).json({ error: "Organiza\xE7\xE3o n\xE3o encontrada." });
+    let org = null;
+    try {
+      const { data } = await supabase.from("organizations").select("*").eq("id", targetId).maybeSingle();
+      org = data;
+    } catch (_) {
     }
-    let liveStatus = org.pagarme_recipient_status || "not_configured";
+    const localBankDb = loadBankDataDb();
+    const localData = localBankDb[targetId] || localBankDb["org-1"] || {};
+    let recipientId = org?.pagarme_recipient_id || localData.pagarmeRecipientId || null;
+    let liveStatus = org?.pagarme_recipient_status || localData.pagarmeRecipientStatus || "not_configured";
     let pagarmeDetails = null;
-    if (org.pagarme_recipient_id && process.env.PAGARME_SECRET_KEY) {
+    if (recipientId && process.env.PAGARME_SECRET_KEY) {
       try {
-        pagarmeDetails = await callPagarMe3(`/recipients/${org.pagarme_recipient_id}`, "GET", null);
+        pagarmeDetails = await callPagarMe3(`/recipients/${recipientId}`, "GET", null);
         if (pagarmeDetails && pagarmeDetails.status) {
           liveStatus = pagarmeDetails.status;
-          if (liveStatus !== org.pagarme_recipient_status) {
-            await supabase.from("organizations").update({ pagarme_recipient_status: liveStatus }).eq("id", id);
+          if (org && liveStatus !== org.pagarme_recipient_status) {
+            await supabase.from("organizations").update({ pagarme_recipient_status: liveStatus }).eq("id", targetId);
           }
         }
       } catch (err) {
@@ -6454,19 +6480,19 @@ router6.get("/organizations/:id/recipient-status", requireAuth, async (req, res)
       }
     }
     res.json({
-      pagarmeRecipientId: org.pagarme_recipient_id || null,
+      pagarmeRecipientId: recipientId,
       pagarmeRecipientStatus: liveStatus,
-      platformFeePercent: org.platform_fee_percent !== void 0 ? Number(org.platform_fee_percent) : 10,
+      platformFeePercent: org?.platform_fee_percent !== void 0 && org?.platform_fee_percent !== null ? Number(org.platform_fee_percent) : localData.platformFeePercent || 10,
       bankData: {
-        holderName: org.bank_holder_name || "",
-        holderDocument: org.bank_holder_document || "",
-        holderType: org.bank_holder_type || "individual",
-        bankCode: org.bank_code || "",
-        bankBranch: org.bank_branch || "",
-        bankAccount: org.bank_account || "",
-        bankAccountType: org.bank_account_type || "checking",
-        holderEmail: org.bank_holder_email || "",
-        holderPhone: org.bank_holder_phone || ""
+        holderName: org?.bank_holder_name || localData.holderName || "",
+        holderDocument: org?.bank_holder_document || localData.holderDocument || "",
+        holderType: org?.bank_holder_type || localData.holderType || "individual",
+        bankCode: org?.bank_code || localData.bankCode || "341",
+        bankBranch: org?.bank_branch || localData.bankBranch || "",
+        bankAccount: org?.bank_account || localData.bankAccount || "",
+        bankAccountType: org?.bank_account_type || localData.bankAccountType || "checking",
+        holderEmail: org?.bank_holder_email || localData.holderEmail || "",
+        holderPhone: org?.bank_holder_phone || localData.holderPhone || ""
       },
       pagarmeDetails
     });
@@ -6531,6 +6557,7 @@ router6.post("/organizations/:id/create-recipient", requireAuth, async (req, res
       recipientStatus = "active";
     }
     const dbPayload = {
+      id,
       pagarme_recipient_id: recipientId,
       pagarme_recipient_status: recipientStatus,
       bank_holder_name: holderName,
@@ -6543,18 +6570,54 @@ router6.post("/organizations/:id/create-recipient", requireAuth, async (req, res
       bank_holder_email: holderEmail || null,
       bank_holder_phone: cleanPhone || null
     };
-    const { error: updateErr } = await supabase.from("organizations").update(dbPayload).eq("id", id);
-    if (updateErr) {
-      console.error("Erro ao atualizar organiza\xE7\xF5es no Supabase:", updateErr);
-      await supabase.from("organizations").update({
-        pagarme_recipient_id: recipientId,
-        pagarme_recipient_status: recipientStatus
-      }).eq("id", id);
+    try {
+      const { error: updateErr } = await supabase.from("organizations").upsert(dbPayload);
+      if (updateErr) {
+        console.warn("Aviso ao salvar organiza\xE7\xE3o no Supabase (tentando update restrito):", updateErr.message);
+        await supabase.from("organizations").update({
+          pagarme_recipient_id: recipientId,
+          pagarme_recipient_status: recipientStatus
+        }).eq("id", id);
+      }
+    } catch (e) {
+      console.warn("Exce\xE7\xE3o Supabase ao salvar recebedor:", e.message);
     }
+    const localBankDb = loadBankDataDb();
+    const bankRecord = {
+      pagarmeRecipientId: recipientId,
+      pagarmeRecipientStatus: recipientStatus,
+      holderName,
+      holderDocument: cleanDoc,
+      holderType: holderType || (cleanDoc.length === 11 ? "individual" : "corporation"),
+      bankCode,
+      bankBranch: cleanBranch,
+      bankAccount: accountFull,
+      bankAccountType: bankAccountType || "checking",
+      holderEmail: holderEmail || "",
+      holderPhone: cleanPhone || "",
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    localBankDb[id] = bankRecord;
+    if (id === "org-1" || id === "redefluir") {
+      localBankDb["org-1"] = bankRecord;
+      localBankDb["redefluir"] = bankRecord;
+    }
+    saveBankDataDb(localBankDb);
     res.json({
       success: true,
       pagarmeRecipientId: recipientId,
       pagarmeRecipientStatus: recipientStatus,
+      bankData: {
+        holderName,
+        holderDocument: cleanDoc,
+        holderType,
+        bankCode,
+        bankBranch: cleanBranch,
+        bankAccount: accountFull,
+        bankAccountType,
+        holderEmail,
+        holderPhone: cleanPhone
+      },
       message: "Dados banc\xE1rios e conta de recebedor configurados com sucesso!"
     });
   } catch (err) {

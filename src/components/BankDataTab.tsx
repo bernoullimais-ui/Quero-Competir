@@ -80,14 +80,11 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
   const [holderPhone, setHolderPhone] = useState("");
 
   const fetchRecipientStatus = async () => {
-    if (!organizationId) {
-      setLoading(false);
-      return;
-    }
+    const targetId = organizationId || "org-1";
     setLoading(true);
     try {
       const token = getAuthToken();
-      const res = await fetch(`/api/payments/organizations/${organizationId}/recipient-status`, {
+      const res = await fetch(`/api/payments/organizations/${targetId}/recipient-status`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -134,9 +131,7 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
   };
 
   useEffect(() => {
-    if (organizationId) {
-      fetchRecipientStatus();
-    }
+    fetchRecipientStatus();
   }, [organizationId]);
 
   const handleSubmitRecipient = async (e: React.FormEvent) => {
@@ -149,7 +144,8 @@ export const BankDataTab: React.FC<BankDataTabProps> = ({ organizationId }) => {
     setSaving(true);
     try {
       const token = getAuthToken();
-      const res = await fetch(`/api/payments/organizations/${organizationId}/create-recipient`, {
+      const targetId = organizationId || "org-1";
+      const res = await fetch(`/api/payments/organizations/${targetId}/create-recipient`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
