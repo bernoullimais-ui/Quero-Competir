@@ -108,6 +108,26 @@ const getDynamicTabLabel = (categories: any[], tournament: any): string => {
   return parts.join("/");
 };
 
+const hasTeamSports = (categories: any[], tournament: any): boolean => {
+  if (categories && categories.length > 0) {
+    return categories.some((cat) => {
+      const st = cat.rules_config?.sport_type;
+      const catName = (cat.name || "").toLowerCase();
+
+      const isSwimming = st === "swimming" || catName.includes("natação") || catName.includes("natacao") || catName.includes("swim");
+      const isCombat = st === "combat" || catName.includes("judô") || catName.includes("judo") || catName.includes("jiu") || catName.includes("karate") || catName.includes("karatê") || catName.includes("luta") || catName.includes("taekwondo");
+
+      return !isSwimming && !isCombat;
+    });
+  }
+
+  const tourName = (tournament?.name || "").toLowerCase();
+  const isSwimming = tourName.includes("natação") || tourName.includes("natacao");
+  const isCombat = tourName.includes("judô") || tourName.includes("judo") || tourName.includes("jiu") || tourName.includes("karate") || tourName.includes("luta");
+
+  return !isSwimming && !isCombat;
+};
+
 const handlePrintAllSumulas = (displayCats: any[], athleteSubs: any[], tournament: any) => {
   const printWindow = window.open("", "_blank");
   if (!printWindow) return;
@@ -396,14 +416,16 @@ export default function PublicTournamentView() {
             >
               <TrendingUp size={16} /> Classificação
             </button>
-            <button
-              onClick={() => setActiveTab("estatisticas")}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
-                activeTab === "estatisticas" ? "bg-white text-indigo-700 shadow-sm" : "text-indigo-100 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Trophy size={16} /> Estatísticas gerais
-            </button>
+            {hasTeamSports(categories, tournament) && (
+              <button
+                onClick={() => setActiveTab("estatisticas")}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                  activeTab === "estatisticas" ? "bg-white text-indigo-700 shadow-sm" : "text-indigo-100 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <Trophy size={16} /> Estatísticas gerais
+              </button>
+            )}
             <button
               onClick={() => setActiveTab("comunidade")}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
@@ -663,7 +685,7 @@ export default function PublicTournamentView() {
           </ErrorBoundary>
         )}
 
-        {activeTab === "estatisticas" && (
+        {activeTab === "estatisticas" && hasTeamSports(categories, tournament) && (
           <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-red-55 rounded-xl">Erro ao processar as estatísticas deste torneio.</div>}>
             <TournamentStats tournamentId={id!} />
           </ErrorBoundary>
