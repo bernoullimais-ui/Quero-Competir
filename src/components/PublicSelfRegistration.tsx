@@ -131,8 +131,7 @@ export default function PublicSelfRegistration() {
   const [docFileName, setDocFileName] = useState("");
 
   // Step 6 — Terms
-  const [acceptedImageUse, setAcceptedImageUse] = useState(false);
-  const [acceptedLiability, setAcceptedLiability] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState<Record<string, boolean>>({});
 
   // Result
   const [resultSubIds, setResultSubIds] = useState<string[]>([]);
@@ -243,8 +242,9 @@ export default function PublicSelfRegistration() {
           parentEmail,
           parentPassword,
           photoFile, documentFile: docFile,
-          authorizedImageUse: acceptedImageUse,
-          liabilityWaiver: acceptedLiability,
+          authorizedImageUse: true,
+          liabilityWaiver: true,
+          acceptedTerms,
           isSelfGuardian,
           additionalData: { bloodType, allergies, emergencyContact, seedTimes },
         })
@@ -809,44 +809,77 @@ export default function PublicSelfRegistration() {
                   </div>
                 </div>
 
-                {/* Term 1 */}
-                <button type="button" onClick={() => setAcceptedImageUse(!acceptedImageUse)}
-                  className={`w-full flex gap-3 p-4 rounded-2xl border text-left transition-all ${acceptedImageUse ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"}`}>
-                  <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 border-2 transition-all ${acceptedImageUse ? "bg-emerald-500 border-emerald-500" : "border-slate-300"}`}>
-                    {acceptedImageUse && <Check size={12} className="text-white" />}
-                  </div>
-                  <div>
-                    <p className="text-xs font-black text-slate-700 mb-1">Concessão de Direito de Uso de Imagem</p>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">Autorizo expressamente o organizador do torneio a capturar e utilizar imagens, vídeos e transmissões de áudio nas quais o atleta participante figure, com finalidade puramente de divulgação esportiva.</p>
-                  </div>
-                </button>
+                {/* Termos dinâmicos configurados no Torneio */}
+                {(() => {
+                  const termsList: any[] = settings?.registrationConfig?.terms || [
+                    {
+                      id: "imageUse",
+                      title: "1. Concessão de Direito de Uso de Imagem",
+                      content: "Autorizo expressamente o organizador do torneio a capturar e utilizar imagens, vídeos e transmissões de áudio nas quais o atleta participante figure, com finalidade puramente de divulgação esportiva, cobertura oficial das partidas, publicações em mídias impressas, redes sociais e portal oficial da competição, sem que isso gere qualquer direito a retribuição financeira.",
+                      enabled: true,
+                      required: true
+                    },
+                    {
+                      id: "liability",
+                      title: "2. Termo de Aptidão Física e Responsabilidade",
+                      content: "Declaro estar inteiramente ciente das regras oficiais do torneio. Sob as penas da lei, declaro que o atleta encontra-se plenamente apto e saudável para a participação em esportes competitivos, gozando de perfeita saúde física e mental. Isento de qualquer responsabilidade civil ou criminal os realizadores, a instituição escolar representativa e os patrocinadores por acidentes, imprevistos ou perdas decorrentes do andamento regular dos jogos.",
+                      enabled: true,
+                      required: true
+                    }
+                  ];
 
-                {/* Term 2 */}
-                <button type="button" onClick={() => setAcceptedLiability(!acceptedLiability)}
-                  className={`w-full flex gap-3 p-4 rounded-2xl border text-left transition-all ${acceptedLiability ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"}`}>
-                  <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 border-2 transition-all ${acceptedLiability ? "bg-emerald-500 border-emerald-500" : "border-slate-300"}`}>
-                    {acceptedLiability && <Check size={12} className="text-white" />}
-                  </div>
-                  <div>
-                    <p className="text-xs font-black text-slate-700 mb-1">Termo de Aptidão Física e Responsabilidade</p>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">Declaro que o atleta encontra-se plenamente apto e saudável para a participação em esportes competitivos. Isento os realizadores e patrocinadores de responsabilidade por acidentes decorrentes dos jogos.</p>
-                  </div>
-                </button>
+                  const activeTerms = termsList.filter((t: any) => t.enabled !== false);
+                  const isAllRequiredAccepted = activeTerms.every((t: any) => !t.required || acceptedTerms[t.id]);
 
-                {submitError && (
-                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex gap-2 text-rose-700 text-sm font-semibold">
-                    <AlertCircle size={18} className="shrink-0 mt-0.5" />
-                    {submitError}
-                  </div>
-                )}
+                  return (
+                    <>
+                      <div className="space-y-3">
+                        {activeTerms.map((term: any) => {
+                          const isChecked = !!acceptedTerms[term.id];
+                          const termTitle = term.title || term.name || "Termo de Aceite";
+                          const rawContent = term.content || term.text || "";
+                          const termContent = rawContent.replace(/{tournament}/g, tournament?.name || "");
 
-                <div className="flex gap-3">
-                  <button onClick={handleBack} className="px-5 py-3 rounded-xl border border-slate-200 font-bold text-sm text-slate-600 hover:bg-slate-50"><ChevronLeft size={16} /></button>
-                  <button onClick={handleSubmit} disabled={!acceptedImageUse || !acceptedLiability}
-                    className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                    <CheckCircle2 size={16} /> Confirmar Inscrição
-                  </button>
-                </div>
+                          return (
+                            <button
+                              key={term.id}
+                              type="button"
+                              onClick={() => setAcceptedTerms(prev => ({ ...prev, [term.id]: !prev[term.id] }))}
+                              className={`w-full flex gap-3 p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                                isChecked ? "border-emerald-300 bg-emerald-50/80 ring-2 ring-emerald-500/10" : "border-slate-200 bg-white hover:border-slate-300"
+                              }`}
+                            >
+                              <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 border-2 transition-all ${
+                                isChecked ? "bg-emerald-500 border-emerald-500" : "border-slate-300"
+                              }`}>
+                                {isChecked && <Check size={12} className="text-white" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-black text-slate-800 mb-1">{termTitle}</p>
+                                <p className="text-[11px] text-slate-600 leading-relaxed whitespace-pre-line">{termContent}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {submitError && (
+                        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex gap-2 text-rose-700 text-sm font-semibold">
+                          <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                          {submitError}
+                        </div>
+                      )}
+
+                      <div className="flex gap-3">
+                        <button onClick={handleBack} className="px-5 py-3 rounded-xl border border-slate-200 font-bold text-sm text-slate-600 hover:bg-slate-50"><ChevronLeft size={16} /></button>
+                        <button onClick={handleSubmit} disabled={!isAllRequiredAccepted}
+                          className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer">
+                          <CheckCircle2 size={16} /> Confirmar Inscrição
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
 
