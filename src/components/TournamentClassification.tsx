@@ -444,13 +444,13 @@ export default function TournamentClassification({ tournamentId }: Props) {
                                     <td className="py-3 px-4 text-center">
                                       {hasResult ? (
                                         rankIdx === 0 ? (
-                                          <span className="px-2.5 py-1 rounded-lg bg-amber-400 text-indigo-950 font-black text-xs shadow-xs">1º 🥇</span>
+                                          <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-indigo-950 font-black text-xs shadow-xs whitespace-nowrap border border-amber-300">1º 🥇</span>
                                         ) : rankIdx === 1 ? (
-                                          <span className="px-2.5 py-1 rounded-lg bg-slate-300 text-indigo-950 font-black text-xs shadow-xs">2º 🥈</span>
+                                          <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-slate-200 to-slate-300 text-slate-900 font-black text-xs shadow-xs whitespace-nowrap border border-slate-300">2º 🥈</span>
                                         ) : rankIdx === 2 ? (
-                                          <span className="px-2.5 py-1 rounded-lg bg-amber-600 text-white font-black text-xs shadow-xs">3º 🥉</span>
+                                          <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-700 to-amber-800 text-amber-100 font-black text-xs shadow-xs whitespace-nowrap border border-amber-600">3º 🥉</span>
                                         ) : (
-                                          <span className="font-bold text-slate-500">{rankIdx + 1}º</span>
+                                          <span className="font-bold text-slate-500 whitespace-nowrap">{rankIdx + 1}º</span>
                                         )
                                       ) : (
                                         <span className="text-slate-300 font-normal">—</span>
@@ -513,13 +513,13 @@ export default function TournamentClassification({ tournamentId }: Props) {
                               <td className="py-3 px-4 text-center">
                                 {hasResult ? (
                                   rankIdx === 0 ? (
-                                    <span className="px-2.5 py-1 rounded-lg bg-amber-400 text-indigo-950 font-black text-xs shadow-xs">1º 🥇</span>
+                                    <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-indigo-950 font-black text-xs shadow-xs whitespace-nowrap border border-amber-300">1º 🥇</span>
                                   ) : rankIdx === 1 ? (
-                                    <span className="px-2.5 py-1 rounded-lg bg-slate-300 text-indigo-950 font-black text-xs shadow-xs">2º 🥈</span>
+                                    <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-slate-200 to-slate-300 text-slate-900 font-black text-xs shadow-xs whitespace-nowrap border border-slate-300">2º 🥈</span>
                                   ) : rankIdx === 2 ? (
-                                    <span className="px-2.5 py-1 rounded-lg bg-amber-600 text-white font-black text-xs shadow-xs">3º 🥉</span>
+                                    <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-700 to-amber-800 text-amber-100 font-black text-xs shadow-xs whitespace-nowrap border border-amber-600">3º 🥉</span>
                                   ) : (
-                                    <span className="font-bold text-slate-500">{rankIdx + 1}º</span>
+                                    <span className="font-bold text-slate-500 whitespace-nowrap">{rankIdx + 1}º</span>
                                   )
                                 ) : (
                                   <span className="text-slate-300 font-normal">—</span>

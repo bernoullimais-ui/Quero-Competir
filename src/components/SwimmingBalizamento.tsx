@@ -227,10 +227,10 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
     const overall = getOverallRankings();
     const idx = overall.findIndex((item) => item.athleteId === athleteId);
     if (idx === -1) return null;
-    if (idx === 0) return <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[11px] border border-amber-200 shadow-2xs">1º 🥇 Geral</span>;
-    if (idx === 1) return <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 font-bold text-[11px] border border-slate-300 shadow-2xs">2º 🥈 Geral</span>;
-    if (idx === 2) return <span className="px-2 py-0.5 rounded-md bg-amber-700/20 text-amber-900 font-bold text-[11px] border border-amber-700/30 shadow-2xs">3º 🥉 Geral</span>;
-    return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium text-[11px]">{idx + 1}º Geral</span>;
+    if (idx === 0) return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400 text-indigo-950 font-black text-[11px] border border-amber-300 whitespace-nowrap shadow-2xs">1º 🥇 Geral</span>;
+    if (idx === 1) return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-900 font-black text-[11px] border border-slate-300 whitespace-nowrap shadow-2xs">2º 🥈 Geral</span>;
+    if (idx === 2) return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-700 text-amber-100 font-black text-[11px] border border-amber-600 whitespace-nowrap shadow-2xs">3º 🥉 Geral</span>;
+    return <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold text-[11px] whitespace-nowrap">{idx + 1}º Geral</span>;
   };
 
   // Print Heat Sheet (Súmula)
@@ -449,10 +449,10 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
                       {overallRankings.map((res, i) => (
                         <tr key={res.athleteId} className={i < 3 ? "bg-white/5 font-bold" : "text-slate-300"}>
                           <td className="py-2.5 px-3 text-center">
-                            {i === 0 && <span className="px-2.5 py-1 rounded-lg bg-amber-400 text-indigo-950 font-black text-xs shadow-sm">1º 🥇</span>}
-                            {i === 1 && <span className="px-2.5 py-1 rounded-lg bg-slate-300 text-indigo-950 font-black text-xs shadow-sm">2º 🥈</span>}
-                            {i === 2 && <span className="px-2.5 py-1 rounded-lg bg-amber-600/60 text-amber-100 font-black text-xs shadow-sm">3º 🥉</span>}
-                            {i > 2 && <span className="font-bold text-slate-400">{i + 1}º</span>}
+                            {i === 0 && <span className="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-indigo-950 font-black text-xs shadow-sm whitespace-nowrap border border-amber-300">1º 🥇</span>}
+                            {i === 1 && <span className="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-slate-200 to-slate-300 text-slate-900 font-black text-xs shadow-sm whitespace-nowrap border border-slate-300">2º 🥈</span>}
+                            {i === 2 && <span className="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-full bg-gradient-to-r from-amber-700 to-amber-800 text-amber-100 font-black text-xs shadow-sm whitespace-nowrap border border-amber-600">3º 🥉</span>}
+                            {i > 2 && <span className="font-bold text-slate-400 whitespace-nowrap">{i + 1}º</span>}
                           </td>
                           <td className="py-2.5 px-3 font-bold text-white">{res.athleteName}</td>
                           <td className="py-2.5 px-3 text-slate-300">{res.institutionName}</td>
