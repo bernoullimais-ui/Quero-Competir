@@ -465,7 +465,7 @@ export default function PublicTournamentView() {
                   <EyeOff size={32} />
                 </div>
                 <h3 className="text-xl font-bold text-slate-800">
-                  {getDynamicTabLabel(categories, tournament)} em Elaboração / Omitido 🔒
+                  {getDynamicTabLabel(categories, tournament)} em Elaboração 🔒
                 </h3>
                 <p className="text-slate-500 text-sm max-w-md mx-auto leading-relaxed">
                   O organizador do evento ainda não liberou a divulgação pública dos balizamentos, chaves e tabelas para esta competição.
