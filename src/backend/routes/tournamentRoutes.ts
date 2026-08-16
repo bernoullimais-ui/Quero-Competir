@@ -4106,11 +4106,42 @@ router.get("/public/athlete-subscription/:subId", async (req, res) => {
       }
     }
     
+    // Buscar todas as modalidades/categorias registradas por este atleta neste torneio
+    let categoriesList: any[] = [catRes.data].filter(Boolean);
+    try {
+      let subQuery = supabase
+        .from('athlete_subscriptions')
+        .select('category_id')
+        .eq('tournament_id', sub.tournamentId);
+
+      if (sub.document) {
+        subQuery = subQuery.eq('document', sub.document);
+      } else if (sub.athleteName) {
+        subQuery = subQuery.eq('athlete_name', sub.athleteName);
+      }
+
+      const { data: siblingSubs } = await subQuery;
+      if (siblingSubs && siblingSubs.length > 0) {
+        const catIds = Array.from(new Set(siblingSubs.map(s => s.category_id).filter(Boolean)));
+        const { data: siblingCats } = await supabase
+          .from('tournament_categories')
+          .select('id, name, gender, rules_config')
+          .in('id', catIds);
+
+        if (siblingCats && siblingCats.length > 0) {
+          categoriesList = siblingCats.map(c => mapCategoryToFrontend(c));
+        }
+      }
+    } catch (catErr: any) {
+      console.warn("Erro ao buscar modalidades irmãs do atleta:", catErr.message);
+    }
+    
     res.json({
       subscription: sub,
       tournament: tRes.data,
       institution: instRes.data,
       category: catRes.data,
+      categories: categoriesList,
       settings,
       membershipStatus,
       organization: organizationData,

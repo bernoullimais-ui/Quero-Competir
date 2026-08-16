@@ -577,7 +577,11 @@ export default function PublicAthleteRegistration() {
     );
   }
 
-  const { subscription, tournament, institution, category, settings, organization } = data;
+  const { subscription, tournament, institution, category, categories, settings, organization } = data;
+  const allCategoryNames = (categories && categories.length > 0)
+    ? categories.map((c: any) => c.name).filter(Boolean).join(" • ")
+    : (category?.name || "Mista");
+
   const isMinor = () => {
     if (!subscription.birthDate) return true;
     const birthYear = new Date(subscription.birthDate).getFullYear();
@@ -599,7 +603,7 @@ export default function PublicAthleteRegistration() {
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">{tournament?.name}</h1>
           <p className="text-slate-500 mt-1.5 text-sm font-semibold">
-            Equipe: <span className="text-indigo-600">{institution?.name}</span> • Categoria: {category?.name || "Mista"}
+            Equipe: <span className="text-indigo-600">{institution?.name}</span> • Categoria(s): <span className="text-slate-800 font-bold">{allCategoryNames}</span>
             {organization?.name && (
               <> • Organizador: <span className="text-indigo-600">{organization.name}</span></>
             )}
@@ -1473,9 +1477,15 @@ export default function PublicAthleteRegistration() {
                   <span className="text-xs text-slate-400 font-bold uppercase">Atleta</span>
                   <span className="text-xs font-bold text-slate-700">{subscription.athleteName}</span>
                 </div>
-                <div className="flex justify-between border-b border-slate-200 pb-2.5">
-                  <span className="text-xs text-slate-400 font-bold uppercase">Modalidade</span>
-                  <span className="text-xs font-bold text-slate-700">{category?.name || "Mista"}</span>
+                <div className="flex justify-between border-b border-slate-200 pb-2.5 items-start">
+                  <span className="text-xs text-slate-400 font-bold uppercase mt-1">Modalidade(s) / Provas</span>
+                  <div className="flex flex-col items-end gap-1.5 max-w-[65%]">
+                    {(categories && categories.length > 0 ? categories : [category]).map((cat: any, idx: number) => (
+                      <span key={cat?.id || idx} className="text-xs font-bold text-slate-800 bg-slate-100/90 px-2.5 py-1 rounded-lg border border-slate-200 text-right">
+                        {cat?.name || "Prova Inscrita"}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex justify-between border-b border-slate-200 pb-2.5">
                   <span className="text-xs text-slate-400 font-bold uppercase">Representante</span>
