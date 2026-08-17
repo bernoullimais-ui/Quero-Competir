@@ -135,7 +135,8 @@ interface ParsedDesc {
 }
 
 function parseDescription(raw?: string): ParsedDesc {
-  if (!raw) return { description: "", photos: [], bannerUrl: "", eventTime: "", location: "", sponsors: [], collectSeedTime: true };
+  const empty: ParsedDesc = { description: "", photos: [], bannerUrl: "", eventTime: "", location: "", sponsors: [], collectSeedTime: true };
+  if (!raw || typeof raw !== "string") return empty;
   let description = raw;
   let photos: string[] = [];
   let bannerUrl = "";
@@ -145,46 +146,55 @@ function parseDescription(raw?: string): ParsedDesc {
 
   const photosRegex = /<!--OFFICIAL_PHOTOS:(.*?)-->/;
   const photosMatch = raw.match(photosRegex);
-  if (photosMatch) {
+  if (photosMatch && photosMatch[1]) {
     photos = photosMatch[1].split(",").map(u => u.trim()).filter(Boolean);
   }
 
   const bannerRegex = /<!--BANNER_URL:(.*?)-->/;
   const bannerMatch = raw.match(bannerRegex);
-  if (bannerMatch) {
+  if (bannerMatch && bannerMatch[1]) {
     bannerUrl = bannerMatch[1].trim();
   }
 
   const timeRegex = /<!--EVENT_TIME:(.*?)-->/;
   const timeMatch = raw.match(timeRegex);
-  if (timeMatch) {
+  if (timeMatch && timeMatch[1]) {
     eventTime = timeMatch[1].trim();
   }
 
   const locationRegex = /<!--EVENT_LOCATION:(.*?)-->/;
   const locationMatch = raw.match(locationRegex);
-  if (locationMatch) {
+  if (locationMatch && locationMatch[1]) {
     location = locationMatch[1].trim();
   }
 
   const sponsorsRegex = /<!--SPONSORS:(.*?)-->/;
   const sponsorsMatch = raw.match(sponsorsRegex);
-  if (sponsorsMatch) {
+  if (sponsorsMatch && sponsorsMatch[1]) {
     try {
-      sponsors = JSON.parse(sponsorsMatch[1]);
+      const parsed = JSON.parse(sponsorsMatch[1]);
+      if (Array.isArray(parsed)) sponsors = parsed;
     } catch(e){}
   }
 
   const seedTimeRegex = /<!--COLLECT_SEED_TIME:(.*?)-->/;
   const seedTimeMatch = raw.match(seedTimeRegex);
   let collectSeedTime = true;
-  if (seedTimeMatch) {
+  if (seedTimeMatch && seedTimeMatch[1]) {
     collectSeedTime = seedTimeMatch[1].trim() === "true";
   }
 
   const cleanDescription = description.replace(/<!--[\s\S]*?-->/g, "").trim();
 
-  return { description: cleanDescription, photos, bannerUrl, eventTime, location, sponsors, collectSeedTime };
+  return {
+    description: cleanDescription || "",
+    photos: Array.isArray(photos) ? photos : [],
+    bannerUrl: bannerUrl || "",
+    eventTime: eventTime || "",
+    location: location || "",
+    sponsors: Array.isArray(sponsors) ? sponsors : [],
+    collectSeedTime
+  };
 }
 
 function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string, eventTime?: string, location?: string, sponsors?: Sponsor[], collectSeedTime: boolean = true): string {
