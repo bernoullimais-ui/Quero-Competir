@@ -453,10 +453,6 @@ export default function App() {
           <Router>
             <TitleUpdater currentUser={currentUser} />
             <Routes>
-              {/* Landing Page — root for unauthenticated users */}
-              <Route path="/" element={
-                currentUser ? <Navigate to="/painel" replace /> : <LandingPage onLoginSuccess={handleLoginSuccess} />
-              } />
               <Route path="/login" element={
                 currentUser ? <Navigate to="/" replace /> :
                 <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar o login.</div>}>
@@ -547,7 +543,7 @@ export default function App() {
               {/* Secure Routing Hierarchy */}
               <Route path="/*" element={
                 !currentUser ? (
-                  <Navigate to="/" replace />
+                  <LandingPage onLoginSuccess={handleLoginSuccess} />
                 ) : currentUser.role === "super_admin" ? (
                   <ErrorBoundary fallback={<div className="p-8 text-center text-red-500">Erro no painel do administrador.</div>}>
                     <SuperAdminDashboard currentUser={currentUser} onLogout={handleLogout} />
