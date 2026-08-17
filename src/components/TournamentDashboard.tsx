@@ -239,7 +239,9 @@ export default function TournamentDashboard() {
     queryKey: ['tournament', id],
     queryFn: async () => {
       const res = await fetch(`/api/tournaments/${id}`);
-      return res.json();
+      const data = await res.json();
+      if (!res.ok || !data || data.error) return null;
+      return data;
     }
   });
 
@@ -1299,11 +1301,13 @@ export default function TournamentDashboard() {
     </div>
   );
 
-  if (!tournament) return (
-    <div className="text-center py-20">
-      <h2 className="text-2xl font-bold text-slate-800">Torneio não encontrado</h2>
-      <button onClick={() => navigate("/torneios")} className="mt-4 text-indigo-600 font-semibold">
-        Voltar para a lista
+  if (!tournament || tournament.error) return (
+    <div className="text-center py-20 bg-white rounded-3xl border border-slate-100 shadow-sm my-8 max-w-xl mx-auto space-y-3">
+      <Trophy size={48} className="mx-auto text-slate-300" />
+      <h2 className="text-2xl font-bold text-slate-800">Torneio não localizado ou indisponível</h2>
+      <p className="text-slate-400 text-sm max-w-sm mx-auto">O identificador informado não retornou um torneio ativo.</p>
+      <button onClick={() => navigate("/torneios")} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition cursor-pointer">
+        Voltar para a Lista de Torneios
       </button>
     </div>
   );
@@ -1326,7 +1330,7 @@ export default function TournamentDashboard() {
               {tournament.logo_url ? (
                 <img 
                   src={tournament.logo_url} 
-                  alt={tournament.name} 
+                  alt={tournament.name || "Torneio"} 
                   className="w-full h-full object-cover" 
                   referrerPolicy="no-referrer"
                 />
@@ -1335,11 +1339,11 @@ export default function TournamentDashboard() {
               )}
             </div>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{tournament.name}</h1>
+              <h1 className="text-3xl font-bold tracking-tight">{tournament.name || "Torneio Esportivo"}</h1>
               <div className="flex items-center gap-4 mt-1 text-slate-500 text-sm">
                 <span className="flex items-center gap-1">
                   <Calendar size={14} />
-                  {new Date(tournament.start_date).toLocaleDateString()}
+                  {tournament.start_date ? new Date(tournament.start_date).toLocaleDateString("pt-BR") : "Data a definir"}
                 </span>
                 <span className="flex items-center gap-1">
                   <MapPin size={14} />
