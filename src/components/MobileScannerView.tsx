@@ -93,14 +93,14 @@ export default function MobileScannerView() {
           setScanResult({
             status: "warning",
             message: data.message,
-            athleteName: data.athlete?.name
+            athleteName: data.subscription?.athleteName || data.subscription?.athlete_name
           });
         } else if (data.status === "checked_in") {
           playBeep("success");
           setScanResult({
             status: "success",
             message: "Check-in realizado com sucesso!",
-            athleteName: data.athlete?.name
+            athleteName: data.subscription?.athleteName || data.subscription?.athlete_name
           });
         } else {
           playBeep("error");
@@ -125,6 +125,23 @@ export default function MobileScannerView() {
       }, 3500);
     }
   };
+
+  const { data: registrations } = useQuery({
+    queryKey: ["tournament", tournamentId, "registrations"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tournaments/${tournamentId}/athlete-subscriptions`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const searchResults = manualInput.trim().length > 2 && registrations 
+    ? registrations.filter((r: any) => 
+        r.athleteName?.toLowerCase().includes(manualInput.toLowerCase()) ||
+        r.id.toLowerCase().includes(manualInput.toLowerCase()) ||
+        r.athleteId?.toLowerCase().includes(manualInput.toLowerCase())
+      ).slice(0, 5)
+    : [];
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,14 +214,34 @@ export default function MobileScannerView() {
             
             <h2 className="font-black text-lg leading-tight">{scanResult.message}</h2>
             {scanResult.athleteName && (
-              <p className="text-sm font-medium mt-1 opacity-90">{scanResult.athleteName}</p>
+              <p className="text-lg font-bold mt-2 opacity-100 bg-black/20 px-4 py-2 rounded-xl">{scanResult.athleteName}</p>
             )}
           </div>
         )}
 
-        {/* Bottom Manual Entry */}
-        <div className="bg-slate-900 p-6 border-t border-slate-800 shrink-0 pb-safe">
-          <p className="text-xs text-slate-400 font-bold mb-3 uppercase tracking-wider text-center">Ou digite o código</p>
+        {/* Bottom Manual Entry / Search */}
+        <div className="bg-slate-900 p-6 border-t border-slate-800 shrink-0 pb-safe relative">
+          <p className="text-xs text-slate-400 font-bold mb-3 uppercase tracking-wider text-center">Ou busque por nome / digite o ID</p>
+          
+          {/* Autocomplete Dropdown */}
+          {searchResults.length > 0 && (
+            <div className="absolute bottom-full left-4 right-4 mb-2 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-30">
+              {searchResults.map((athlete: any) => (
+                <button
+                  key={athlete.id}
+                  onClick={() => {
+                    setManualInput("");
+                    processCheckIn(athlete.id);
+                  }}
+                  className="w-full text-left p-4 hover:bg-slate-700 border-b border-slate-700/50 last:border-0 flex flex-col"
+                >
+                  <span className="font-bold text-slate-200">{athlete.athleteName || athlete.athlete_name}</span>
+                  <span className="text-xs text-slate-400 mt-1">{athlete.categoryName} • ID: {athlete.id.split("-")[0]}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           <form onSubmit={handleManualSubmit} className="flex gap-2">
             <div className="relative flex-1">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -214,7 +251,7 @@ export default function MobileScannerView() {
                 type="text"
                 value={manualInput}
                 onChange={(e) => setManualInput(e.target.value)}
-                placeholder="ID ou Protocolo"
+                placeholder="Nome do atleta, ID ou Protocolo"
                 className="w-full bg-slate-800 border-slate-700 text-white rounded-xl pl-10 pr-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono text-sm"
               />
             </div>
