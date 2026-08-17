@@ -295,11 +295,13 @@ export default function SubscriptionsTab({
                 return;
               }
 
-              const headers = ["Nome do Atleta", "CPF", "Instituição", "Prova / Categoria", "Classe de Idade", "Gênero", "Status Validação", "Status Pagamento", "Responsável", "Telefone Resp."];
+              const headers = ["Nome do Atleta", "CPF", "Instituição", "Prova / Categoria", "Classe de Idade", "Gênero", "Status Validação", "Status Pagamento", "Responsável", "Telefone Resp.", "Check-in Presencial"];
               const rows = filtered.map(sub => {
                 const inst = institutions.find(i => i.id === sub.institutionId);
                 const cat = categories.find(c => c.id === sub.categoryId);
                 const ageGroupStr = sub.additionalData?.age_group || cat?.age_group || (cat?.rules_config?.ages?.join(", ")) || "Livre";
+                const checkInStr = sub.checkedInAt ? `Realizado às ${new Date(sub.checkedInAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}` : "Pendente";
+                
                 return [
                   `"${sub.athleteName || ''}"`,
                   `"${sub.document || ''}"`,
@@ -310,7 +312,8 @@ export default function SubscriptionsTab({
                   `"${sub.validationStatus === 'approved' ? 'Aprovado' : sub.validationStatus === 'rejected' ? 'Recusado' : 'Pendente'}"`,
                   `"${sub.paymentStatus === 'paid' ? 'Pago' : 'Pendente'}"`,
                   `"${sub.parentName || ''}"`,
-                  `"${sub.parentPhone || ''}"`
+                  `"${sub.parentPhone || ''}"`,
+                  `"${checkInStr}"`
                 ];
               });
 
@@ -531,6 +534,10 @@ export default function SubscriptionsTab({
                             Taxa Individual Responsável: {sub.paymentStatus === "paid" ? "Pago" : "Pendente"}
                           </div>
                         )}
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                          <span className={`w-2 h-2 rounded-full ${sub.checkedInAt ? "bg-indigo-500" : "bg-slate-300"}`} />
+                          Check-in Presencial: {sub.checkedInAt ? `Realizado às ${new Date(sub.checkedInAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}` : "Pendente"}
+                        </div>
                       </div>
 
                       {/* Link de Pagamento para Responsável */}
