@@ -4094,7 +4094,7 @@ router.get("/public/athlete-subscription/:subId", async (req, res) => {
     const [tRes, instRes, catRes] = await Promise.all([
       supabase.from('tournaments').select('name, start_date, owner_id').eq('id', sub.tournamentId).single(),
       supabase.from('institutions').select('name, logo_url').eq('id', sub.institutionId).single(),
-      supabase.from('tournament_categories').select('name, gender').eq('id', sub.categoryId).maybeSingle()
+      supabase.from('tournament_categories').select('name, gender, age_group').eq('id', sub.categoryId).maybeSingle()
     ]);
     
     const settings = await getSubscriptionSettings(sub.tournamentId);
@@ -4168,7 +4168,7 @@ router.get("/public/athlete-subscription/:subId", async (req, res) => {
         const catIds = Array.from(new Set(siblingSubs.map(s => s.category_id).filter(Boolean)));
         const { data: siblingCats } = await supabase
           .from('tournament_categories')
-          .select('id, name, gender, rules_config')
+          .select('id, name, gender, rules_config, age_group')
           .in('id', catIds);
 
         if (siblingCats && siblingCats.length > 0) {
