@@ -233,7 +233,7 @@ export default function LandingPage() {
                 return (
                   <Link
                     key={t.id}
-                    to={t.slug ? `/public/torneio/${t.slug}` : `/public/tournament/${t.id}`}
+                    to={`/public/tournament/${t.id}`}
                     className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-500/30 rounded-2xl p-5 flex flex-col gap-3 transition"
                   >
                     <div className="flex items-start justify-between gap-2">
