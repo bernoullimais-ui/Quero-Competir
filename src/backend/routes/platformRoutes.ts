@@ -73,7 +73,16 @@ router.get("/landing-config", async (_req, res) => {
     try {
       const supabase = getSupabaseAdmin();
       const { data } = await supabase.from("platform_config").select("value").eq("key", "landing_page").maybeSingle();
-      if (data?.value) return res.json(data.value);
+      if (data?.value) {
+        const val = data.value;
+        return res.json({
+          seo: { ...DEFAULT_CONFIG.seo, ...(val.seo || {}) },
+          hero: {
+            slides: val.hero?.slides && val.hero.slides.length > 0 ? val.hero.slides : DEFAULT_CONFIG.hero.slides
+          },
+          features: val.features && val.features.length > 0 ? val.features : DEFAULT_CONFIG.features
+        });
+      }
     } catch { /**/ }
     return res.json(loadConfig());
   } catch (err: any) { res.status(500).json({ error: err.message }); }
