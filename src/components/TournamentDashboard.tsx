@@ -240,6 +240,22 @@ const parseLocalTime = (scheduledTime: string) => {
   );
 };
 
+const safeFormatDate = (dateVal: any, fallback = "Data a definir") => {
+  if (!dateVal) return fallback;
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return fallback;
+    return d.toLocaleDateString("pt-BR");
+  } catch (e) {
+    return fallback;
+  }
+};
+
+const safeSplitDate = (dateVal: any) => {
+  if (typeof dateVal === "string") return dateVal.split("T")[0];
+  return "";
+};
+
 export default function TournamentDashboard() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -375,8 +391,8 @@ export default function TournamentDashboard() {
       setEditForm({
         name: tournament.name || "",
         description: parsed.description || "",
-        start_date: tournament.start_date ? tournament.start_date.split("T")[0] : "",
-        end_date: tournament.end_date ? tournament.end_date.split("T")[0] : "",
+        start_date: safeSplitDate(tournament.start_date),
+        end_date: safeSplitDate(tournament.end_date),
         logo_url: tournament.logo_url || "",
         banner_url: parsed.bannerUrl || "",
         location: tournament.location || "",
@@ -1353,7 +1369,7 @@ export default function TournamentDashboard() {
               <div className="flex items-center gap-4 mt-1 text-slate-500 text-sm">
                 <span className="flex items-center gap-1">
                   <Calendar size={14} />
-                  {tournament.start_date ? new Date(tournament.start_date).toLocaleDateString("pt-BR") : "Data a definir"}
+                  {safeFormatDate(tournament.start_date)}
                 </span>
                 <span className="flex items-center gap-1">
                   <MapPin size={14} />
@@ -1746,8 +1762,8 @@ export default function TournamentDashboard() {
                             setEditForm({
                               name: tournament.name || "",
                               description: tournament.description || "",
-                              start_date: tournament.start_date ? tournament.start_date.split("T")[0] : "",
-                              end_date: tournament.end_date ? tournament.end_date.split("T")[0] : "",
+                              start_date: safeSplitDate(tournament.start_date),
+                              end_date: safeSplitDate(tournament.end_date),
                               logo_url: tournament.logo_url || ""
                             });
                           }
@@ -1794,7 +1810,7 @@ export default function TournamentDashboard() {
                         <div>
                           <span className="text-[10px] font-bold text-slate-400 block uppercase">Data do Evento</span>
                           <span className="text-xs font-bold text-slate-700">
-                            {tournament.start_date ? new Date(tournament.start_date).toLocaleDateString("pt-BR") : "-"}
+                            {safeFormatDate(tournament.start_date, "-")}
                           </span>
                         </div>
                       </div>
