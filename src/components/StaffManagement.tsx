@@ -4,7 +4,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useConfirm } from './ui/ConfirmDialog.tsx';
 import { useToast } from './ui/Toast.tsx';
 
-export default function StaffManagement() {
+interface StaffManagementProps {
+  defaultTab?: "checkin" | "staff";
+  hideHeader?: boolean;
+}
+
+export default function StaffManagement({ defaultTab = "checkin", hideHeader = false }: StaffManagementProps) {
   const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -18,7 +23,13 @@ export default function StaffManagement() {
   const [scanInput, setScanInput] = useState("");
   const [scanResult, setScanResult] = useState<{ status: "checked_in" | "already_checked_in" | "unpaid" | "error"; message: string; sub?: any } | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
-  const [activeTab, setActiveTab] = useState<"checkin" | "staff">("checkin");
+  const [activeTab, setActiveTab] = useState<"checkin" | "staff">(defaultTab);
+
+  useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
 
   const getHeaders = () => {
     const savedUser = localStorage.getItem("currentUser");
@@ -193,26 +204,28 @@ export default function StaffManagement() {
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">Arbitragem & Check-in Presencial</h1>
-          <p className="text-xs text-slate-500 font-medium">Gestão da equipe de campo e chamada de atletas por QR Code</p>
+      {!hideHeader && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+          <div>
+            <h1 className="text-xl font-bold text-slate-800">Arbitragem & Check-in Presencial</h1>
+            <p className="text-xs text-slate-500 font-medium">Gestão da equipe de campo e chamada de atletas por QR Code</p>
+          </div>
+          <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+            <button
+              onClick={() => setActiveTab("checkin")}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition ${activeTab === "checkin" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-500"}`}
+            >
+              🎟️ Scanner Check-in
+            </button>
+            <button
+              onClick={() => setActiveTab("staff")}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition ${activeTab === "staff" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-500"}`}
+            >
+              🛡️ Equipe Staff
+            </button>
+          </div>
         </div>
-        <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
-          <button
-            onClick={() => setActiveTab("checkin")}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition ${activeTab === "checkin" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-500"}`}
-          >
-            🎟️ Scanner Check-in
-          </button>
-          <button
-            onClick={() => setActiveTab("staff")}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition ${activeTab === "staff" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-500"}`}
-          >
-            🛡️ Equipe Staff
-          </button>
-        </div>
-      </div>
+      )}
 
       {activeTab === "checkin" && (
         <div className="space-y-6">

@@ -3493,25 +3493,42 @@ export default function TournamentDashboard() {
         )}
 
         {activeTab === "arbitragem" && (
-          <div className="space-y-4">
-            <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 text-white p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
-                  <ShieldCheck size={20} className="text-emerald-400" />
+          <div className="space-y-6">
+            <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar a arbitragem deste torneio.</div>}>
+              <TournamentScheduler tournamentId={id!} mode="refereeing" />
+            </ErrorBoundary>
+            <div className="pt-6 border-t border-slate-200/80">
+              <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                🛡️ Equipe Staff & Árbitros
+              </h3>
+              <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar a gestão da equipe staff.</div>}>
+                <StaffManagement defaultTab="staff" hideHeader={true} />
+              </ErrorBoundary>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "checkin" && (
+          <div className="space-y-6">
+            {/* Banner do Link Mobile do Scanner de Check-in em Tempo Real */}
+            <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 text-white p-4 sm:p-5 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border border-indigo-800">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 bg-white/10 rounded-2xl flex items-center justify-center shrink-0">
+                  <ShieldCheck size={22} className="text-emerald-400" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm">Scanner de Check-in em Tempo Real</h4>
+                  <h4 className="font-bold text-base">Scanner de Check-in em Tempo Real</h4>
                   <p className="text-xs text-indigo-200">Realize a chamada e validação de atletas por QR Code ou protocolo de inscrição.</p>
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+              <div className="flex flex-col sm:flex-row gap-2.5 shrink-0">
                 <button
                   onClick={() => {
                     const link = `${window.location.origin}/scanner/${id}`;
                     navigator.clipboard.writeText(link);
                     toastSuccess("Link do Scanner Mobile copiado!");
                   }}
-                  className="px-4 py-2 bg-indigo-800 text-white border border-indigo-600 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-indigo-700 transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  className="px-4 py-2.5 bg-indigo-800 text-white border border-indigo-600 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-indigo-700 transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                   title="Copiar link exclusivo do scanner para o Staff"
                 >
                   <Copy size={16} /> Link Mobile
@@ -3519,22 +3536,17 @@ export default function TournamentDashboard() {
                 <a
                   href={`/scanner/${id}`}
                   target="_blank"
-                  className="px-4 py-2 bg-white text-indigo-900 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-indigo-50 transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  className="px-4 py-2.5 bg-white text-indigo-900 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-indigo-50 transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                 >
                   Abrir Scanner 🎟️
                 </a>
               </div>
             </div>
-            <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar a arbitragem deste torneio.</div>}>
-              <TournamentScheduler tournamentId={id!} mode="refereeing" />
+
+            <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar o scanner de check-in.</div>}>
+              <StaffManagement defaultTab="checkin" hideHeader={true} />
             </ErrorBoundary>
           </div>
-        )}
-
-        {activeTab === "checkin" && (
-          <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar o scanner de check-in.</div>}>
-            <StaffManagement />
-          </ErrorBoundary>
         )}
 
         {activeTab === "estatisticas" && (
