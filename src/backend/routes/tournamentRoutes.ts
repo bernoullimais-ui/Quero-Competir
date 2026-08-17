@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { generatePixEMV } from "../utils/pix.ts";
-import { getSupabaseAdmin } from "../lib/supabase.ts";
-import { requireAuth, requireRole } from "../middleware/auth.ts";
+import { generatePixEMV } from "../utils/pix";
+import { getSupabaseAdmin } from "../lib/supabase";
+import { requireAuth, requireRole } from "../middleware/auth";
 import fs from "fs";
 import path from "path";
 import bcrypt from "bcryptjs";
@@ -3658,7 +3658,7 @@ router.post("/:id/self-register", async (req, res) => {
       }
 
       if (guardianAccountId) {
-        const { generateToken } = await import("../middleware/auth.ts");
+        const { generateToken } = await import("../middleware/auth");
         guardianToken = generateToken({ id: guardianAccountId, role: "guardian", email: parentEmail });
       }
     }
@@ -3741,7 +3741,7 @@ router.post("/:id/self-register", async (req, res) => {
     const phone = parentPhone || additionalData?.phone;
     if (phone && createdSubIds.length > 0) {
       try {
-        const { sendPreRegistrationMessage } = await import("../services/utalkService.ts");
+        const { sendPreRegistrationMessage } = await import("../services/utalkService");
         const { data: org } = await supabase
           .from("organizations")
           .select("whatsapp_tpl_pre_registration, utalk_token, utalk_from_phone")
@@ -4964,7 +4964,7 @@ async function updateSubscriptionPaymentStatus(subId: string, status: 'pending' 
   // ── WhatsApp: Confirmação de Pagamento ───────────────────────────────────
   if (status === "paid") {
     try {
-      const { sendConfirmedMessage } = await import("../services/utalkService.ts");
+      const { sendConfirmedMessage } = await import("../services/utalkService");
       const supabase = getSupabaseAdmin();
       const tournamentId = sub?.tournament_id || sub?.tournamentId;
       const phone = sub?.parent_phone || sub?.parentPhone || sub?.additional_data?.phone;

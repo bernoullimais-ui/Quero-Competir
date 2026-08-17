@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { getSupabaseAdmin } from "../lib/supabase.ts";
-import { requireAuth, requireRole } from "../middleware/auth.ts";
+import { getSupabaseAdmin } from "../lib/supabase";
+import { requireAuth, requireRole } from "../middleware/auth";
 import fs from "fs";
 import path from "path";
 

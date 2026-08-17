@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { requireAuth } from "../middleware/auth.ts";
-import { getSupabaseAdmin } from "../lib/supabase.ts";
+import { requireAuth } from "../middleware/auth";
+import { getSupabaseAdmin } from "../lib/supabase";
 import {
   sendWhatsAppMessage,
   sendCartRecoveryMessage,
   formatPhoneBR,
-} from "../services/utalkService.ts";
+} from "../services/utalkService";
 
 const router = Router();
 

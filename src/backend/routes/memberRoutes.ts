@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { getSupabaseAdmin } from "../lib/supabase.ts";
+import { getSupabaseAdmin } from "../lib/supabase";
 import fs from "fs";
 import path from "path";
-import { requireAuth } from "../middleware/auth.ts";
+import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 

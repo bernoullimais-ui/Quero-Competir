@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from "../lib/supabase.ts";
+import { getSupabaseAdmin } from "../lib/supabase";
 
 const DEFAULT_TPL_PRE_REGISTRATION = `🏆 *{torneio}*
 

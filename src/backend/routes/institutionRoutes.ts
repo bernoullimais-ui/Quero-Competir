@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { generatePixEMV } from '../utils/pix.ts';
-import { getSupabaseAdmin } from "../lib/supabase.ts";
+import { generatePixEMV } from '../utils/pix';
+import { getSupabaseAdmin } from "../lib/supabase";
 import fs from "fs";
 import path from "path";
-import { requireAuth, generateToken } from "../middleware/auth.ts";
+import { requireAuth, generateToken } from "../middleware/auth";
 
 const router = Router();
 

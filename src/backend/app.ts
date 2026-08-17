@@ -3,15 +3,15 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-import institutionRoutes from "./routes/institutionRoutes.ts";
-import tournamentRoutes from "./routes/tournamentRoutes.ts";
-import memberRoutes from "./routes/memberRoutes.ts";
-import authRoutes from "./routes/authRoutes.ts";
-import membershipRoutes from "./routes/membershipRoutes.ts";
-import paymentRoutes from "./routes/paymentRoutes.ts";
-import whatsappRoutes from "./routes/whatsappRoutes.ts";
-import platformRoutes from "./routes/platformRoutes.ts";
-import { optionalAuth } from "./middleware/auth.ts";
+import institutionRoutes from "./routes/institutionRoutes";
+import tournamentRoutes from "./routes/tournamentRoutes";
+import memberRoutes from "./routes/memberRoutes";
+import authRoutes from "./routes/authRoutes";
+import membershipRoutes from "./routes/membershipRoutes";
+import paymentRoutes from "./routes/paymentRoutes";
+import whatsappRoutes from "./routes/whatsappRoutes";
+import platformRoutes from "./routes/platformRoutes";
+import { optionalAuth } from "./middleware/auth";
 
 // ─── Load env vars first (ESM-safe: called in module body, not hoisted) ────────
 // This ensures env vars are available even when app.ts is imported before

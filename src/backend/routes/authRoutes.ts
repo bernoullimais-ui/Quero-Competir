@@ -2,8 +2,8 @@ import { Router } from "express";
 import * as fs from "fs";
 import * as path from "path";
 import bcrypt from "bcryptjs";
-import { getSupabaseAdmin } from "../lib/supabase.ts";
-import { generateToken, requireAuth, requireRole } from "../middleware/auth.ts";
+import { getSupabaseAdmin } from "../lib/supabase";
+import { generateToken, requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
 const ACCOUNTS_FILE = path.join(process.cwd(), "src/backend/data/accounts.json");
