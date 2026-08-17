@@ -5162,15 +5162,24 @@ router2.post("/:id/check-in/:subId", async (req, res) => {
     }
     const nowIso = (/* @__PURE__ */ new Date()).toISOString();
     try {
-      await supabase.from("athlete_subscriptions").update({ checked_in_at: nowIso }).eq("id", subId);
+      let query = supabase.from("athlete_subscriptions").update({ checked_in_at: nowIso }).eq("tournament_id", tournamentId).eq("athlete_name", sub.athleteName);
+      if (dbSub && dbSub.document) {
+        query = query.eq("document", dbSub.document);
+      }
+      await query;
     } catch {
     }
     const db = loadDb();
-    const idx = db.athleteSubscriptions.findIndex((s) => s.id === subId);
-    if (idx !== -1) {
-      db.athleteSubscriptions[idx].checkedInAt = nowIso;
-      saveDb(db);
-    }
+    let updatedDbCount = 0;
+    db.athleteSubscriptions.forEach((s) => {
+      if (s.tournamentId === tournamentId && s.athleteName === sub.athleteName) {
+        if (!sub.document || s.document === sub.document) {
+          s.checkedInAt = nowIso;
+          updatedDbCount++;
+        }
+      }
+    });
+    if (updatedDbCount > 0) saveDb(db);
     sub.checkedInAt = nowIso;
     return res.json({
       success: true,

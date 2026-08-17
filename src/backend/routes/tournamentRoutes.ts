@@ -5154,21 +5154,33 @@ router.post("/:id/check-in/:subId", async (req, res) => {
       });
     }
 
-    // 4. Salvar novo check-in
+    // 4. Salvar novo check-in para TODAS as inscrições do atleta no torneio
     const nowIso = new Date().toISOString();
     try {
-      await supabase
+      let query = supabase
         .from('athlete_subscriptions')
         .update({ checked_in_at: nowIso })
-        .eq('id', subId);
+        .eq('tournament_id', tournamentId)
+        .eq('athlete_name', sub.athleteName);
+        
+      if (dbSub && dbSub.document) {
+        query = query.eq('document', dbSub.document);
+      }
+      
+      await query;
     } catch { /* ignore fallback */ }
 
     const db = loadDb();
-    const idx = db.athleteSubscriptions.findIndex(s => s.id === subId);
-    if (idx !== -1) {
-      db.athleteSubscriptions[idx].checkedInAt = nowIso;
-      saveDb(db);
-    }
+    let updatedDbCount = 0;
+    db.athleteSubscriptions.forEach(s => {
+      if (s.tournamentId === tournamentId && s.athleteName === sub.athleteName) {
+        if (!sub.document || s.document === sub.document) {
+          s.checkedInAt = nowIso;
+          updatedDbCount++;
+        }
+      }
+    });
+    if (updatedDbCount > 0) saveDb(db);
 
     sub.checkedInAt = nowIso;
 
