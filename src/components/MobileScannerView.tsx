@@ -55,9 +55,20 @@ export default function MobileScannerView() {
   const processCheckIn = async (rawString: string) => {
     if (isProcessing || !rawString.trim()) return;
     
-    // Extract ID if the QR code is a full URL (e.g. https://domain.com/public/credencial/uuid)
     let subId = rawString.trim();
-    if (subId.includes("/")) {
+    
+    // Attempt to parse JSON if the QR Code contains a JSON object
+    if (subId.startsWith("{") && subId.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(subId);
+        if (parsed && parsed.ticketId) {
+          subId = parsed.ticketId;
+        }
+      } catch (e) {
+        // Not valid JSON, continue with original string
+      }
+    } else if (subId.includes("/")) {
+      // Extract ID if the QR code is a full URL (e.g. https://domain.com/public/credencial/uuid)
       subId = subId.split("/").pop() || subId;
     }
 
