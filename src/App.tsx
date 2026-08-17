@@ -32,6 +32,7 @@ import VenueManagement from "./components/VenueManagement.tsx";
 import PublicTournamentView from "./components/PublicTournamentView.tsx";
 import InstitutionPortal from "./components/InstitutionPortal.tsx";
 import VenuePortal from "./components/VenuePortal.tsx";
+import MobileScannerView from "./components/MobileScannerView.tsx";
 import PublicAthleteRegistration from "./components/PublicAthleteRegistration.tsx";
 import PublicSelfRegistration from "./components/PublicSelfRegistration.tsx";
 import SettingsPage from "./components/Settings";
@@ -561,6 +562,7 @@ export default function App() {
                         <Route path="/torneios" element={<TournamentList />} />
                         <Route path="/torneios/new" element={<NewTournament />} />
                         <Route path="/torneios/:id" element={<TournamentDashboard />} />
+                        <Route path="/scanner/:id" element={<MobileScannerView />} />
                         <Route path="/atletas" element={<AthleteFilter />} />
                         <Route path="/staff" element={<StaffManagement />} />
                         <Route path="/sedes" element={<VenueManagement />} />

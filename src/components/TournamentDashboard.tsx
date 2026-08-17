@@ -3488,12 +3488,26 @@ export default function TournamentDashboard() {
                   <p className="text-xs text-indigo-200">Realize a chamada e validação de atletas por QR Code ou protocolo de inscrição.</p>
                 </div>
               </div>
-              <button
-                onClick={() => setActiveTab("checkin")}
-                className="px-4 py-2 bg-white text-indigo-900 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-indigo-50 transition shrink-0 cursor-pointer shadow-sm"
-              >
-                Abrir Scanner de Check-in 🎟️
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/scanner/${id}`;
+                    navigator.clipboard.writeText(link);
+                    toastSuccess("Link do Scanner Mobile copiado!");
+                  }}
+                  className="px-4 py-2 bg-indigo-800 text-white border border-indigo-600 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-indigo-700 transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  title="Copiar link exclusivo do scanner para o Staff"
+                >
+                  <Copy size={16} /> Link Mobile
+                </button>
+                <a
+                  href={`/scanner/${id}`}
+                  target="_blank"
+                  className="px-4 py-2 bg-white text-indigo-900 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-indigo-50 transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                >
+                  Abrir Scanner 🎟️
+                </a>
+              </div>
             </div>
             <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar a arbitragem deste torneio.</div>}>
               <TournamentScheduler tournamentId={id!} mode="refereeing" />
