@@ -58,9 +58,13 @@ function loadConfig() {
 }
 
 function saveConfig(config: any) {
-  const dir = path.dirname(CONFIG_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  try {
+    const dir = path.dirname(CONFIG_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  } catch (err) {
+    console.warn("Could not save landing config to local JSON (Vercel read-only filesystem):", err);
+  }
 }
 
 // GET /api/platform/landing-config — PUBLIC
@@ -80,13 +84,28 @@ router.patch("/landing-config", requireAuth, requireRole("super_admin"), async (
   try {
     const config = req.body;
     if (!config || typeof config !== "object") return res.status(400).json({ error: "Configuração inválida." });
+    
+    // Save locally if writable (dev)
     saveConfig(config);
+
+    // Persist to Supabase DB (production)
     try {
       const supabase = getSupabaseAdmin();
-      await supabase.from("platform_config").upsert({ key: "landing_page", value: config }, { onConflict: "key" });
-    } catch { /**/ }
+      const { error } = await supabase
+        .from("platform_config")
+        .upsert({ key: "landing_page", value: config, updated_at: new Date().toISOString() }, { onConflict: "key" });
+      if (error) {
+        console.error("Supabase landing_config error:", error);
+      }
+    } catch (sbErr) {
+      console.error("Supabase upsert exception:", sbErr);
+    }
+
     return res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) {
+    console.error("PATCH /landing-config error:", err);
+    res.status(500).json({ error: err.message || "Erro ao salvar configuração." }); 
+  }
 });
 
 // GET /api/platform/public-tournaments — PUBLIC

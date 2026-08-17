@@ -7964,9 +7964,13 @@ function loadConfig() {
   return DEFAULT_CONFIG;
 }
 function saveConfig(config) {
-  const dir = path6.dirname(CONFIG_FILE);
-  if (!fs6.existsSync(dir)) fs6.mkdirSync(dir, { recursive: true });
-  fs6.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  try {
+    const dir = path6.dirname(CONFIG_FILE);
+    if (!fs6.existsSync(dir)) fs6.mkdirSync(dir, { recursive: true });
+    fs6.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  } catch (err) {
+    console.warn("Could not save landing config to local JSON (Vercel read-only filesystem):", err);
+  }
 }
 router8.get("/landing-config", async (_req, res) => {
   try {
@@ -7988,12 +7992,17 @@ router8.patch("/landing-config", requireAuth, requireRole("super_admin"), async 
     saveConfig(config);
     try {
       const supabase = getSupabaseAdmin();
-      await supabase.from("platform_config").upsert({ key: "landing_page", value: config }, { onConflict: "key" });
-    } catch {
+      const { error } = await supabase.from("platform_config").upsert({ key: "landing_page", value: config, updated_at: (/* @__PURE__ */ new Date()).toISOString() }, { onConflict: "key" });
+      if (error) {
+        console.error("Supabase landing_config error:", error);
+      }
+    } catch (sbErr) {
+      console.error("Supabase upsert exception:", sbErr);
     }
     return res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("PATCH /landing-config error:", err);
+    res.status(500).json({ error: err.message || "Erro ao salvar configura\xE7\xE3o." });
   }
 });
 router8.get("/public-tournaments", async (_req, res) => {
