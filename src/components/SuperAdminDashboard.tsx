@@ -345,6 +345,7 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
       </header>
 
       {/* Main SaaS Contents Grid */}
+      {adminTab === "dashboard" && (
       <main className="flex-1 p-8 max-w-7xl w-full mx-auto space-y-8 relative">
         
         {/* Statistics Widgets Row */}
@@ -832,6 +833,7 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
           )}
         </AnimatePresence>
       </main>
+      )}
 
       {/* ── LANDING PAGE TAB ── */}
       {adminTab === "landing" && (
