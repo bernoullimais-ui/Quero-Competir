@@ -3054,6 +3054,7 @@ function mapSettingsToDb(feSettings: any) {
 
 function mapSubToFrontend(dbSub: any) {
   if (!dbSub) return null;
+  const add = dbSub.additional_data || {};
   return {
     id: dbSub.id,
     tournamentId: dbSub.tournament_id,
@@ -3069,7 +3070,9 @@ function mapSubToFrontend(dbSub: any) {
     validatedAt: dbSub.validated_at || null,
     parentName: dbSub.parent_name || null,
     parentPhone: dbSub.parent_phone || null,
-    additionalData: dbSub.additional_data || {},
+    additionalData: add,
+    athleteFee: add.athleteFee !== undefined ? Number(add.athleteFee) : (add.registeredFee !== undefined ? Number(add.registeredFee) : null),
+    totalFee: add.totalFee !== undefined ? Number(add.totalFee) : null,
     documentUrl: dbSub.document_url || null,
     photoUrl: dbSub.photo_url || null,
     authorizedImageUse: !!dbSub.authorized_image_use,
@@ -3650,6 +3653,9 @@ router.post("/:id/self-register", async (req, res) => {
 
     // 5. Create athlete_subscriptions for each selected category
     const createdSubIds: string[] = [];
+    const feePricingModel = settings?.feePricingModel || "per_event";
+    const unitFee = Number(settings?.athleteFee) || 0;
+    const totalFee = feePricingModel === "fixed_package" ? unitFee : unitFee * targetCategoryIds.length;
 
     for (const catId of targetCategoryIds) {
       const insertData: any = {
@@ -3674,6 +3680,9 @@ router.post("/:id/self-register", async (req, res) => {
           parentEmail,
           isSelfGuardian: !!isSelfGuardian,
           registration_source: "self",
+          athleteFee: unitFee,
+          totalFee: totalFee,
+          registeredFee: unitFee,
         },
       };
 
@@ -3706,10 +3715,6 @@ router.post("/:id/self-register", async (req, res) => {
         createdSubIds.push(sub.id);
       }
     }
-
-    const feePricingModel = settings?.feePricingModel || "per_event";
-    const unitFee = settings?.athleteFee || 0;
-    const totalFee = feePricingModel === "fixed_package" ? unitFee : unitFee * targetCategoryIds.length;
 
     return res.status(201).json({
       subIds: createdSubIds,
@@ -3868,6 +3873,7 @@ router.post("/:id/athlete-subscriptions", async (req, res) => {
               returned.push(mapSubToFrontend(found));
             }
           } else {
+            const unitFee = Number(settings?.athleteFee) || 0;
             inserts.push({
               tournament_id: tournamentId,
               institution_id: institutionId,
@@ -3879,7 +3885,11 @@ router.post("/:id/athlete-subscriptions", async (req, res) => {
               is_completed: false,
               validation_status: "pending",
               payment_status: settings.feeType === "by_team_and_athlete_parent" ? "pending" : "paid",
-              additional_data: a.additionalData || {}
+              additional_data: {
+                ...(a.additionalData || {}),
+                athleteFee: unitFee,
+                registeredFee: unitFee,
+              }
             });
           }
         }

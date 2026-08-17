@@ -1978,6 +1978,14 @@ export default function TournamentDashboard() {
                     fee = Number(s.totalFee);
                   } else if (s.athleteFee !== undefined && s.athleteFee !== null && Number(s.athleteFee) > 0) {
                     fee = Number(s.athleteFee);
+                  } else if (s.additionalData?.totalFee !== undefined && s.additionalData?.totalFee !== null && Number(s.additionalData?.totalFee) > 0) {
+                    fee = Number(s.additionalData.totalFee);
+                  } else if (s.additionalData?.athleteFee !== undefined && s.additionalData?.athleteFee !== null && Number(s.additionalData?.athleteFee) > 0) {
+                    fee = Number(s.additionalData.athleteFee);
+                  } else if (s.additional_data?.totalFee !== undefined && s.additional_data?.totalFee !== null && Number(s.additional_data?.totalFee) > 0) {
+                    fee = Number(s.additional_data.totalFee);
+                  } else if (s.additional_data?.athleteFee !== undefined && s.additional_data?.athleteFee !== null && Number(s.additional_data?.athleteFee) > 0) {
+                    fee = Number(s.additional_data.athleteFee);
                   } else {
                     fee = hasAFee ? aFee : 0;
                   }
@@ -2256,6 +2264,14 @@ export default function TournamentDashboard() {
                                      fee = Number(s.totalFee);
                                    } else if (s.athleteFee !== undefined && s.athleteFee !== null && Number(s.athleteFee) > 0) {
                                      fee = Number(s.athleteFee);
+                                   } else if (s.additionalData?.totalFee !== undefined && s.additionalData?.totalFee !== null && Number(s.additionalData?.totalFee) > 0) {
+                                     fee = Number(s.additionalData.totalFee);
+                                   } else if (s.additionalData?.athleteFee !== undefined && s.additionalData?.athleteFee !== null && Number(s.additionalData?.athleteFee) > 0) {
+                                     fee = Number(s.additionalData.athleteFee);
+                                   } else if (s.additional_data?.totalFee !== undefined && s.additional_data?.totalFee !== null && Number(s.additional_data?.totalFee) > 0) {
+                                     fee = Number(s.additional_data.totalFee);
+                                   } else if (s.additional_data?.athleteFee !== undefined && s.additional_data?.athleteFee !== null && Number(s.additional_data?.athleteFee) > 0) {
+                                     fee = Number(s.additional_data.athleteFee);
                                    } else {
                                      fee = hasAFee ? aFee : 0;
                                    }
