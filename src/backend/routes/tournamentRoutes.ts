@@ -106,6 +106,11 @@ function isValidUUID(str: string | null | undefined): boolean {
 // and dynamically create one if it does not yet exist.
 async function getOrganizerReferenceIdAndSync(organizerId: string): Promise<string> {
   try {
+    // 0. If organizerId is already a valid UUID, it's directly the organization ID
+    if (isValidUUID(organizerId)) {
+      return organizerId;
+    }
+
     const supabase = getSupabaseAdmin();
 
     const { data: acc } = await supabase
@@ -130,8 +135,9 @@ async function getOrganizerReferenceIdAndSync(organizerId: string): Promise<stri
       }
 
       // 3. For any newly created organizer, create a dedicated row in organizations table in Supabase
-      const orgName = acc.name || `Organização de ${acc.email.split("@")[0]}`;
-      const cleanSub = (acc.name || acc.email.split("@")[0])
+      const userEmail = acc.email || "organizador@querocompetir.com.br";
+      const orgName = acc.name || `Organização de ${userEmail.split("@")[0]}`;
+      const cleanSub = (acc.name || userEmail.split("@")[0])
         .toLowerCase()
         .replace(/[^a-z0-9]/g, "")
         .substring(0, 15) || "org";
@@ -158,7 +164,7 @@ async function getOrganizerReferenceIdAndSync(organizerId: string): Promise<stri
       }
     }
   } catch (err) {
-    console.error("Error resolving organizer organization:", err);
+    console.error("Error in getOrganizerReferenceIdAndSync:", err);
   }
 
   return PRIMARY_ORG_UUID;

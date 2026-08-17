@@ -1632,6 +1632,9 @@ function isValidUUID(str) {
 }
 async function getOrganizerReferenceIdAndSync(organizerId) {
   try {
+    if (isValidUUID(organizerId)) {
+      return organizerId;
+    }
     const supabase = getSupabaseAdmin();
     const { data: acc } = await supabase.from("portal_accounts").select("id, email, name, reference_id").eq("id", organizerId).maybeSingle();
     if (acc) {
@@ -1642,8 +1645,9 @@ async function getOrganizerReferenceIdAndSync(organizerId) {
         await supabase.from("portal_accounts").update({ reference_id: PRIMARY_ORG_UUID }).eq("id", organizerId);
         return PRIMARY_ORG_UUID;
       }
-      const orgName = acc.name || `Organiza\xE7\xE3o de ${acc.email.split("@")[0]}`;
-      const cleanSub = (acc.name || acc.email.split("@")[0]).toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 15) || "org";
+      const userEmail = acc.email || "organizador@querocompetir.com.br";
+      const orgName = acc.name || `Organiza\xE7\xE3o de ${userEmail.split("@")[0]}`;
+      const cleanSub = (acc.name || userEmail.split("@")[0]).toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 15) || "org";
       const randomSubdomain = `${cleanSub}-${Math.floor(1e3 + Math.random() * 9e3)}`;
       const { data: newOrg, error: insertErr } = await supabase.from("organizations").insert([{
         name: orgName,
@@ -1658,7 +1662,7 @@ async function getOrganizerReferenceIdAndSync(organizerId) {
       }
     }
   } catch (err) {
-    console.error("Error resolving organizer organization:", err);
+    console.error("Error in getOrganizerReferenceIdAndSync:", err);
   }
   return PRIMARY_ORG_UUID;
 }
