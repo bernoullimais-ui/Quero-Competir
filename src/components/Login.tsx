@@ -147,11 +147,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       <div className="relative w-full max-w-[500px]" id="login-container">
         {/* Brand Banner */}
         <div className="flex flex-col items-center mb-8 text-center">
-          <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/20 mb-3 hover:scale-105 duration-300">
-            <Activity size={32} />
-          </div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">Quero Competir</h1>
-          <p className="text-sm text-slate-400 mt-1 font-medium">Gestão integrada de ligas e torneios esportivos</p>
+          <img src="/logo.png" alt="Eu Quero Competir" className="h-16 w-auto object-contain mb-2" />
         </div>
 
         {/* Auth Box */}

@@ -67,10 +67,7 @@ export default function LandingPage() {
       {/* ── NAVBAR ── */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
         <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-            <Activity size={20} className="text-white" />
-          </div>
-          <span className="text-lg font-extrabold tracking-tight text-white">Quero Competir</span>
+          <img src="/logo.png" alt="Eu Quero Competir" className="h-10 w-auto object-contain" />
         </Link>
         <div className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-400">
           <a href="#organizacoes" className="hover:text-white transition">Organizações</a>
@@ -311,10 +308,7 @@ export default function LandingPage() {
       {/* ── FOOTER ── */}
       <footer className="bg-slate-950 border-t border-slate-900 py-10 px-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-4">
-          <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
-            <Activity size={14} className="text-white" />
-          </div>
-          <span className="text-sm font-bold text-slate-400">Quero Competir</span>
+          <img src="/logo.png" alt="Eu Quero Competir" className="h-10 w-auto object-contain opacity-90" />
         </div>
         <p className="text-xs text-slate-600 font-semibold">© {new Date().getFullYear()} Quero Competir · Sistema Oficial de Gestão Esportiva</p>
         <div className="flex justify-center gap-6 mt-4 text-xs text-slate-600 font-medium">
