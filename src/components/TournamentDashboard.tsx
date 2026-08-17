@@ -228,6 +228,7 @@ const formatCurrency = (val: number) => {
 type Tab = "geral" | "modalidades" | "inscricoes" | "financeiro" | "configuracoes" | "tabela" | "escala" | "arbitragem" | "estatisticas" | "classificacao" | "comunidade" | "comunicacao" | "checkin";
 
 const parseLocalTime = (scheduledTime: string) => {
+  if (!scheduledTime || typeof scheduledTime !== 'string') return null;
   const regexMatch = scheduledTime.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   if (!regexMatch) return null;
   const [_, year, month, day, hour, minute] = regexMatch;

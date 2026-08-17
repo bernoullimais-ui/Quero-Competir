@@ -552,7 +552,7 @@ export default function App() {
                 ) : (
                   /* Organizer accesses all general panel routes */
                   <Layout onLogout={handleLogout}>
-                    <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 bg-white rounded-2xl shadow-sm border border-red-100">Erro inesperado no painel. Tente recarregar a página.</div>}>
+                    <ErrorBoundary fallbackRender={({ error }) => <div className="p-8 text-center text-red-500 bg-white rounded-2xl shadow-sm border border-red-100">Erro inesperado no painel: {error?.message || "Desconhecido"}. Tente recarregar a página.</div>}>
                       <Routes>
                         <Route path="/" element={<Home />} />
                         <Route path="/instituicoes" element={<InstitutionList />} />
