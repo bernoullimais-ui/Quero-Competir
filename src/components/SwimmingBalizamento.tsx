@@ -645,7 +645,20 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
                           {/* Athlete Name */}
                           <td className="py-3 px-4 font-bold text-slate-800">
                             {lane.athleteName ? (
-                              <span className="text-sm">{lane.athleteName}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">{lane.athleteName}</span>
+                                {(() => {
+                                  const sub = athleteSubs.find(s => s.id === lane.athleteId);
+                                  if (sub?.checkedInAt) {
+                                    return (
+                                      <span title="Check-in Presencial Realizado" className="text-indigo-600 flex-shrink-0">
+                                        <CheckCircle2 size={14} className="stroke-[3px]" />
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
                             ) : (
                               <span className="text-slate-300 italic font-normal text-xs">Vazia</span>
                             )}
