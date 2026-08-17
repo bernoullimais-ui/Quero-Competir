@@ -4074,7 +4074,8 @@ router2.post("/:id/self-register", async (req, res) => {
         guardianAccountId = existingAcc.id;
       } else {
         const bcrypt3 = await import("bcryptjs");
-        const hash = parentPassword ? await bcrypt3.default.hash(parentPassword, 10) : null;
+        const passToHash = parentPassword || `Auto_${Date.now()}`;
+        const hash = await bcrypt3.default.hash(passToHash, 10);
         const newId = `guardian_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const { data: newAcc } = await supabase.from("portal_accounts").insert({
           id: newId,
@@ -4146,15 +4147,6 @@ router2.post("/:id/self-register", async (req, res) => {
         createdSubIds.push(sub.id);
       }
     }
-    return res.status(201).json({
-      subIds: createdSubIds,
-      subId: createdSubIds[0] || null,
-      guardianToken,
-      athleteFee: unitFee,
-      totalFee,
-      feePricingModel,
-      message: "Inscri\xE7\xE3o realizada com sucesso!"
-    });
     const phone = parentPhone || additionalData?.phone;
     if (phone && createdSubIds.length > 0) {
       try {
@@ -4178,6 +4170,15 @@ router2.post("/:id/self-register", async (req, res) => {
         console.warn("[WhatsApp] Falha ao enviar mensagem de pr\xE9-inscri\xE7\xE3o:", wErr);
       }
     }
+    return res.status(201).json({
+      subIds: createdSubIds,
+      subId: createdSubIds[0] || null,
+      guardianToken,
+      athleteFee: unitFee,
+      totalFee,
+      feePricingModel,
+      message: "Inscri\xE7\xE3o realizada com sucesso!"
+    });
   } catch (err) {
     console.error("[self-register]", err);
     res.status(500).json({ error: err.message });

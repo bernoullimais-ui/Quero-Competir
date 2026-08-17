@@ -249,9 +249,9 @@ export default function PublicSelfRegistration() {
           additionalData: { bloodType, allergies, emergencyContact, seedTimes },
         })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setSubmitError(data.error || "Erro ao realizar inscrição.");
+        setSubmitError(data.error || "Não foi possível concluir a inscrição no momento. Tente novamente em instantes.");
         setStep("terms");
         return;
       }

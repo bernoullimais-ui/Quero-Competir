@@ -3638,7 +3638,8 @@ router.post("/:id/self-register", async (req, res) => {
         guardianAccountId = existingAcc.id;
       } else {
         const bcrypt = await import("bcryptjs");
-        const hash = parentPassword ? await bcrypt.default.hash(parentPassword, 10) : null;
+        const passToHash = parentPassword || `Auto_${Date.now()}`;
+        const hash = await bcrypt.default.hash(passToHash, 10);
         const newId = `guardian_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const { data: newAcc } = await supabase.from("portal_accounts").insert({
           id: newId,
@@ -3730,16 +3731,6 @@ router.post("/:id/self-register", async (req, res) => {
       }
     }
 
-    return res.status(201).json({
-      subIds: createdSubIds,
-      subId: createdSubIds[0] || null,
-      guardianToken,
-      athleteFee: unitFee,
-      totalFee,
-      feePricingModel,
-      message: "Inscrição realizada com sucesso!",
-    });
-
     // ── WhatsApp: Pré-Inscrição ───────────────────────────────────────────────
     const phone = parentPhone || additionalData?.phone;
     if (phone && createdSubIds.length > 0) {
@@ -3776,6 +3767,16 @@ router.post("/:id/self-register", async (req, res) => {
         console.warn("[WhatsApp] Falha ao enviar mensagem de pré-inscrição:", wErr);
       }
     }
+
+    return res.status(201).json({
+      subIds: createdSubIds,
+      subId: createdSubIds[0] || null,
+      guardianToken,
+      athleteFee: unitFee,
+      totalFee,
+      feePricingModel,
+      message: "Inscrição realizada com sucesso!",
+    });
   } catch (err: any) {
     console.error("[self-register]", err);
     res.status(500).json({ error: err.message });
