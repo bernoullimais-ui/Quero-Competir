@@ -32,32 +32,32 @@ function getUserRoleAndReferenceId(userId: string): { role: string | null; name:
 }
 
 async function ensureStaffAndVenuesMappings(): Promise<void> {
-  const supabase = getSupabaseAdmin();
-  
-  if (!fs.existsSync(ORG_STAFF_FILE)) {
-    try {
-      const { data: staffData } = await supabase.from('staff').select('id');
-      const staffIds = staffData?.map(s => s.id) || [];
-      const initialStaff = {
-        "org-1": staffIds
-      };
-      fs.writeFileSync(ORG_STAFF_FILE, JSON.stringify(initialStaff, null, 2), "utf-8");
-    } catch (e) {
-      console.error("Error seeding organizer_staff.json:", e);
+  try {
+    const supabase = getSupabaseAdmin();
+    
+    if (!fs.existsSync(ORG_STAFF_FILE)) {
+      try {
+        const { data: staffData } = await supabase.from('staff').select('id');
+        const staffIds = staffData?.map(s => s.id) || [];
+        const initialStaff = { "org-1": staffIds };
+        const dir = path.dirname(ORG_STAFF_FILE);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(ORG_STAFF_FILE, JSON.stringify(initialStaff, null, 2), "utf-8");
+      } catch (e) {}
     }
-  }
 
-  if (!fs.existsSync(ORG_VENUES_FILE)) {
-    try {
-      const { data: venuesData } = await supabase.from('venues').select('id');
-      const venueIds = venuesData?.map(v => v.id) || [];
-      const initialVenues = {
-        "org-1": venueIds
-      };
-      fs.writeFileSync(ORG_VENUES_FILE, JSON.stringify(initialVenues, null, 2), "utf-8");
-    } catch (e) {
-      console.error("Error seeding organizer_venues.json:", e);
+    if (!fs.existsSync(ORG_VENUES_FILE)) {
+      try {
+        const { data: venuesData } = await supabase.from('venues').select('id');
+        const venueIds = venuesData?.map(v => v.id) || [];
+        const initialVenues = { "org-1": venueIds };
+        const dir = path.dirname(ORG_VENUES_FILE);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(ORG_VENUES_FILE, JSON.stringify(initialVenues, null, 2), "utf-8");
+      } catch (e) {}
     }
+  } catch (e) {
+    console.warn("ensureStaffAndVenuesMappings skipped on Vercel:", e);
   }
 }
 
@@ -2963,19 +2963,14 @@ interface DbSchema {
 
 function loadDb(): DbSchema {
   try {
-    if (!fs.existsSync(DATA_FILE)) {
-      const dir = path.dirname(DATA_FILE);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(DATA_FILE, JSON.stringify({ settings: {}, athleteSubscriptions: [] }, null, 2));
+    if (fs.existsSync(DATA_FILE)) {
+      const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+      return JSON.parse(raw);
     }
-    const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-    return JSON.parse(raw);
   } catch (err) {
     console.error("Error reading subscriptions.json", err);
-    return { settings: {}, athleteSubscriptions: [] };
   }
+  return { settings: {}, athleteSubscriptions: [] };
 }
 
 function saveDb(db: DbSchema) {

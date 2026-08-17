@@ -87,12 +87,14 @@ function ensureInvitationsFile() {
 }
 
 function loadInvitations(): any[] {
-  ensureInvitationsFile();
   try {
-    return JSON.parse(fs.readFileSync(INVITATIONS_FILE, "utf-8"));
+    if (fs.existsSync(INVITATIONS_FILE)) {
+      return JSON.parse(fs.readFileSync(INVITATIONS_FILE, "utf-8"));
+    }
   } catch (e) {
-    return [];
+    console.error("Error loading invitations:", e);
   }
+  return [];
 }
 
 function saveInvitations(data: any[]) {
