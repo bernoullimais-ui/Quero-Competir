@@ -50868,7 +50868,7 @@ __export(auth_exports, {
   generateToken: () => generateToken,
   optionalAuth: () => optionalAuth,
   requireAuth: () => requireAuth,
-  requireRole: () => requireRole2
+  requireRole: () => requireRole
 });
 function getJwtSecret() {
   return process.env.JWT_SECRET || "QueroCompetir_Production_Default_JWT_Secret_Key_2026_Secure_Fallback";
@@ -50891,7 +50891,7 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ error: "Token inv\xE1lido ou corrompido." });
   }
 }
-function requireRole2(...roles) {
+function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ error: "N\xE3o autenticado." });
@@ -59821,7 +59821,7 @@ router4.post("/seed", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-router4.get("/users", requireAuth, requireRole2("super_admin"), async (req, res) => {
+router4.get("/users", requireAuth, requireRole("super_admin"), async (req, res) => {
   try {
     const accounts = await loadAccountsDb();
     res.json(
@@ -59838,7 +59838,7 @@ router4.get("/users", requireAuth, requireRole2("super_admin"), async (req, res)
     res.status(500).json({ error: err.message });
   }
 });
-router4.delete("/users/:id", requireAuth, requireRole2("super_admin"), async (req, res) => {
+router4.delete("/users/:id", requireAuth, requireRole("super_admin"), async (req, res) => {
   try {
     let accounts = await loadAccountsDb();
     accounts = accounts.filter((a) => a.id !== req.params.id);
@@ -61146,7 +61146,7 @@ router8.get("/landing-config", async (_req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-router8.patch("/landing-config", requireAuth, requireRole2("super_admin"), async (req, res) => {
+router8.patch("/landing-config", requireAuth, requireRole("super_admin"), async (req, res) => {
   try {
     const config = req.body;
     if (!config || typeof config !== "object") return res.status(400).json({ error: "Configura\xE7\xE3o inv\xE1lida." });

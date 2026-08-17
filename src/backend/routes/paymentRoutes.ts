@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getSupabaseAdmin } from "../lib/supabase";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, requireRole } from "../middleware/auth";
 import fs from "fs";
 import path from "path";
 
