@@ -93,11 +93,19 @@ export default function PublicOrganizationPortal({ overrideSubdomain }: PublicOr
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
             {/* Logo */}
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-slate-900 border-2 border-white/20 p-2 shrink-0 shadow-2xl flex items-center justify-center overflow-hidden">
+            <div 
+              className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl p-3 shrink-0 shadow-2xl flex items-center justify-center overflow-hidden border-2 border-white/20"
+              style={{ backgroundColor: "#ffffff" }}
+            >
               {org.logo_url ? (
-                <img src={org.logo_url} alt={org.name} className="max-w-full max-h-full object-contain rounded-2xl" />
+                <img 
+                  src={org.logo_url} 
+                  alt={org.name} 
+                  className="max-w-full max-h-full object-contain" 
+                  style={{ backgroundColor: "#ffffff" }}
+                />
               ) : (
-                <Building2 size={48} className="text-indigo-400" />
+                <Building2 size={48} className="text-indigo-600" />
               )}
             </div>
 
