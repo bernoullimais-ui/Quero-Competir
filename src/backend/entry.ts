@@ -1,9 +1,7 @@
 /**
  * Vercel Serverless Function entry point.
- * Explicitly wraps Express app into standard Vercel serverless handler (req, res) => app(req, res).
+ * Uses export = app so esbuild generates direct module.exports = app for Vercel.
  */
 import app from "./app";
 
-export default function handler(req: any, res: any) {
-  return app(req, res);
-}
+export = app;
