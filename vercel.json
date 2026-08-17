@@ -4,10 +4,16 @@
   "outputDirectory": "dist",
   "installCommand": "npm ci",
   "framework": null,
+  "functions": {
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 15
+    }
+  },
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/api/index"
+      "destination": "/api/index.js"
     },
     {
       "source": "/((?!api/).*)",
