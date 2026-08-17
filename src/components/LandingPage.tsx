@@ -14,12 +14,19 @@ function getStatusInfo(t: any) {
   return { label: "Em Breve", color: "bg-amber-500", dot: "bg-amber-400" };
 }
 
-export default function LandingPage() {
+import Login from "./Login.tsx";
+
+interface LandingPageProps {
+  onLoginSuccess?: (user: any) => void;
+}
+
+export default function LandingPage({ onLoginSuccess }: LandingPageProps) {
   const [config, setConfig] = useState<any>(null);
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [filterStatus, setFilterStatus] = useState<"all" | "open" | "ongoing" | "done">("all");
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const intervalRef = useRef<any>(null);
 
   useEffect(() => {
@@ -74,13 +81,13 @@ export default function LandingPage() {
           <a href="#torneios" className="hover:text-white transition">Torneios</a>
           <a href="#diferenciais" className="hover:text-white transition">Diferenciais</a>
         </div>
-        <Link
-          to="/login"
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-xl transition shadow-lg shadow-indigo-600/30"
+        <button
+          onClick={() => setShowLoginModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-xl transition shadow-lg shadow-indigo-600/30 cursor-pointer"
         >
           Entrar
           <ArrowRight size={14} />
-        </Link>
+        </button>
       </nav>
 
       {/* ── HERO CAROUSEL ── */}
@@ -124,13 +131,23 @@ export default function LandingPage() {
               <p className="text-lg md:text-xl text-slate-300 font-medium mb-8 max-w-xl mx-auto leading-relaxed">
                 {slides[currentSlide]?.subtitle || "A plataforma de gestão esportiva mais completa do Brasil."}
               </p>
-              <Link
-                to={slides[currentSlide]?.ctaUrl || "/login"}
-                className="inline-flex items-center gap-2 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-base transition shadow-2xl shadow-indigo-600/40 hover:shadow-indigo-500/50"
-              >
-                {slides[currentSlide]?.ctaText || "Começar Agora"}
-                <ArrowRight size={18} />
-              </Link>
+              {slides[currentSlide]?.ctaUrl && slides[currentSlide]?.ctaUrl !== "/login" ? (
+                <Link
+                  to={slides[currentSlide].ctaUrl}
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-base transition shadow-2xl shadow-indigo-600/40 hover:shadow-indigo-500/50"
+                >
+                  {slides[currentSlide]?.ctaText || "Começar Agora"}
+                  <ArrowRight size={18} />
+                </Link>
+              ) : (
+                <button
+                  onClick={() => setShowLoginModal(true)}
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-base transition shadow-2xl shadow-indigo-600/40 hover:shadow-indigo-500/50 cursor-pointer"
+                >
+                  {slides[currentSlide]?.ctaText || "Começar Agora"}
+                  <ArrowRight size={18} />
+                </button>
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -295,13 +312,13 @@ export default function LandingPage() {
         <div className="max-w-2xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-black text-white mb-4">Pronto para organizar seu próximo evento?</h2>
           <p className="text-indigo-200 mb-8 font-medium">Entre em contato e faça parte da plataforma esportiva que está transformando a gestão de torneios no Brasil.</p>
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-indigo-700 font-extrabold rounded-2xl hover:bg-indigo-50 transition shadow-2xl text-base"
+          <button
+            onClick={() => setShowLoginModal(true)}
+            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-indigo-700 font-extrabold rounded-2xl hover:bg-indigo-50 transition shadow-2xl text-base cursor-pointer"
           >
             Acessar a Plataforma
             <ArrowRight size={18} />
-          </Link>
+          </button>
         </div>
       </section>
 
@@ -312,11 +329,23 @@ export default function LandingPage() {
         </div>
         <p className="text-xs text-slate-600 font-semibold">© {new Date().getFullYear()} Quero Competir · Sistema Oficial de Gestão Esportiva</p>
         <div className="flex justify-center gap-6 mt-4 text-xs text-slate-600 font-medium">
-          <Link to="/login" className="hover:text-slate-400 transition">Entrar</Link>
+          <button onClick={() => setShowLoginModal(true)} className="hover:text-slate-400 transition cursor-pointer">Entrar</button>
           <a href="#organizacoes" className="hover:text-slate-400 transition">Organizações</a>
           <a href="#torneios" className="hover:text-slate-400 transition">Torneios</a>
         </div>
       </footer>
+
+      {/* Login Pop-up Modal */}
+      {showLoginModal && (
+        <Login
+          isModal={true}
+          onClose={() => setShowLoginModal(false)}
+          onLoginSuccess={(user) => {
+            setShowLoginModal(false);
+            if (onLoginSuccess) onLoginSuccess(user);
+          }}
+        />
+      )}
     </div>
   );
 }
