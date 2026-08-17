@@ -61280,9 +61280,11 @@ app.use((err, _req, res, _next) => {
 var app_default = app;
 
 // src/backend/entry.ts
-var entry_default = app_default;
+function handler(req, res) {
+  return app_default(req, res);
+}
 export {
-  entry_default as default
+  handler as default
 };
 /*! Bundled license information:
 
