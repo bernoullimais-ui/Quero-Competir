@@ -54440,7 +54440,7 @@ async function getOrganizerReferenceIdAndSync(organizerId) {
       if (isValidUUID(acc.reference_id)) {
         return acc.reference_id;
       }
-      if (acc.email?.toLowerCase().includes("organizador") || acc.email?.toLowerCase().includes("judobrunomaia")) {
+      if (acc.email?.toLowerCase().includes("organizador") || acc.email?.toLowerCase().includes("judobrunomaia") || acc.email?.toLowerCase().includes("fluir")) {
         await supabase.from("portal_accounts").update({ reference_id: PRIMARY_ORG_UUID }).eq("id", organizerId);
         return PRIMARY_ORG_UUID;
       }

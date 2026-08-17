@@ -126,7 +126,7 @@ async function getOrganizerReferenceIdAndSync(organizerId: string): Promise<stri
       }
 
       // 2. Default primary organizer ("Rede Fluir")
-      if (acc.email?.toLowerCase().includes("organizador") || acc.email?.toLowerCase().includes("judobrunomaia")) {
+      if (acc.email?.toLowerCase().includes("organizador") || acc.email?.toLowerCase().includes("judobrunomaia") || acc.email?.toLowerCase().includes("fluir")) {
         await supabase
           .from("portal_accounts")
           .update({ reference_id: PRIMARY_ORG_UUID })
