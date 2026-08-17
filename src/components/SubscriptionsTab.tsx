@@ -300,7 +300,7 @@ export default function SubscriptionsTab({
                 const inst = institutions.find(i => i.id === sub.institutionId);
                 const cat = categories.find(c => c.id === sub.categoryId);
                 const ageGroupStr = sub.additionalData?.age_group || cat?.age_group || (cat?.rules_config?.ages?.join(", ")) || "Livre";
-                const checkInStr = sub.checkedInAt ? `Realizado às ${new Date(sub.checkedInAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}` : "Pendente";
+                const checkInStr = sub.checkedInAt ? `Realizado às ${new Date(sub.checkedInAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit', timeZone: 'America/Sao_Paulo'})}` : "Pendente";
                 
                 return [
                   `"${sub.athleteName || ''}"`,
@@ -536,7 +536,7 @@ export default function SubscriptionsTab({
                         )}
                         <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
                           <span className={`w-2 h-2 rounded-full ${sub.checkedInAt ? "bg-indigo-500" : "bg-slate-300"}`} />
-                          Check-in Presencial: {sub.checkedInAt ? `Realizado às ${new Date(sub.checkedInAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}` : "Pendente"}
+                          Check-in Presencial: {sub.checkedInAt ? `Realizado às ${new Date(sub.checkedInAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit', timeZone: 'America/Sao_Paulo'})}` : "Pendente"}
                         </div>
                       </div>
 

@@ -5148,7 +5148,7 @@ router.post("/:id/check-in/:subId", async (req, res) => {
       return res.json({
         success: true,
         status: "already_checked_in",
-        message: `⚠️ Check-in já realizado anteriormente às ${new Date(sub.checkedInAt).toLocaleTimeString("pt-BR")}`,
+        message: `⚠️ Check-in já realizado anteriormente às ${new Date(sub.checkedInAt).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
         checkedInAt: sub.checkedInAt,
         subscription: sub
       });
