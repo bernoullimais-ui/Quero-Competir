@@ -107,7 +107,7 @@ import TournamentScheduler from "./TournamentScheduler.tsx";
 import TournamentStats from "./TournamentStats.tsx";
 import TournamentClassification from "./TournamentClassification.tsx";
 import TournamentCommunity from "./TournamentCommunity.tsx";
-import { TrendingUp, MessageSquare } from "lucide-react";
+import { TrendingUp, MessageSquare, ShieldCheck } from "lucide-react";
 import { useToast } from "./ui/Toast.tsx";
 import { useConfirm } from "./ui/ConfirmDialog.tsx";
 import CategoriesTab from "./CategoriesTab.tsx";
