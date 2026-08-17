@@ -118,11 +118,15 @@ export default function PublicAthleteTicket() {
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-extrabold text-white truncate leading-snug">{subscription?.athleteName}</h2>
               <p className="text-xs font-bold text-indigo-400 truncate mt-0.5">{institution?.name || "Atleta Independente"}</p>
-              {subscription?.additionalData?.age_group && (
-                <span className="inline-block mt-1 text-[10px] font-extrabold bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-md uppercase">
-                  {subscription.additionalData.age_group}
-                </span>
-              )}
+              {(() => {
+                const ageGroup = subscription?.additionalData?.age_group || categories[0]?.age_group;
+                if (!ageGroup) return null;
+                return (
+                  <span className="inline-block mt-1 text-[10px] font-extrabold bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-md uppercase">
+                    Classe de Idade: {ageGroup}
+                  </span>
+                );
+              })()}
             </div>
           </div>
 
