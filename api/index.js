@@ -61196,8 +61196,11 @@ var platformRoutes_default = router8;
 
 // src/backend/app.ts
 init_auth();
-import_dotenv.default.config();
-import_dotenv.default.config({ path: ".env.local", override: true });
+try {
+  import_dotenv.default.config();
+  import_dotenv.default.config({ path: ".env.local", override: true });
+} catch (_) {
+}
 var app = (0, import_express9.default)();
 var isProduction = process.env.NODE_ENV === "production";
 app.use(

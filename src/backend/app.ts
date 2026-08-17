@@ -16,8 +16,10 @@ import { optionalAuth } from "./middleware/auth";
 // ─── Load env vars first (ESM-safe: called in module body, not hoisted) ────────
 // This ensures env vars are available even when app.ts is imported before
 // the parent module (server.ts) runs its own dotenv.config() call.
-dotenv.config();
-dotenv.config({ path: ".env.local", override: true });
+try {
+  dotenv.config();
+  dotenv.config({ path: ".env.local", override: true });
+} catch (_) {}
 
 const app = express();
 
