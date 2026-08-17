@@ -154,9 +154,17 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
         headers: getHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(landingConfig)
       });
-      if (res.ok) toastSuccess("Configuração da página inicial salva com sucesso!");
-      else toastError("Erro ao salvar configuração.");
-    } catch { toastError("Erro de rede ao salvar."); } finally { setLandingSaving(false); }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toastSuccess("Configuração da página inicial salva com sucesso!");
+      } else {
+        toastError(data.error || "Erro ao salvar configuração.");
+      }
+    } catch {
+      toastError("Erro de rede ao salvar.");
+    } finally {
+      setLandingSaving(false);
+    }
   };
 
   const addSlide = () => {
