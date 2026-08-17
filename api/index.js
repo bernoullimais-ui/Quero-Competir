@@ -6362,37 +6362,30 @@ async function loadAccountsDb() {
   } catch (err) {
   }
   try {
-    const dir = path4.dirname(ACCOUNTS_FILE4);
-    if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
-    if (!fs4.existsSync(ACCOUNTS_FILE4)) {
-      const defaultAccounts = [
-        {
-          id: "sa-1",
-          email: "admin@querocompetir.com.br",
-          // Plaintext — will be automatically hashed on first login
-          passwordHash: "admin123",
-          role: "super_admin",
-          name: "Super Admin (SaaS Manager)",
-          createdAt: (/* @__PURE__ */ new Date()).toISOString()
-        },
-        {
-          id: "org-1",
-          email: "organizador@querocompetir.com.br",
-          // Plaintext — will be automatically hashed on first login
-          passwordHash: "org123",
-          role: "organizer",
-          name: "Organizador Principal",
-          createdAt: (/* @__PURE__ */ new Date()).toISOString()
-        }
-      ];
-      fs4.writeFileSync(ACCOUNTS_FILE4, JSON.stringify(defaultAccounts, null, 2));
-      return defaultAccounts;
+    if (fs4.existsSync(ACCOUNTS_FILE4)) {
+      return JSON.parse(fs4.readFileSync(ACCOUNTS_FILE4, "utf-8"));
     }
-    return JSON.parse(fs4.readFileSync(ACCOUNTS_FILE4, "utf-8"));
   } catch (err) {
     console.error("Error reading accounts.json", err);
-    return [];
   }
+  return [
+    {
+      id: "sa-1",
+      email: "admin@querocompetir.com.br",
+      passwordHash: "admin123",
+      role: "super_admin",
+      name: "Super Admin (SaaS Manager)",
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    {
+      id: "org-1",
+      email: "organizador@querocompetir.com.br",
+      passwordHash: "org123",
+      role: "organizer",
+      name: "Organizador Principal",
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    }
+  ];
 }
 function saveAccountsDb(accounts) {
   try {

@@ -119,10 +119,10 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
       ]);
 
       const [uData, iData, tData, aData] = await Promise.all([
-        uRes.json(),
-        iRes.json(),
-        tRes.json(),
-        aRes.json()
+        uRes.ok ? uRes.json().catch(() => []) : [],
+        iRes.ok ? iRes.json().catch(() => []) : [],
+        tRes.ok ? tRes.json().catch(() => []) : [],
+        aRes.ok ? aRes.json().catch(() => []) : []
       ]);
 
       if (Array.isArray(uData)) setUsers(uData);
