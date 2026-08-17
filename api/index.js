@@ -7906,6 +7906,116 @@ router7.post("/cron-cart-recovery", async (req, res) => {
 });
 var whatsappRoutes_default = router7;
 
+// src/backend/routes/platformRoutes.ts
+init_supabase();
+init_auth();
+import { Router as Router8 } from "express";
+import fs6 from "fs";
+import path6 from "path";
+var router8 = Router8();
+var CONFIG_FILE = path6.join(process.cwd(), "src", "backend", "data", "landing_config.json");
+var DEFAULT_CONFIG = {
+  seo: {
+    title: "Quero Competir \u2014 Plataforma de Gest\xE3o Esportiva",
+    description: "A plataforma completa para organizar torneios, gerenciar inscri\xE7\xF5es e conectar atletas, clubes e organizadores."
+  },
+  hero: {
+    slides: [
+      {
+        id: "slide1",
+        imageUrl: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&q=80&w=1600",
+        title: "Organize Torneios com Excel\xEAncia",
+        subtitle: "Inscri\xE7\xF5es, balizamento, check-in digital e muito mais em uma \xFAnica plataforma.",
+        ctaText: "Come\xE7ar Agora",
+        ctaUrl: "/login"
+      },
+      {
+        id: "slide2",
+        imageUrl: "https://images.unsplash.com/photo-1530549387789-4c1017266635?auto=format&fit=crop&q=80&w=1600",
+        title: "Check-in via QR Code",
+        subtitle: "Agilidade para sua equipe de arbitragem e recep\xE7\xE3o no dia do evento.",
+        ctaText: "Conhecer Recursos",
+        ctaUrl: "/login"
+      },
+      {
+        id: "slide3",
+        imageUrl: "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?auto=format&fit=crop&q=80&w=1600",
+        title: "Conecte Atletas e Clubes",
+        subtitle: "Portal completo para respons\xE1veis, clubes e organizadores esportivos.",
+        ctaText: "Saiba Mais",
+        ctaUrl: "/login"
+      }
+    ]
+  },
+  features: [
+    { id: "f1", icon: "\u{1F3C6}", title: "Gest\xE3o Completa de Torneios", description: "Crie, configure e gerencie torneios de qualquer modalidade, do in\xEDcio ao fim." },
+    { id: "f2", icon: "\u{1F4F1}", title: "Check-in via QR Code", description: "Scanner mobile para a equipe de recep\xE7\xE3o confirmar presen\xE7a dos atletas em segundos." },
+    { id: "f3", icon: "\u{1F3CA}", title: "Balizamento Autom\xE1tico", description: "Gera\xE7\xE3o de raias e s\xE9ries de nata\xE7\xE3o conforme regras FINA/CBDA automaticamente." },
+    { id: "f4", icon: "\u{1F4B3}", title: "Pagamentos Integrados", description: "Pix e cart\xE3o de cr\xE9dito via Pagar.me com repasse autom\xE1tico aos organizadores." },
+    { id: "f5", icon: "\u{1F4CA}", title: "Relat\xF3rios e Estat\xEDsticas", description: "Dashboards em tempo real com dados de inscri\xE7\xF5es, financeiro e resultados." },
+    { id: "f6", icon: "\u{1F91D}", title: "Portal para Clubes", description: "As institui\xE7\xF5es gerenciam seus atletas, fichas m\xE9dicas e inscri\xE7\xF5es em um s\xF3 lugar." }
+  ]
+};
+function loadConfig() {
+  try {
+    if (fs6.existsSync(CONFIG_FILE)) return JSON.parse(fs6.readFileSync(CONFIG_FILE, "utf-8"));
+  } catch {
+  }
+  return DEFAULT_CONFIG;
+}
+function saveConfig(config) {
+  const dir = path6.dirname(CONFIG_FILE);
+  if (!fs6.existsSync(dir)) fs6.mkdirSync(dir, { recursive: true });
+  fs6.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+}
+router8.get("/landing-config", async (_req, res) => {
+  try {
+    try {
+      const supabase = getSupabaseAdmin();
+      const { data } = await supabase.from("platform_config").select("value").eq("key", "landing_page").maybeSingle();
+      if (data?.value) return res.json(data.value);
+    } catch {
+    }
+    return res.json(loadConfig());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+router8.patch("/landing-config", requireAuth, requireRole("super_admin"), async (req, res) => {
+  try {
+    const config = req.body;
+    if (!config || typeof config !== "object") return res.status(400).json({ error: "Configura\xE7\xE3o inv\xE1lida." });
+    saveConfig(config);
+    try {
+      const supabase = getSupabaseAdmin();
+      await supabase.from("platform_config").upsert({ key: "landing_page", value: config }, { onConflict: "key" });
+    } catch {
+    }
+    return res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+router8.get("/public-tournaments", async (_req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase.from("tournaments").select("id, name, start_date, end_date, status, slug, rules_config, owner_id").order("start_date", { ascending: false }).limit(9);
+    return res.json(data || []);
+  } catch {
+    return res.json([]);
+  }
+});
+router8.get("/public-organizations", async (_req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase.from("organizations").select("id, name, logo_url, subdomain, description").order("name");
+    return res.json(data || []);
+  } catch {
+    return res.json([]);
+  }
+});
+var platformRoutes_default = router8;
+
 // src/backend/app.ts
 init_auth();
 dotenv.config();
@@ -7981,6 +8091,7 @@ app.use("/api/auth", authRoutes_default);
 app.use("/api/memberships", membershipRoutes_default);
 app.use("/api/payments", paymentRoutes_default);
 app.use("/api/whatsapp", whatsappRoutes_default);
+app.use("/api/platform", platformRoutes_default);
 app.use((err, _req, res, _next) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Erro interno do servidor.";

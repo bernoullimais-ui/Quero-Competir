@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Activity, Shield, Users, Building2, Trophy, Key, Trash2, ShieldAlert, CheckCircle, TrendingUp, DollarSign, Plus, Eye, Check, X, Percent, Save } from "lucide-react";
+import { Activity, Shield, Users, Building2, Trophy, Key, Trash2, ShieldAlert, CheckCircle, TrendingUp, DollarSign, Plus, Eye, Check, X, Percent, Save, Globe, LayoutTemplate, ChevronUp, ChevronDown, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { Link } from "react-router-dom";
 import { useToast } from "./ui/Toast.tsx";
 import { useConfirm } from "./ui/ConfirmDialog.tsx";
 
@@ -33,6 +34,12 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
 
   // Details Modal State
   const [activeModal, setActiveModal] = useState<"athletes" | "institutions" | "tournaments" | null>(null);
+  
+  // Landing Page Config State
+  const [adminTab, setAdminTab] = useState<"dashboard" | "landing">("dashboard");
+  const [landingConfig, setLandingConfig] = useState<any>(null);
+  const [landingLoading, setLandingLoading] = useState(false);
+  const [landingSaving, setLandingSaving] = useState(false);
 
   const getHeaders = (extraHeaders: any = {}) => {
     const headersObj: any = { ...extraHeaders };
@@ -124,7 +131,78 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
 
   useEffect(() => {
     fetchAllData();
+    fetchLandingConfig();
   }, []);
+
+  const fetchLandingConfig = async () => {
+    setLandingLoading(true);
+    try {
+      const res = await fetch("/api/platform/landing-config");
+      if (res.ok) setLandingConfig(await res.json());
+    } catch { /**/ } finally { setLandingLoading(false); }
+  };
+
+  const saveLandingConfig = async () => {
+    if (!landingConfig) return;
+    setLandingSaving(true);
+    try {
+      const res = await fetch("/api/platform/landing-config", {
+        method: "PATCH",
+        headers: getHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(landingConfig)
+      });
+      if (res.ok) toastSuccess("Configuração da página inicial salva com sucesso!");
+      else toastError("Erro ao salvar configuração.");
+    } catch { toastError("Erro de rede ao salvar."); } finally { setLandingSaving(false); }
+  };
+
+  const addSlide = () => {
+    setLandingConfig((prev: any) => ({
+      ...prev,
+      hero: { ...prev.hero, slides: [...(prev.hero?.slides || []), { id: `slide_${Date.now()}`, imageUrl: "", title: "Novo Banner", subtitle: "", ctaText: "Saiba Mais", ctaUrl: "/login" }] }
+    }));
+  };
+
+  const removeSlide = (idx: number) => {
+    setLandingConfig((prev: any) => ({ ...prev, hero: { ...prev.hero, slides: prev.hero.slides.filter((_: any, i: number) => i !== idx) } }));
+  };
+
+  const updateSlide = (idx: number, field: string, value: string) => {
+    setLandingConfig((prev: any) => {
+      const slides = [...prev.hero.slides];
+      slides[idx] = { ...slides[idx], [field]: value };
+      return { ...prev, hero: { ...prev.hero, slides } };
+    });
+  };
+
+  const moveSlide = (idx: number, dir: -1 | 1) => {
+    setLandingConfig((prev: any) => {
+      const slides = [...prev.hero.slides];
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= slides.length) return prev;
+      [slides[idx], slides[newIdx]] = [slides[newIdx], slides[idx]];
+      return { ...prev, hero: { ...prev.hero, slides } };
+    });
+  };
+
+  const addFeature = () => {
+    setLandingConfig((prev: any) => ({
+      ...prev,
+      features: [...(prev.features || []), { id: `f_${Date.now()}`, icon: "🏅", title: "Novo Diferencial", description: "" }]
+    }));
+  };
+
+  const removeFeature = (idx: number) => {
+    setLandingConfig((prev: any) => ({ ...prev, features: prev.features.filter((_: any, i: number) => i !== idx) }));
+  };
+
+  const updateFeature = (idx: number, field: string, value: string) => {
+    setLandingConfig((prev: any) => {
+      const features = [...prev.features];
+      features[idx] = { ...features[idx], [field]: value };
+      return { ...prev, features };
+    });
+  };
 
   const handleSaveOrgFee = async (orgId: string) => {
     const feeVal = editingFees[orgId];
@@ -244,6 +322,15 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Tab navigation */}
+          <div className="hidden md:flex items-center gap-1 bg-slate-800 rounded-xl p-1 border border-slate-700">
+            <button onClick={() => setAdminTab("dashboard")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${adminTab === "dashboard" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white"}`}>
+              <TrendingUp size={13} /> Dashboard
+            </button>
+            <button onClick={() => setAdminTab("landing")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${adminTab === "landing" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white"}`}>
+              <Globe size={13} /> Página Inicial
+            </button>
+          </div>
           <div className="hidden md:flex items-center gap-2 bg-slate-800/80 p-2 px-3.5 rounded-xl border border-slate-800">
             <Shield size={14} className="text-indigo-400" />
             <span className="text-xs font-bold text-slate-200">Sessão: {currentUser.name} (Super Admin)</span>
@@ -745,6 +832,146 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
           )}
         </AnimatePresence>
       </main>
+
+      {/* ── LANDING PAGE TAB ── */}
+      {adminTab === "landing" && (
+        <main className="flex-1 p-8 max-w-5xl w-full mx-auto space-y-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-extrabold text-slate-800 flex items-center gap-2"><Globe size={22} className="text-indigo-600" /> Página Inicial da Plataforma</h2>
+              <p className="text-sm text-slate-500 mt-1">Configure o conteúdo exibido em <a href="/" target="_blank" rel="noreferrer" className="text-indigo-600 underline font-semibold">querocompetir.com.br <ExternalLink size={12} className="inline" /></a></p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link to="/" target="_blank" className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition">
+                <Eye size={14} /> Visualizar
+              </Link>
+              <button onClick={saveLandingConfig} disabled={landingSaving} className="flex items-center gap-1.5 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition disabled:opacity-60 cursor-pointer">
+                {landingSaving ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save size={14} />}
+                Salvar Alterações
+              </button>
+            </div>
+          </div>
+
+          {landingLoading ? (
+            <div className="text-center py-24 text-slate-400 font-semibold">Carregando configuração...</div>
+          ) : landingConfig ? (
+            <div className="space-y-10">
+
+              {/* SEO */}
+              <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm space-y-4">
+                <h3 className="font-extrabold text-slate-800 flex items-center gap-2"><LayoutTemplate size={17} className="text-indigo-500" /> SEO e Identidade</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] font-black text-slate-500 uppercase block mb-1">Título da Página</label>
+                    <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400" value={landingConfig.seo?.title || ""} onChange={e => setLandingConfig((p: any) => ({ ...p, seo: { ...p.seo, title: e.target.value } }))} />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-black text-slate-500 uppercase block mb-1">Meta Description</label>
+                    <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400" value={landingConfig.seo?.description || ""} onChange={e => setLandingConfig((p: any) => ({ ...p, seo: { ...p.seo, description: e.target.value } }))} />
+                  </div>
+                </div>
+              </div>
+
+              {/* HERO CAROUSEL */}
+              <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm space-y-5">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-slate-800 flex items-center gap-2"><Globe size={17} className="text-indigo-500" /> Carrossel de Banners</h3>
+                  <button onClick={addSlide} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 transition cursor-pointer">
+                    <Plus size={13} /> Adicionar Slide
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  {(landingConfig.hero?.slides || []).map((slide: any, idx: number) => (
+                    <div key={slide.id || idx} className="border border-slate-200 rounded-2xl p-4 space-y-3 bg-slate-50/50">
+                      <div className="flex items-center gap-2 justify-between">
+                        <span className="text-xs font-black text-slate-500 uppercase">Slide {idx + 1}</span>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => moveSlide(idx, -1)} disabled={idx === 0} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 disabled:opacity-30 cursor-pointer"><ChevronUp size={14} /></button>
+                          <button onClick={() => moveSlide(idx, 1)} disabled={idx === (landingConfig.hero?.slides?.length - 1)} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 disabled:opacity-30 cursor-pointer"><ChevronDown size={14} /></button>
+                          <button onClick={() => removeSlide(idx)} className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 cursor-pointer"><Trash2 size={14} /></button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="md:col-span-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">URL da Imagem de Fundo</label>
+                          <input placeholder="https://images.unsplash.com/..." className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white" value={slide.imageUrl || ""} onChange={e => updateSlide(idx, "imageUrl", e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Título</label>
+                          <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white" value={slide.title || ""} onChange={e => updateSlide(idx, "title", e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Subtítulo</label>
+                          <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white" value={slide.subtitle || ""} onChange={e => updateSlide(idx, "subtitle", e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Texto do Botão</label>
+                          <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white" value={slide.ctaText || ""} onChange={e => updateSlide(idx, "ctaText", e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Link do Botão</label>
+                          <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white" value={slide.ctaUrl || ""} onChange={e => updateSlide(idx, "ctaUrl", e.target.value)} />
+                        </div>
+                      </div>
+                      {slide.imageUrl && (
+                        <div className="mt-2 h-24 rounded-xl overflow-hidden border border-slate-200">
+                          <img src={slide.imageUrl} alt="preview" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {(!landingConfig.hero?.slides || landingConfig.hero.slides.length === 0) && (
+                    <p className="text-sm text-slate-400 text-center py-6">Nenhum slide adicionado. Clique em "Adicionar Slide" para começar.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* FEATURES */}
+              <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm space-y-5">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-slate-800 flex items-center gap-2"><CheckCircle size={17} className="text-indigo-500" /> Diferenciais e Vantagens</h3>
+                  <button onClick={addFeature} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 transition cursor-pointer">
+                    <Plus size={13} /> Adicionar Card
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(landingConfig.features || []).map((f: any, idx: number) => (
+                    <div key={f.id || idx} className="border border-slate-200 rounded-2xl p-4 space-y-3 bg-slate-50/50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-500 uppercase">Card {idx + 1}</span>
+                        <button onClick={() => removeFeature(idx)} className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 cursor-pointer"><Trash2 size={14} /></button>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Ícone (emoji)</label>
+                          <input maxLength={4} className="w-full text-2xl text-center border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white" value={f.icon || ""} onChange={e => updateFeature(idx, "icon", e.target.value)} />
+                        </div>
+                        <div className="col-span-3">
+                          <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Título</label>
+                          <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white" value={f.title || ""} onChange={e => updateFeature(idx, "title", e.target.value)} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Descrição</label>
+                        <textarea rows={2} className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white resize-none" value={f.description || ""} onChange={e => updateFeature(idx, "description", e.target.value)} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end pb-10">
+                <button onClick={saveLandingConfig} disabled={landingSaving} className="flex items-center gap-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition disabled:opacity-60 text-sm cursor-pointer shadow-lg shadow-indigo-500/30">
+                  {landingSaving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save size={16} />}
+                  Salvar Configuração da Página
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-24 text-slate-400 font-semibold">Não foi possível carregar a configuração.</div>
+          )}
+        </main>
+      )}
     </div>
   );
 }

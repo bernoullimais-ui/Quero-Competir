@@ -10,6 +10,7 @@ import authRoutes from "./routes/authRoutes.ts";
 import membershipRoutes from "./routes/membershipRoutes.ts";
 import paymentRoutes from "./routes/paymentRoutes.ts";
 import whatsappRoutes from "./routes/whatsappRoutes.ts";
+import platformRoutes from "./routes/platformRoutes.ts";
 import { optionalAuth } from "./middleware/auth.ts";
 
 // ─── Load env vars first (ESM-safe: called in module body, not hoisted) ────────
@@ -118,6 +119,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/memberships", membershipRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
+app.use("/api/platform", platformRoutes);
 
 // ─── Global Error Handler (must be last) ─────────────────────────────────────
 // Catches any unhandled errors and returns JSON instead of HTML/plain-text.

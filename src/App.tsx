@@ -41,6 +41,7 @@ import DrawCeremony from "./components/DrawCeremony.tsx";
 import PublicPaymentPage from "./components/PublicPaymentPage.tsx";
 import PublicOrganizationPortal from "./components/PublicOrganizationPortal.tsx";
 import PublicAthleteTicket from "./components/PublicAthleteTicket.tsx";
+import LandingPage from "./components/LandingPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -452,6 +453,17 @@ export default function App() {
           <Router>
             <TitleUpdater currentUser={currentUser} />
             <Routes>
+              {/* Landing Page — root for unauthenticated users */}
+              <Route path="/" element={
+                currentUser ? null : <LandingPage />
+              } />
+              <Route path="/login" element={
+                currentUser ? <Navigate to="/" replace /> :
+                <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar o login.</div>}>
+                  <Login onLoginSuccess={handleLoginSuccess} />
+                </ErrorBoundary>
+              } />
+
               {/* Public views accessible without logging in */}
               <Route path="/public/match/:matchId" element={
                 <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar o placar.</div>}>
@@ -535,7 +547,7 @@ export default function App() {
               {/* Secure Routing Hierarchy */}
               <Route path="/*" element={
                 !currentUser ? (
-                  <Login onLoginSuccess={handleLoginSuccess} />
+                  <Navigate to="/" replace />
                 ) : currentUser.role === "super_admin" ? (
                   <ErrorBoundary fallback={<div className="p-8 text-center text-red-500">Erro no painel do administrador.</div>}>
                     <SuperAdminDashboard currentUser={currentUser} onLogout={handleLogout} />
