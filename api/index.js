@@ -1625,64 +1625,66 @@ function saveOrgVenues(data) {
     console.error("Error saving organizer_venues.json:", e);
   }
 }
+var PRIMARY_ORG_UUID = "470275a0-cc3c-49f1-b61e-0f19850a6a4e";
+var UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(str) {
+  return typeof str === "string" && UUID_REGEX.test(str);
+}
 async function getOrganizerReferenceIdAndSync(organizerId) {
   try {
     const supabase = getSupabaseAdmin();
-    try {
-      const { data: acc } = await supabase.from("portal_accounts").select("id, email, reference_id").eq("id", organizerId).maybeSingle();
-      if (acc) {
-        if (acc.reference_id && acc.reference_id !== "org-1" && !acc.email?.includes("judobrunomaia") && !acc.email?.includes("organizador")) {
-          return acc.reference_id;
-        }
-        await supabase.from("portal_accounts").update({ reference_id: "org-1" }).eq("id", organizerId);
-        return "org-1";
+    const { data: acc } = await supabase.from("portal_accounts").select("id, email, name, reference_id").eq("id", organizerId).maybeSingle();
+    if (acc) {
+      if (isValidUUID(acc.reference_id)) {
+        return acc.reference_id;
       }
-    } catch (_) {
-    }
-    if (fs2.existsSync(ACCOUNTS_FILE2)) {
-      const accounts = JSON.parse(fs2.readFileSync(ACCOUNTS_FILE2, "utf-8"));
-      const user = accounts.find((a) => a.id === organizerId);
-      if (user) {
-        user.referenceId = "org-1";
-        fs2.writeFileSync(ACCOUNTS_FILE2, JSON.stringify(accounts, null, 2));
-        return "org-1";
+      if (acc.email?.toLowerCase().includes("organizador") || acc.email?.toLowerCase().includes("judobrunomaia")) {
+        await supabase.from("portal_accounts").update({ reference_id: PRIMARY_ORG_UUID }).eq("id", organizerId);
+        return PRIMARY_ORG_UUID;
+      }
+      const orgName = acc.name || `Organiza\xE7\xE3o de ${acc.email.split("@")[0]}`;
+      const cleanSub = (acc.name || acc.email.split("@")[0]).toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 15) || "org";
+      const randomSubdomain = `${cleanSub}-${Math.floor(1e3 + Math.random() * 9e3)}`;
+      const { data: newOrg, error: insertErr } = await supabase.from("organizations").insert([{
+        name: orgName,
+        subdomain: randomSubdomain,
+        primary_color: "#4F46E5",
+        secondary_color: "#0F172A",
+        font_family: "inter"
+      }]).select("id").maybeSingle();
+      if (!insertErr && newOrg && isValidUUID(newOrg.id)) {
+        await supabase.from("portal_accounts").update({ reference_id: newOrg.id }).eq("id", organizerId);
+        return newOrg.id;
       }
     }
-    return "org-1";
   } catch (err) {
     console.error("Error resolving organizer organization:", err);
-    return "org-1";
   }
+  return PRIMARY_ORG_UUID;
 }
 router2.get("/organization", requireAuth, async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
     const organizerId = req.user.id;
-    let orgId = null;
-    if (organizerId) {
-      orgId = await getOrganizerReferenceIdAndSync(organizerId);
-    }
-    if (!orgId) orgId = "org-1";
+    let orgId = await getOrganizerReferenceIdAndSync(organizerId);
     let orgData = null;
-    const { data, error } = await supabase.from("organizations").select("*").eq("id", orgId).maybeSingle();
-    orgData = data;
-    if (!orgData && (orgId === "org-1" || orgId === "redefluir")) {
-      const { data: fallback } = await supabase.from("organizations").select("*").limit(1).maybeSingle();
+    if (isValidUUID(orgId)) {
+      const { data } = await supabase.from("organizations").select("*").eq("id", orgId).maybeSingle();
+      orgData = data;
+    }
+    if (!orgData) {
+      const { data: fallback } = await supabase.from("organizations").select("*").eq("id", PRIMARY_ORG_UUID).maybeSingle();
       orgData = fallback;
     }
     if (!orgData) {
       orgData = {
-        id: "org-1",
+        id: PRIMARY_ORG_UUID,
         name: "Rede Fluir",
         subdomain: "redefluir",
         primary_color: "#4F46E5",
         secondary_color: "#0F172A",
         font_family: "inter"
       };
-    }
-    if (orgData.id === "org-1" || orgData.name === "Organizador Principal" || orgData.name === "Organiza\xE7\xE3o de Organizador Principal" || orgData.subdomain === "redefluir" || orgData.name.toLowerCase().includes("fluir")) {
-      orgData.name = "Rede Fluir";
-      orgData.subdomain = orgData.subdomain || "redefluir";
     }
     if (orgData.description && typeof orgData.description === "string" && orgData.description.includes("__FIN_DATA__:")) {
       orgData.description = orgData.description.split("__FIN_DATA__:")[0].trim();
@@ -1697,36 +1699,23 @@ router2.put("/organization", requireAuth, async (req, res) => {
     const supabase = getSupabaseAdmin();
     const { id, updated_at, created_at, ...payload } = req.body;
     const organizerId = req.user.id;
-    let orgId = null;
-    if (organizerId) {
-      orgId = await getOrganizerReferenceIdAndSync(organizerId);
+    let orgId = await getOrganizerReferenceIdAndSync(organizerId);
+    if (!isValidUUID(orgId)) {
+      orgId = PRIMARY_ORG_UUID;
     }
-    if (!orgId) {
-      const { data: existing } = await supabase.from("organizations").select("id").limit(1).maybeSingle();
-      orgId = existing?.id || null;
-    }
-    if (orgId) {
-      const { data: currentOrg } = await supabase.from("organizations").select("description").eq("id", orgId).maybeSingle();
-      if (currentOrg?.description && typeof currentOrg.description === "string" && currentOrg.description.includes("__FIN_DATA__:")) {
-        const finPart = currentOrg.description.split("__FIN_DATA__:")[1];
-        const userDesc = (payload.description || "").split("__FIN_DATA__:")[0].trim();
-        payload.description = userDesc ? `${userDesc}
+    const { data: currentOrg } = await supabase.from("organizations").select("description").eq("id", orgId).maybeSingle();
+    if (currentOrg?.description && typeof currentOrg.description === "string" && currentOrg.description.includes("__FIN_DATA__:")) {
+      const finPart = currentOrg.description.split("__FIN_DATA__:")[1];
+      const userDesc = (payload.description || "").split("__FIN_DATA__:")[0].trim();
+      payload.description = userDesc ? `${userDesc}
 
 __FIN_DATA__:${finPart}` : `__FIN_DATA__:${finPart}`;
-      }
     }
-    let result;
-    if (orgId) {
-      const { data, error } = await supabase.from("organizations").update(payload).eq("id", orgId).select().maybeSingle();
-      if (error) throw error;
-      result = data;
-    } else {
-      const { data, error } = await supabase.from("organizations").insert([payload]).select().maybeSingle();
-      if (error) throw error;
-      result = data;
-    }
-    res.json(result);
+    const { data, error } = await supabase.from("organizations").update(payload).eq("id", orgId).select().maybeSingle();
+    if (error) throw error;
+    res.json(data);
   } catch (error) {
+    console.error("PUT /organization error:", error);
     res.status(500).json({ error: error.message });
   }
 });
