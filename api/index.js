@@ -3681,6 +3681,7 @@ function mapSubToFrontend(dbSub) {
     authorizedImageUse: !!dbSub.authorized_image_use,
     liabilityWaiver: !!dbSub.liability_waiver,
     paymentStatus: dbSub.payment_status || "pending",
+    checkedInAt: dbSub.checked_in_at || null,
     createdAt: dbSub.created_at
   };
 }

@@ -3075,6 +3075,7 @@ function mapSubToFrontend(dbSub: any) {
     authorizedImageUse: !!dbSub.authorized_image_use,
     liabilityWaiver: !!dbSub.liability_waiver,
     paymentStatus: dbSub.payment_status || "pending",
+    checkedInAt: dbSub.checked_in_at || null,
     createdAt: dbSub.created_at
   };
 }
@@ -3100,7 +3101,8 @@ function mapSubToDb(feSub: any) {
     photo_url: feSub.photoUrl || null,
     authorized_image_use: !!feSub.authorizedImageUse,
     liability_waiver: !!feSub.liabilityWaiver,
-    payment_status: feSub.paymentStatus || "pending"
+    payment_status: feSub.paymentStatus || "pending",
+    checked_in_at: feSub.checkedInAt || null
   };
 }
 
