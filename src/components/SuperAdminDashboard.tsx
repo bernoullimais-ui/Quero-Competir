@@ -35,6 +35,9 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
   // Details Modal State
   const [activeModal, setActiveModal] = useState<"athletes" | "institutions" | "tournaments" | null>(null);
   
+  // Role Filter State (default to 'organizer')
+  const [roleFilter, setRoleFilter] = useState<string>("organizer");
+  
   // Landing Page Config State
   const [adminTab, setAdminTab] = useState<"dashboard" | "landing">("dashboard");
   const [landingConfig, setLandingConfig] = useState<any>(null);
@@ -381,14 +384,49 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
             
             {/* User credentials administration */}
             <div className="bg-white rounded-3xl border border-slate-150 p-6 shadow-sm space-y-4">
-              <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-800">Credenciais & Contas Cadastradas</h3>
-                  <p className="text-xs text-slate-400 font-medium">Controle de acesso seguro para Organizadores, Clubes e Pais</p>
+              <div className="border-b border-slate-100 pb-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-800">Credenciais & Contas Cadastradas</h3>
+                    <p className="text-xs text-slate-400 font-medium">Controle de acesso seguro para Organizadores, Clubes, Sedes e Pais</p>
+                  </div>
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                    {users.filter(u => roleFilter === "all" || u.role === roleFilter).length} de {users.length} Contas
+                  </span>
                 </div>
-                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                  {users.length} Contas
-                </span>
+
+                {/* Filter Pills */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                  {[
+                    { id: "organizer", label: "Organizadores" },
+                    { id: "guardian", label: "Responsáveis / Pais" },
+                    { id: "institution", label: "Clubes / Escolas" },
+                    { id: "venue", label: "Sedes" },
+                    { id: "super_admin", label: "Super Admins" },
+                    { id: "all", label: "Todos os Perfis" },
+                  ].map((tab) => {
+                    const count = tab.id === "all" ? users.length : users.filter(u => u.role === tab.id).length;
+                    const isActive = roleFilter === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setRoleFilter(tab.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                          isActive
+                            ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
+                            : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-800"
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                          isActive ? "bg-indigo-700/80 text-white" : "bg-slate-200 text-slate-600"
+                        }`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {loading ? (
@@ -405,44 +443,59 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
                       </tr>
                     </thead>
                     <tbody className="font-semibold text-slate-700 divide-y divide-slate-100">
-                      {users.map((u) => {
-                        const isMaster = u.email === "admin@querocompetir.com.br";
-                        return (
-                          <tr key={u.id} className="hover:bg-slate-50/80 transition duration-150">
-                            <td className="py-3 px-4 font-mono select-all text-slate-800">{u.email}</td>
-                            <td className="py-3 px-4">{u.name}</td>
-                            <td className="py-3 px-4">
-                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase ${
-                                u.role === "super_admin" 
-                                  ? "bg-rose-50 text-rose-700 border-rose-100" 
-                                  : u.role === "organizer" 
-                                  ? "bg-indigo-50 text-indigo-700 border-indigo-100"
-                                  : u.role === "institution"
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                                  : "bg-amber-50 text-amber-700 border-amber-100"
-                              }`}>
-                                {u.role === "super_admin" && "SAAS_ADMIN"}
-                                {u.role === "organizer" && "ORGANIZADOR"}
-                                {u.role === "institution" && "CLUBE_ESCOLA"}
-                                {u.role === "guardian" && "RESPONSÁVEL_PAI"}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-center">
-                              {isMaster ? (
-                                <span className="text-[10px] uppercase text-indigo-500 font-extrabold pr-3">Inviolável</span>
-                              ) : (
-                                <button
-                                  onClick={() => handleDeleteUser(u.id)}
-                                  className="p-1 px-2.5 bg-red-50 hover:bg-red-100 hover:text-red-700 text-red-500 rounded-lg transition duration-150 inline-flex items-center gap-1 text-[11px] font-bold"
-                                >
-                                  <Trash2 size={12} />
-                                  <span>Excluir</span>
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {(() => {
+                        const filteredUsers = users.filter(u => roleFilter === "all" || u.role === roleFilter);
+                        if (filteredUsers.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={4} className="py-10 text-center text-slate-400 font-semibold text-xs">
+                                Nenhuma conta cadastrada nesta categoria.
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return filteredUsers.map((u) => {
+                          const isMaster = u.email === "admin@querocompetir.com.br";
+                          return (
+                            <tr key={u.id} className="hover:bg-slate-50/80 transition duration-150">
+                              <td className="py-3 px-4 font-mono select-all text-slate-800">{u.email}</td>
+                              <td className="py-3 px-4">{u.name}</td>
+                              <td className="py-3 px-4">
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase ${
+                                  u.role === "super_admin" 
+                                    ? "bg-rose-50 text-rose-700 border-rose-100" 
+                                    : u.role === "organizer" 
+                                    ? "bg-indigo-50 text-indigo-700 border-indigo-100"
+                                    : u.role === "institution"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                                    : u.role === "venue"
+                                    ? "bg-purple-50 text-purple-700 border-purple-100"
+                                    : "bg-amber-50 text-amber-700 border-amber-100"
+                                }`}>
+                                  {u.role === "super_admin" && "SAAS_ADMIN"}
+                                  {u.role === "organizer" && "ORGANIZADOR"}
+                                  {u.role === "institution" && "CLUBE_ESCOLA"}
+                                  {u.role === "venue" && "SEDE_QUADRA"}
+                                  {u.role === "guardian" && "RESPONSÁVEL_PAI"}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                {isMaster ? (
+                                  <span className="text-[10px] uppercase text-indigo-500 font-extrabold pr-3">Inviolável</span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleDeleteUser(u.id)}
+                                    className="p-1 px-2.5 bg-red-50 hover:bg-red-100 hover:text-red-700 text-red-500 rounded-lg transition duration-150 inline-flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                                  >
+                                    <Trash2 size={12} />
+                                    <span>Excluir</span>
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
                     </tbody>
                   </table>
                 </div>
