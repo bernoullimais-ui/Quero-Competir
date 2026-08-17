@@ -190,13 +190,15 @@ export default function LandingPage({ onLoginSuccess }: LandingPageProps) {
                   to={org.subdomain ? `/o/${org.subdomain}` : "#"}
                   className="group bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-500/40 rounded-2xl p-5 flex flex-col items-center gap-3 transition text-center"
                 >
-                  {org.logo_url ? (
-                    <img src={org.logo_url} alt={org.name} className="w-14 h-14 rounded-xl object-cover border border-slate-700 group-hover:border-indigo-500/40 transition" />
-                  ) : (
-                    <div className="w-14 h-14 bg-indigo-950 rounded-xl flex items-center justify-center text-indigo-400 border border-indigo-900">
-                      <Building2 size={22} />
-                    </div>
-                  )}
+                  <div className="w-16 h-16 rounded-2xl bg-white p-2 border border-white/20 shadow-md flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition">
+                    {org.logo_url ? (
+                      <img src={org.logo_url} alt={org.name} className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="w-full h-full bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                        <Building2 size={24} />
+                      </div>
+                    )}
+                  </div>
                   <span className="text-xs font-bold text-slate-300 group-hover:text-white transition leading-snug">{org.name}</span>
                 </Link>
               ))}
