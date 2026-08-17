@@ -205,11 +205,19 @@ export default function PublicOrganizationPortal({ overrideSubdomain }: PublicOr
                 >
                   <div className="p-6 space-y-4">
                     <div className="flex items-start justify-between gap-4">
-                      <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 p-1 shrink-0 flex items-center justify-center overflow-hidden">
+                      <div 
+                        className="w-14 h-14 rounded-2xl p-1.5 shrink-0 flex items-center justify-center overflow-hidden border border-slate-200 shadow-sm"
+                        style={{ backgroundColor: "#ffffff" }}
+                      >
                         {t.logo_url ? (
-                          <img src={t.logo_url} alt={t.name} className="max-w-full max-h-full object-contain rounded-xl" />
+                          <img 
+                            src={t.logo_url} 
+                            alt={t.name} 
+                            className="max-w-full max-h-full object-contain" 
+                            style={{ backgroundColor: "#ffffff" }}
+                          />
                         ) : (
-                          <Trophy size={28} className="text-indigo-400" />
+                          <Trophy size={26} className="text-indigo-600" />
                         )}
                       </div>
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
