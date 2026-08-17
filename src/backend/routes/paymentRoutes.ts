@@ -765,6 +765,71 @@ router.get("/admin/global-config", requireAuth, async (req, res) => {
   }
 });
 
+// 6. Relatório Financeiro de Comissões SaaS (Somente Super Admin)
+router.get("/admin/commissions", requireAuth, requireRole("super_admin"), async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    
+    // 1. Map organizations for platform_fee_percent
+    const { data: orgs } = await supabase.from("organizations").select("id, name, subdomain, platform_fee_percent");
+    const orgMap = new Map<string, any>();
+    if (orgs) {
+      orgs.forEach(o => orgMap.set(o.id, o));
+    }
+
+    // 2. Map tournaments
+    const { data: tournaments } = await supabase.from("tournaments").select("id, name, owner_id");
+    const tourneyMap = new Map<string, any>();
+    if (tournaments) {
+      tournaments.forEach(t => tourneyMap.set(t.id, t));
+    }
+
+    // 3. Fetch subscriptions
+    const { data: subscriptions, error } = await supabase
+      .from("athlete_subscriptions")
+      .select("id, tournament_id, athlete_name, parent_name, payment_status, created_at, additional_data, is_completed")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    // 4. Calculate commissions
+    const transactions = (subscriptions || []).map((sub: any) => {
+      const tourney = tourneyMap.get(sub.tournament_id) || {};
+      const ownerId = tourney.owner_id || "470275a0-cc3c-49f1-b61e-0f19850a6a4e";
+      const org = orgMap.get(ownerId) || { name: "Organizador", subdomain: "", platform_fee_percent: 10 };
+
+      const feePercent = org.platform_fee_percent !== undefined && org.platform_fee_percent !== null ? Number(org.platform_fee_percent) : 10;
+      
+      const addData = sub.additional_data || {};
+      const amount = Number(addData.totalFee || addData.athleteFee || 50);
+      const commissionAmount = amount * (feePercent / 100);
+      const organizerPayout = amount - commissionAmount;
+
+      return {
+        id: sub.id,
+        created_at: sub.created_at || new Date().toISOString(),
+        tournament_id: sub.tournament_id,
+        tournament_name: tourney.name || "Torneio",
+        organizer_id: ownerId,
+        organizer_name: org.name || "Organizador",
+        organizer_subdomain: org.subdomain || "",
+        athlete_name: sub.athlete_name || "Inscrição",
+        parent_name: sub.parent_name || "",
+        payment_status: sub.payment_status || "paid",
+        amount: amount,
+        fee_percent: feePercent,
+        saas_commission: Number(commissionAmount.toFixed(2)),
+        organizer_payout: Number(organizerPayout.toFixed(2))
+      };
+    });
+
+    res.json(transactions);
+  } catch (err: any) {
+    console.error("GET /admin/commissions error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 6. Atualizar Parâmetros Globais do SaaS (Somente Super Admin)
 router.patch("/admin/global-config", requireAuth, async (req, res) => {
   const { platformFeePercent, maintenanceMode } = req.body;

@@ -44,7 +44,7 @@ __export(auth_exports, {
   generateToken: () => generateToken,
   optionalAuth: () => optionalAuth,
   requireAuth: () => requireAuth,
-  requireRole: () => requireRole
+  requireRole: () => requireRole2
 });
 import jwt from "jsonwebtoken";
 function getJwtSecret() {
@@ -72,7 +72,7 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ error: "Token inv\xE1lido ou corrompido." });
   }
 }
-function requireRole(...roles) {
+function requireRole2(...roles) {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ error: "N\xE3o autenticado." });
@@ -6716,7 +6716,7 @@ router4.post("/seed", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-router4.get("/users", requireAuth, requireRole("super_admin"), async (req, res) => {
+router4.get("/users", requireAuth, requireRole2("super_admin"), async (req, res) => {
   try {
     const accounts = await loadAccountsDb();
     res.json(
@@ -6733,7 +6733,7 @@ router4.get("/users", requireAuth, requireRole("super_admin"), async (req, res) 
     res.status(500).json({ error: err.message });
   }
 });
-router4.delete("/users/:id", requireAuth, requireRole("super_admin"), async (req, res) => {
+router4.delete("/users/:id", requireAuth, requireRole2("super_admin"), async (req, res) => {
   try {
     let accounts = await loadAccountsDb();
     accounts = accounts.filter((a) => a.id !== req.params.id);
@@ -7553,6 +7553,53 @@ router6.get("/admin/global-config", requireAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+router6.get("/admin/commissions", requireAuth, requireRole("super_admin"), async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: orgs } = await supabase.from("organizations").select("id, name, subdomain, platform_fee_percent");
+    const orgMap = /* @__PURE__ */ new Map();
+    if (orgs) {
+      orgs.forEach((o) => orgMap.set(o.id, o));
+    }
+    const { data: tournaments } = await supabase.from("tournaments").select("id, name, owner_id");
+    const tourneyMap = /* @__PURE__ */ new Map();
+    if (tournaments) {
+      tournaments.forEach((t) => tourneyMap.set(t.id, t));
+    }
+    const { data: subscriptions, error } = await supabase.from("athlete_subscriptions").select("id, tournament_id, athlete_name, parent_name, payment_status, created_at, additional_data, is_completed").order("created_at", { ascending: false });
+    if (error) throw error;
+    const transactions = (subscriptions || []).map((sub) => {
+      const tourney = tourneyMap.get(sub.tournament_id) || {};
+      const ownerId = tourney.owner_id || "470275a0-cc3c-49f1-b61e-0f19850a6a4e";
+      const org = orgMap.get(ownerId) || { name: "Organizador", subdomain: "", platform_fee_percent: 10 };
+      const feePercent = org.platform_fee_percent !== void 0 && org.platform_fee_percent !== null ? Number(org.platform_fee_percent) : 10;
+      const addData = sub.additional_data || {};
+      const amount = Number(addData.totalFee || addData.athleteFee || 50);
+      const commissionAmount = amount * (feePercent / 100);
+      const organizerPayout = amount - commissionAmount;
+      return {
+        id: sub.id,
+        created_at: sub.created_at || (/* @__PURE__ */ new Date()).toISOString(),
+        tournament_id: sub.tournament_id,
+        tournament_name: tourney.name || "Torneio",
+        organizer_id: ownerId,
+        organizer_name: org.name || "Organizador",
+        organizer_subdomain: org.subdomain || "",
+        athlete_name: sub.athlete_name || "Inscri\xE7\xE3o",
+        parent_name: sub.parent_name || "",
+        payment_status: sub.payment_status || "paid",
+        amount,
+        fee_percent: feePercent,
+        saas_commission: Number(commissionAmount.toFixed(2)),
+        organizer_payout: Number(organizerPayout.toFixed(2))
+      };
+    });
+    res.json(transactions);
+  } catch (err) {
+    console.error("GET /admin/commissions error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 router6.patch("/admin/global-config", requireAuth, async (req, res) => {
   const { platformFeePercent, maintenanceMode } = req.body;
   const feeVal = Number(platformFeePercent);
@@ -7985,7 +8032,7 @@ router8.get("/landing-config", async (_req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-router8.patch("/landing-config", requireAuth, requireRole("super_admin"), async (req, res) => {
+router8.patch("/landing-config", requireAuth, requireRole2("super_admin"), async (req, res) => {
   try {
     const config = req.body;
     if (!config || typeof config !== "object") return res.status(400).json({ error: "Configura\xE7\xE3o inv\xE1lida." });

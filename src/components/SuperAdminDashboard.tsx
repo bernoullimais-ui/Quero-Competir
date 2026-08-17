@@ -39,10 +39,16 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
   const [roleFilter, setRoleFilter] = useState<string>("organizer");
   
   // Landing Page & Admin Tab State
-  const [adminTab, setAdminTab] = useState<"dashboard" | "landing" | "settings">("dashboard");
+  const [adminTab, setAdminTab] = useState<"dashboard" | "landing" | "settings" | "financial">("dashboard");
   const [landingConfig, setLandingConfig] = useState<any>(null);
   const [landingLoading, setLandingLoading] = useState(false);
   const [landingSaving, setLandingSaving] = useState(false);
+
+  // Financial Commissions State
+  const [commissions, setCommissions] = useState<any[]>([]);
+  const [commissionsLoading, setCommissionsLoading] = useState(false);
+  const [finOrgFilter, setFinOrgFilter] = useState("all");
+  const [finSearch, setFinSearch] = useState("");
 
   const getHeaders = (extraHeaders: any = {}) => {
     const headersObj: any = { ...extraHeaders };
@@ -132,9 +138,25 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
     }
   };
 
+  const fetchCommissions = async () => {
+    setCommissionsLoading(true);
+    try {
+      const res = await fetch("/api/payments/admin/commissions", { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setCommissions(data);
+      }
+    } catch (err) {
+      console.error("Error fetching commissions in super admin:", err);
+    } finally {
+      setCommissionsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchAllData();
     fetchLandingConfig();
+    fetchCommissions();
   }, []);
 
   const fetchLandingConfig = async () => {
@@ -343,6 +365,9 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
             </button>
             <button onClick={() => setAdminTab("settings")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${adminTab === "settings" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white"}`}>
               <Settings size={13} /> Configurações
+            </button>
+            <button onClick={() => setAdminTab("financial")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${adminTab === "financial" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white"}`}>
+              <DollarSign size={13} /> Financeiro
             </button>
           </div>
           <div className="hidden md:flex items-center gap-2 bg-slate-800/80 p-2 px-3.5 rounded-xl border border-slate-800">
@@ -1053,6 +1078,246 @@ export default function SuperAdminDashboard({ onLogout, currentUser }: SuperAdmi
           </div>
         </main>
       )}
+
+      {/* ── FINANCIAL COMMISSIONS TAB ── */}
+      {adminTab === "financial" && (() => {
+        const filteredCommissions = commissions.filter((item: any) => {
+          const matchOrg = finOrgFilter === "all" || item.organizer_id === finOrgFilter;
+          const matchText = !finSearch || 
+            item.athlete_name?.toLowerCase().includes(finSearch.toLowerCase()) || 
+            item.tournament_name?.toLowerCase().includes(finSearch.toLowerCase()) ||
+            item.organizer_name?.toLowerCase().includes(finSearch.toLowerCase());
+          return matchOrg && matchText;
+        });
+
+        const totalGrossRevenue = filteredCommissions.reduce((acc: number, item: any) => acc + (item.amount || 0), 0);
+        const totalSaasRevenue = filteredCommissions.reduce((acc: number, item: any) => acc + (item.saas_commission || 0), 0);
+        const totalOrganizerPayout = filteredCommissions.reduce((acc: number, item: any) => acc + (item.organizer_payout || 0), 0);
+
+        // Group by organization for summary
+        const orgSummaryMap = new Map<string, any>();
+        organizations.forEach((o: any) => {
+          orgSummaryMap.set(o.id, {
+            id: o.id,
+            name: o.name,
+            subdomain: o.subdomain,
+            feePercent: o.platform_fee_percent || 10,
+            gross: 0,
+            commission: 0,
+            payout: 0,
+            count: 0
+          });
+        });
+
+        filteredCommissions.forEach((item: any) => {
+          const existing = orgSummaryMap.get(item.organizer_id) || {
+            id: item.organizer_id,
+            name: item.organizer_name,
+            subdomain: item.organizer_subdomain,
+            feePercent: item.fee_percent,
+            gross: 0,
+            commission: 0,
+            payout: 0,
+            count: 0
+          };
+          existing.gross += item.amount || 0;
+          existing.commission += item.saas_commission || 0;
+          existing.payout += item.organizer_payout || 0;
+          existing.count += 1;
+          orgSummaryMap.set(item.organizer_id, existing);
+        });
+
+        const orgFinancialSummary = Array.from(orgSummaryMap.values());
+
+        return (
+          <main className="flex-1 p-8 max-w-7xl w-full mx-auto space-y-8">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+              <div>
+                <h2 className="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
+                  <DollarSign size={24} className="text-emerald-600" /> Controle Financeiro & Comissões de SaaS
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">Acompanhe a receita retida da Quero Competir, faturamento bruto e repasses por organizador</p>
+              </div>
+              <button
+                onClick={fetchCommissions}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
+              >
+                <Activity size={14} /> Atualizar Extrato
+              </button>
+            </div>
+
+            {/* Financial KPI Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white rounded-3xl p-6 border border-slate-150 shadow-sm space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Faturamento Bruto Total</span>
+                <div className="text-2xl font-black text-slate-900">
+                  R$ {totalGrossRevenue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <span className="text-[11px] font-semibold text-slate-400 block">Soma de todas as inscrições pagas</span>
+              </div>
+
+              <div className="bg-gradient-to-br from-indigo-900 to-indigo-950 text-white rounded-3xl p-6 shadow-xl space-y-2 relative overflow-hidden">
+                <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300">Comissão Retida (Receita SaaS)</span>
+                <div className="text-2xl font-black text-emerald-400">
+                  R$ {totalSaasRevenue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <span className="text-[11px] font-medium text-indigo-200 block">Receita líquida da Quero Competir</span>
+              </div>
+
+              <div className="bg-white rounded-3xl p-6 border border-slate-150 shadow-sm space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Repasse aos Organizadores</span>
+                <div className="text-2xl font-black text-indigo-600">
+                  R$ {totalOrganizerPayout.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <span className="text-[11px] font-semibold text-slate-400 block">Valor repassado via split Pagar.me</span>
+              </div>
+
+              <div className="bg-white rounded-3xl p-6 border border-slate-150 shadow-sm space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Transações Processadas</span>
+                <div className="text-2xl font-black text-slate-900">
+                  {filteredCommissions.length} <span className="text-xs font-semibold text-slate-400">inscrições</span>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-400 block">Comissões auditadas no sistema</span>
+              </div>
+            </div>
+
+            {/* Consolidado por Organizador */}
+            <div className="bg-white rounded-3xl border border-slate-150 p-6 shadow-sm space-y-4">
+              <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-800">Consolidado Financeiro por Organizador</h3>
+                  <p className="text-xs text-slate-400 font-medium">Balanço de vendas, comissão retida e repasses por conta</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {orgFinancialSummary.map((orgSum: any) => (
+                  <div key={orgSum.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-150 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-extrabold text-slate-800 text-sm">{orgSum.name}</h4>
+                        {orgSum.subdomain && (
+                          <span className="text-[10px] text-indigo-600 font-mono font-semibold">{orgSum.subdomain}.querocompetir.com.br</span>
+                        )}
+                      </div>
+                      <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 font-black text-xs rounded-lg">
+                        {orgSum.feePercent}% SaaS
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-200/60">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Faturamento Bruto</span>
+                        <span className="font-bold text-slate-800">R$ {orgSum.gross.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-emerald-600 uppercase font-bold block">Comissão SaaS</span>
+                        <span className="font-extrabold text-emerald-600">R$ {orgSum.commission.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Extrato Detalhado de Transações de Comissão */}
+            <div className="bg-white rounded-3xl border border-slate-150 p-6 shadow-sm space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-800">Extrato Detalhado de Comissões</h3>
+                  <p className="text-xs text-slate-400 font-medium">Histórico individual de comissões por atleta / inscrição</p>
+                </div>
+
+                {/* Filters */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    type="text"
+                    placeholder="Buscar atleta ou torneio..."
+                    value={finSearch}
+                    onChange={e => setFinSearch(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500 w-48"
+                  />
+                  <select
+                    value={finOrgFilter}
+                    onChange={e => setFinOrgFilter(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500"
+                  >
+                    <option value="all">Todos os Organizadores</option>
+                    {organizations.map((o: any) => (
+                      <option key={o.id} value={o.id}>{o.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {commissionsLoading ? (
+                <div className="py-12 text-center text-slate-400 text-xs font-semibold">Carregando extrato financeiro...</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-600">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-slate-400 uppercase text-[10px] tracking-wider font-extrabold">
+                        <th className="py-3 px-4">Data / Hora</th>
+                        <th className="py-3 px-4">Organizador</th>
+                        <th className="py-3 px-4">Torneio</th>
+                        <th className="py-3 px-4">Inscrição / Atleta</th>
+                        <th className="py-3 px-4 text-right">Valor Bruto</th>
+                        <th className="py-3 px-4 text-center">Taxa SaaS (%)</th>
+                        <th className="py-3 px-4 text-right">Comissão Retida</th>
+                        <th className="py-3 px-4 text-right">Repasse Líquido</th>
+                        <th className="py-3 px-4 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 font-semibold text-slate-700">
+                      {filteredCommissions.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="py-8 text-center text-slate-400 text-xs italic">
+                            Nenhuma transação financeira encontrada neste filtro.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredCommissions.map((item: any) => (
+                          <tr key={item.id} className="hover:bg-slate-50/50">
+                            <td className="py-3.5 px-4 font-mono text-[11px] text-slate-500">
+                              {new Date(item.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-slate-800">
+                              {item.organizer_name}
+                            </td>
+                            <td className="py-3.5 px-4 font-medium text-slate-700">
+                              {item.tournament_name}
+                            </td>
+                            <td className="py-3.5 px-4 font-semibold text-slate-800">
+                              {item.athlete_name}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-bold text-slate-900">
+                              R$ {item.amount.toFixed(2)}
+                            </td>
+                            <td className="py-3.5 px-4 text-center font-bold text-indigo-600">
+                              {item.fee_percent}%
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-extrabold text-emerald-600">
+                              R$ {item.saas_commission.toFixed(2)}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-bold text-slate-700">
+                              R$ {item.organizer_payout.toFixed(2)}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-bold">
+                                🟢 Pago
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </main>
+        );
+      })()}
     </div>
   );
 }
