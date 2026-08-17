@@ -455,7 +455,7 @@ export default function App() {
             <Routes>
               {/* Landing Page — root for unauthenticated users */}
               <Route path="/" element={
-                currentUser ? null : <LandingPage />
+                currentUser ? <Navigate to="/painel" replace /> : <LandingPage />
               } />
               <Route path="/login" element={
                 currentUser ? <Navigate to="/" replace /> :
