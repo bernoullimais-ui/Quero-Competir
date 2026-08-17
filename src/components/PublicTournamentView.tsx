@@ -258,6 +258,7 @@ export default function PublicTournamentView() {
   const [athleteSubs, setAthleteSubs] = useState<any[]>([]);
   const [selfRegEnabled, setSelfRegEnabled] = useState(false);
   const [showBracketsPublicly, setShowBracketsPublicly] = useState<boolean>(true);
+  const [institutions, setInstitutions] = useState<any[]>([]);
 
   useEffect(() => {
     // Verificar se o usuário conectado é organizador para fins de moderação
@@ -288,16 +289,18 @@ export default function PublicTournamentView() {
 
         const realId = tData.id || id;
 
-        const [cData, subsData, pubSettings, subSettings] = await Promise.all([
+        const [cData, subsData, pubSettings, subSettings, instData] = await Promise.all([
           fetch(`/api/tournaments/${realId}/categories`).then(r => r.json()),
           fetch(`/api/tournaments/${realId}/athlete-subscriptions`).then(r => r.ok ? r.json() : []),
           fetch(`/api/tournaments/${realId}/public-settings`).then(r => r.ok ? r.json() : null),
           fetch(`/api/tournaments/${realId}/subscription-settings`).then(r => r.ok ? r.json() : null),
+          fetch(`/api/tournaments/${realId}/institutions`).then(r => r.ok ? r.json() : []),
         ]);
 
         const catsList = Array.isArray(cData) ? cData : [];
         setCategories(catsList);
         setAthleteSubs(Array.isArray(subsData) ? subsData : []);
+        setInstitutions(Array.isArray(instData) ? instData : []);
         if (pubSettings && !pubSettings.error) {
           setSelfRegEnabled(true);
         }
