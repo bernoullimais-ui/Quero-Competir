@@ -7,11 +7,10 @@ function getStatusInfo(t: any) {
   const now = new Date();
   const start = t.start_date ? new Date(t.start_date) : null;
   const end = t.end_date ? new Date(t.end_date) : null;
-  const regEnd = t.rules_config?.registration_end_date ? new Date(t.rules_config.registration_end_date) : null;
 
   if (end && now > end) return { label: "Realizado", color: "bg-slate-500", dot: "bg-slate-400" };
   if (start && now >= start) return { label: "Em Andamento", color: "bg-emerald-600", dot: "bg-emerald-400" };
-  if (regEnd && now < regEnd) return { label: "Inscrições Abertas", color: "bg-indigo-600", dot: "bg-indigo-400" };
+  if (start && now < start) return { label: "Inscrições Abertas", color: "bg-indigo-600", dot: "bg-indigo-400" };
   return { label: "Em Breve", color: "bg-amber-500", dot: "bg-amber-400" };
 }
 

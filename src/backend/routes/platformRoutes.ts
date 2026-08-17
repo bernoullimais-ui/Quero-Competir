@@ -95,7 +95,7 @@ router.get("/public-tournaments", async (_req, res) => {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("tournaments")
-      .select("id, name, start_date, end_date, status, rules_config, owner_id")
+      .select("id, name, start_date, end_date, status, logo_url, owner_id")
       .order("start_date", { ascending: false })
       .limit(9);
 
