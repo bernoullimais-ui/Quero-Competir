@@ -2768,6 +2768,7 @@ export default function TournamentDashboard() {
                       categories={categories.filter(cat => !onlyWithAthletes || athleteSubs.some((sub: any) => sub.categoryId === cat.id || sub.category_id === cat.id))}
                       athleteSubs={athleteSubs}
                       tournamentId={id!}
+                      tournament={tournament}
                       institutions={institutions}
                     />
                   ) : (

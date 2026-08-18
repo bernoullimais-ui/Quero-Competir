@@ -56617,6 +56617,21 @@ router2.post("/:id/subscription-settings", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+router2.patch("/:id/swimming-lanes", async (req, res) => {
+  try {
+    const { lanesCount } = req.body;
+    const tData2 = await findTournamentByIdOrSlug(req.params.id);
+    if (!tData2) return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
+    const tournamentId = tData2.id;
+    const supabase = getSupabaseAdmin();
+    const currentRules = tData2.rules_config || {};
+    const updatedRules = { ...currentRules, swimming_lanes_count: lanesCount };
+    await supabase.from("tournaments").update({ rules_config: updatedRules }).eq("id", tournamentId);
+    res.json({ success: true, swimming_lanes_count: lanesCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 router2.patch("/:id/brackets-visibility", async (req, res) => {
   try {
     const { showBracketsPublicly } = req.body;

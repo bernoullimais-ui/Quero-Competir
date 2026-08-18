@@ -2,13 +2,23 @@ import React, { useState, useCallback, useRef } from "react";
 import { Printer, RefreshCw, Settings2 } from "lucide-react";
 import SwimmingBalizamento from "./SwimmingBalizamento";
 
-export default function AllSwimmingBalizamento({ categories, athleteSubs, tournamentId, institutions = [] }: any) {
-  const [globalLanesCount, setGlobalLanesCount] = useState<number>(6);
+export default function AllSwimmingBalizamento({ categories, athleteSubs, tournamentId, tournament, institutions = [] }: any) {
+  const [globalLanesCount, setGlobalLanesCount] = useState<number>(tournament?.rules_config?.swimming_lanes_count || 6);
   const [recalcTrigger, setRecalcTrigger] = useState<number>(0);
   const allHeatsRef = useRef<Record<string, any[]>>({});
 
-  const handleLanesChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setGlobalLanesCount(Number(e.target.value));
+  const handleLanesChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = Number(e.target.value);
+    setGlobalLanesCount(val);
+    try {
+      await fetch(`/api/tournaments/${tournamentId}/swimming-lanes`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lanesCount: val })
+      });
+    } catch(err) {
+      console.error(err);
+    }
   };
 
   const handleRecalculateAll = () => {
