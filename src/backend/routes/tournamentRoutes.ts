@@ -3645,6 +3645,10 @@ router.delete("/:id/coupons/:couponId", requireAuth, requireRole("super_admin", 
 router.post("/:id/validate-coupon", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
+    const tData = await findTournamentByIdOrSlug(req.params.id);
+    if (!tData) return res.status(404).json({ error: "Torneio não encontrado" });
+    const tournamentId = tData.id;
+
     const { code, categoryIds } = req.body;
     
     if (!code) return res.status(400).json({ error: "Código do cupom é obrigatório" });
@@ -3652,7 +3656,7 @@ router.post("/:id/validate-coupon", async (req, res) => {
     const { data: coupon, error } = await supabase
       .from("tournament_coupons")
       .select("*")
-      .eq("tournament_id", req.params.id)
+      .eq("tournament_id", tournamentId)
       .eq("code", code.trim().toUpperCase())
       .eq("is_active", true)
       .maybeSingle();

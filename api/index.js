@@ -56862,9 +56862,12 @@ router2.delete("/:id/coupons/:couponId", requireAuth, requireRole("super_admin",
 router2.post("/:id/validate-coupon", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
+    const tData2 = await findTournamentByIdOrSlug(req.params.id);
+    if (!tData2) return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
+    const tournamentId = tData2.id;
     const { code, categoryIds } = req.body;
     if (!code) return res.status(400).json({ error: "C\xF3digo do cupom \xE9 obrigat\xF3rio" });
-    const { data: coupon, error } = await supabase.from("tournament_coupons").select("*").eq("tournament_id", req.params.id).eq("code", code.trim().toUpperCase()).eq("is_active", true).maybeSingle();
+    const { data: coupon, error } = await supabase.from("tournament_coupons").select("*").eq("tournament_id", tournamentId).eq("code", code.trim().toUpperCase()).eq("is_active", true).maybeSingle();
     if (error) throw error;
     if (!coupon) return res.json({ valid: false, message: "Cupom inv\xE1lido ou inativo." });
     if (coupon.valid_until && /* @__PURE__ */ new Date() > new Date(coupon.valid_until)) {
