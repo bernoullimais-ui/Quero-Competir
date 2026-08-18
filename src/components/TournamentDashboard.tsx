@@ -2665,7 +2665,21 @@ export default function TournamentDashboard() {
             </div>
 
             {/* Card Placar Natação (Se aplicável) */}
-            {categories.some((c: any) => c.rules_config?.sport_type === "swimming" || c.name?.toLowerCase().includes("natação") || c.name?.toLowerCase().includes("natacao")) && (
+            {(() => {
+              const isSwimmingTournament = tournament?.name?.toLowerCase().includes("natação") || tournament?.name?.toLowerCase().includes("natacao");
+              const hasSwimmingCategory = categories.some((c: any) => 
+                c.rules_config?.sport_type === "swimming" || 
+                c.name?.toLowerCase().includes("natação") || 
+                c.name?.toLowerCase().includes("natacao") ||
+                c.name?.toLowerCase().includes("nado") ||
+                c.name?.toLowerCase().includes("costa") ||
+                c.name?.toLowerCase().includes("borboleta") ||
+                c.name?.toLowerCase().includes("peito") ||
+                c.name?.toLowerCase().includes("medley") ||
+                c.name?.toLowerCase().includes("revezamento")
+              );
+              return isSwimmingTournament || hasSwimmingCategory;
+            })() && (
               <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-300">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-indigo-500/20 text-indigo-400">

@@ -141,10 +141,19 @@ export default function PublicSwimmingScoreboard() {
       setTournament(tData);
       
       // Filter swimming categories and sort
+      const isSwimmingTournament = tData?.name?.toLowerCase().includes("natação") || tData?.name?.toLowerCase().includes("natacao");
+      
       const swimCats = (cData || []).filter((c: any) => 
+        isSwimmingTournament ||
         c.rules_config?.sport_type === "swimming" || 
         c.name?.toLowerCase().includes("natação") || 
-        c.name?.toLowerCase().includes("natacao")
+        c.name?.toLowerCase().includes("natacao") ||
+        c.name?.toLowerCase().includes("nado") ||
+        c.name?.toLowerCase().includes("costa") ||
+        c.name?.toLowerCase().includes("borboleta") ||
+        c.name?.toLowerCase().includes("peito") ||
+        c.name?.toLowerCase().includes("medley") ||
+        c.name?.toLowerCase().includes("revezamento")
       ).sort((a: any, b: any) => {
         const orderA = a.rules_config?.display_order ?? a.display_order ?? 9999;
         const orderB = b.rules_config?.display_order ?? b.display_order ?? 9999;
