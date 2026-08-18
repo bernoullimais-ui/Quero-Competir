@@ -246,37 +246,91 @@ export default function EventInfoTab({ tournament, categories }: EventInfoTabPro
             </div>
 
             {categories.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {categories.map((cat, index) => (
-                  <div
-                    key={cat.id || index}
-                    className="p-5 border border-slate-100 bg-slate-50/40 rounded-2xl flex items-start gap-3.5 hover:border-indigo-100 hover:bg-indigo-50/10 transition-all duration-350 shadow-ultra-sm relative overflow-hidden group"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 shrink-0 font-bold group-hover:scale-110 transition-transform">
-                      <Users size={18} />
-                    </div>
-                    
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      <h3 className="font-extrabold text-sm text-slate-800 truncate select-none">{cat.name}</h3>
-                      <div className="flex flex-wrap gap-1.5">
-                        <span className="px-2 py-0.5 bg-white text-slate-600 border border-slate-205 text-[10px] font-black rounded-lg">
-                          🤼 {getGenderLabel(cat.gender)}
-                        </span>
-                        {cat.age_group && (
-                          <span className="px-2 py-0.5 bg-white text-slate-600 border border-slate-205 text-[10px] font-black rounded-lg">
-                            🎂 {cat.age_group}
-                          </span>
-                        )}
-                        {cat.max_teams && (
-                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black rounded-lg">
-                            🛡️ Máx: {cat.max_teams} Times
-                          </span>
-                        )}
+              (() => {
+                const isSwimming = categories.some(cat => 
+                  cat.name.toLowerCase().includes("natação") || 
+                  cat.name.toLowerCase().includes("natacao") ||
+                  tournament.name?.toLowerCase().includes("natação") ||
+                  tournament.name?.toLowerCase().includes("natacao")
+                );
+
+                if (isSwimming) {
+                  const uniqueProvas = Array.from(new Set(categories.map(c => 
+                    c.name.replace(/natação\s*-\s*/i, "").replace(/natacao\s*-\s*/i, "").trim()
+                  ))).sort((a,b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+                  const uniqueAges = Array.from(new Set(categories.map(c => c.age_group).filter(Boolean))).sort((a, b) => {
+                    const numA = parseInt(a!.replace(/\D/g, '')) || 0;
+                    const numB = parseInt(b!.replace(/\D/g, '')) || 0;
+                    return numA - numB;
+                  }) as string[];
+
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-3 bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                        <h3 className="font-black text-slate-800 text-sm flex items-center gap-2 border-b border-slate-200 pb-2 mb-3">
+                          🏊 As Provas (Estilos)
+                        </h3>
+                        <div className="flex flex-col gap-2">
+                          {uniqueProvas.map((prova, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-sm font-bold text-slate-700 bg-white px-3 py-2 rounded-xl border border-slate-200/60 shadow-sm">
+                              <span className="text-indigo-600 w-5 font-black">{idx + 1}º</span> {prova}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                        <h3 className="font-black text-slate-800 text-sm flex items-center gap-2 border-b border-slate-200 pb-2 mb-3">
+                          🎂 Classes de Idade
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {uniqueAges.map((age, idx) => (
+                            <span key={idx} className="px-3 py-1.5 bg-white text-slate-700 border border-slate-200/60 text-xs font-black rounded-xl shadow-sm">
+                              {age}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
+                  );
+                }
+
+                // Default rendering for other sports
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {categories.map((cat, index) => (
+                      <div
+                        key={cat.id || index}
+                        className="p-5 border border-slate-100 bg-slate-50/40 rounded-2xl flex items-start gap-3.5 hover:border-indigo-100 hover:bg-indigo-50/10 transition-all duration-350 shadow-ultra-sm relative overflow-hidden group"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 shrink-0 font-bold group-hover:scale-110 transition-transform">
+                          <Users size={18} />
+                        </div>
+                        
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <h3 className="font-extrabold text-sm text-slate-800 truncate select-none">{cat.name}</h3>
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="px-2 py-0.5 bg-white text-slate-600 border border-slate-205 text-[10px] font-black rounded-lg">
+                              🤼 {getGenderLabel(cat.gender)}
+                            </span>
+                            {cat.age_group && (
+                              <span className="px-2 py-0.5 bg-white text-slate-600 border border-slate-205 text-[10px] font-black rounded-lg">
+                                🎂 {cat.age_group}
+                              </span>
+                            )}
+                            {cat.max_teams && (
+                              <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black rounded-lg">
+                                🛡️ Máx: {cat.max_teams} Times
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })()
             ) : (
               <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl">
                 <p className="text-slate-400 font-medium text-sm">Nenhuma categoria confirmada neste evento.</p>
