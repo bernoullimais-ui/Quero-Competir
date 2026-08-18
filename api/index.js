@@ -56472,6 +56472,8 @@ function mapSubToFrontend(dbSub) {
     liabilityWaiver: !!dbSub.liability_waiver,
     paymentStatus: dbSub.payment_status || "pending",
     checkedInAt: dbSub.checked_in_at || null,
+    couponCode: dbSub.coupon_code || null,
+    discountAmount: dbSub.discount_amount !== void 0 ? Number(dbSub.discount_amount) : 0,
     createdAt: dbSub.created_at
   };
 }
@@ -56799,6 +56801,100 @@ router2.get("/:id/public-settings", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+router2.get("/:id/coupons", requireAuth, requireRole("super_admin", "organizer"), async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase.from("tournament_coupons").select("*").eq("tournament_id", req.params.id).order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+router2.post("/:id/coupons", requireAuth, requireRole("super_admin", "organizer"), async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { code, description, discountType, discountValue, maxUses, validUntil, categoryIds } = req.body;
+    if (!code || !discountType || discountValue === void 0) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    const { data, error } = await supabase.from("tournament_coupons").insert({
+      tournament_id: req.params.id,
+      code: code.trim().toUpperCase(),
+      description: description || null,
+      discount_type: discountType,
+      discount_value: discountValue,
+      max_uses: maxUses || null,
+      valid_until: validUntil || null,
+      category_ids: categoryIds && categoryIds.length > 0 ? categoryIds : null,
+      is_active: true
+    }).select().maybeSingle();
+    if (error) {
+      if (error.code === "23505") return res.status(400).json({ error: "Um cupom com este c\xF3digo j\xE1 existe neste torneio." });
+      throw error;
+    }
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+router2.patch("/:id/coupons/:couponId", requireAuth, requireRole("super_admin", "organizer"), async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { is_active } = req.body;
+    const { data, error } = await supabase.from("tournament_coupons").update({ is_active }).eq("id", req.params.couponId).eq("tournament_id", req.params.id).select().maybeSingle();
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+router2.delete("/:id/coupons/:couponId", requireAuth, requireRole("super_admin", "organizer"), async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase.from("tournament_coupons").delete().eq("id", req.params.couponId).eq("tournament_id", req.params.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+router2.post("/:id/validate-coupon", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { code, categoryIds } = req.body;
+    if (!code) return res.status(400).json({ error: "C\xF3digo do cupom \xE9 obrigat\xF3rio" });
+    const { data: coupon, error } = await supabase.from("tournament_coupons").select("*").eq("tournament_id", req.params.id).eq("code", code.trim().toUpperCase()).eq("is_active", true).maybeSingle();
+    if (error) throw error;
+    if (!coupon) return res.json({ valid: false, message: "Cupom inv\xE1lido ou inativo." });
+    if (coupon.valid_until && /* @__PURE__ */ new Date() > new Date(coupon.valid_until)) {
+      return res.json({ valid: false, message: "Este cupom j\xE1 expirou." });
+    }
+    if (coupon.max_uses !== null && coupon.uses_count >= coupon.max_uses) {
+      return res.json({ valid: false, message: "Este cupom atingiu o limite de usos." });
+    }
+    if (coupon.category_ids && coupon.category_ids.length > 0) {
+      if (!categoryIds || categoryIds.length === 0) {
+        return res.json({ valid: false, message: "Cupom n\xE3o aplic\xE1vel \xE0s categorias selecionadas." });
+      }
+      const isApplicable = categoryIds.some((id) => coupon.category_ids.includes(id));
+      if (!isApplicable) {
+        return res.json({ valid: false, message: "Cupom n\xE3o aplic\xE1vel \xE0s categorias selecionadas." });
+      }
+    }
+    res.json({
+      valid: true,
+      coupon: {
+        id: coupon.id,
+        code: coupon.code,
+        discountType: coupon.discount_type,
+        discountValue: Number(coupon.discount_value)
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 router2.post("/:id/self-register", async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
@@ -56899,6 +56995,22 @@ router2.post("/:id/self-register", async (req, res) => {
     const feePricingModel = settings?.feePricingModel || "per_event";
     const unitFee = Number(settings?.athleteFee) || 0;
     const totalFee = feePricingModel === "fixed_package" ? unitFee : unitFee * targetCategoryIds.length;
+    let finalFee = totalFee;
+    let couponDiscountAmount = 0;
+    let appliedCouponCode = null;
+    const couponCodeFromReq = req.body.couponCode?.trim().toUpperCase();
+    if (couponCodeFromReq && totalFee > 0) {
+      const { data: coupon } = await supabase.from("tournament_coupons").select("*").eq("tournament_id", tournamentId).eq("code", couponCodeFromReq).eq("is_active", true).maybeSingle();
+      const isExpired = coupon?.valid_until && /* @__PURE__ */ new Date() > new Date(coupon.valid_until);
+      const isExhausted = coupon?.max_uses !== null && coupon?.uses_count >= coupon?.max_uses;
+      const categoryOk = !coupon?.category_ids?.length || targetCategoryIds.some((id) => coupon.category_ids.includes(id));
+      if (coupon && !isExpired && !isExhausted && categoryOk) {
+        couponDiscountAmount = coupon.discount_type === "percent" ? totalFee * (Number(coupon.discount_value) / 100) : Math.min(Number(coupon.discount_value), totalFee);
+        finalFee = Math.max(0, totalFee - couponDiscountAmount);
+        appliedCouponCode = coupon.code;
+        await supabase.rpc("increment_coupon_uses", { coupon_id: coupon.id });
+      }
+    }
     for (const catId of targetCategoryIds) {
       const insertData = {
         tournament_id: tournamentId,
@@ -56912,11 +57024,13 @@ router2.post("/:id/self-register", async (req, res) => {
         parent_phone: parentPhone,
         is_completed: true,
         validation_status: "approved",
-        payment_status: settings?.athleteFee > 0 ? "pending" : "paid",
+        payment_status: finalFee > 0 ? "pending" : "paid",
         authorized_image_use: !!authorizedImageUse,
         liability_waiver: !!liabilityWaiver,
         photo_url: photoFile || null,
         document_url: documentFile || null,
+        coupon_code: appliedCouponCode,
+        discount_amount: appliedCouponCode ? couponDiscountAmount : 0,
         additional_data: {
           ...additionalData,
           parentEmail,
@@ -57395,11 +57509,12 @@ router2.post("/public/athlete-subscription/:subId/complete", async (req, res) =>
     res.status(500).json({ error: err.message });
   }
 });
-function buildSplitRules2(totalCents, organizerRecipientId, platformFeePercent = 10) {
+function buildSplitRules2(totalCents, organizerRecipientId, platformFeePercent = 10, originalTotalCents) {
   const platformRecipientId = process.env.PAGARME_PLATFORM_RECIPIENT_ID || "re_cmqgwhfdc1hp60l9t950siqs7";
   if (!organizerRecipientId || !platformRecipientId || organizerRecipientId === platformRecipientId) return void 0;
-  const platformCents = Math.round(totalCents * (platformFeePercent / 100));
-  const organizerCents = totalCents - platformCents;
+  const baseCentsForPlatform = originalTotalCents !== void 0 ? originalTotalCents : totalCents;
+  const platformCents = Math.round(baseCentsForPlatform * (platformFeePercent / 100));
+  const organizerCents = Math.max(0, totalCents - platformCents);
   if (organizerCents <= 0) return void 0;
   return [
     {
@@ -57503,7 +57618,10 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
         }
       }
     }
-    const totalAmount = athleteFee + membershipFee;
+    const discountAmount = sub.discountAmount || 0;
+    const discountedAthleteFee = Math.max(0, athleteFee - discountAmount);
+    const totalAmount = discountedAthleteFee + membershipFee;
+    const originalTotalAmount = athleteFee + membershipFee;
     if (totalAmount <= 0) {
       await updateSubscriptionPaymentStatus(subId, "paid", sub);
       return res.json({ success: true, method, paid: true });
@@ -57549,10 +57667,10 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
       address: defaultAddress
     };
     const items = [];
-    if (athleteFee > 0) {
+    if (discountedAthleteFee > 0) {
       items.push({
         code: `athlete_${sub.id?.slice(0, 8) || "fee"}`,
-        amount: Math.round(athleteFee * 100),
+        amount: Math.round(discountedAthleteFee * 100),
         description: `Inscri\xE7\xE3o Torneio - ${sub.athleteName}`,
         quantity: 1
       });
@@ -57571,8 +57689,9 @@ router2.post("/public/athlete-subscription/:subId/pay", async (req, res) => {
         const { data: orgData } = await supabase.from("organizations").select("pagarme_recipient_id, platform_fee_percent").eq("id", tData2.owner_id).maybeSingle();
         if (orgData?.pagarme_recipient_id) {
           const totalCents = Math.round(totalAmount * 100);
+          const originalTotalCents = Math.round(originalTotalAmount * 100);
           const feePercent = orgData.platform_fee_percent !== void 0 ? Number(orgData.platform_fee_percent) : 10;
-          splitRules = buildSplitRules2(totalCents, orgData.pagarme_recipient_id, feePercent);
+          splitRules = buildSplitRules2(totalCents, orgData.pagarme_recipient_id, feePercent, originalTotalCents);
         }
       } catch (err) {
         console.warn("[Split Rules Warning]", err.message);

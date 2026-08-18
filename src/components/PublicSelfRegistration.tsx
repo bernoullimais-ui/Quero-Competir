@@ -176,6 +176,16 @@ export default function PublicSelfRegistration() {
     return true;
   });
 
+  // Clear selected categories if they are no longer eligible (e.g. user changed birthDate or gender)
+  useEffect(() => {
+    setSelectedCategoryIds(prev => {
+      if (prev.length === 0) return prev;
+      const validIds = new Set(eligibleCategories.map((c: any) => c.id));
+      const newSelected = prev.filter(id => validIds.has(id));
+      return newSelected.length !== prev.length ? newSelected : prev;
+    });
+  }, [birthDate, gender, pageData?.categories]);
+
   const settings = pageData?.settings;
   const tournament = pageData?.tournament;
   const selectedCategories = (pageData?.categories ?? []).filter((c: any) => selectedCategoryIds.includes(c.id));

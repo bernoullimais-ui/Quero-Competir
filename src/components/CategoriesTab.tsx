@@ -888,10 +888,14 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
                 </div>
 
                 {/* Faixa de nascimento */}
-                <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 space-y-3">
+                <div className={`border rounded-2xl p-4 space-y-3 ${(!newCat.birth_year_min && !newCat.birth_year_max) ? "bg-amber-50/60 border-amber-200" : "bg-indigo-50/60 border-indigo-100"}`}>
                   <div>
-                    <label className="block text-xs font-bold text-indigo-700 uppercase tracking-wider mb-1">🎂 Faixa de Nascimento (opcional)</label>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">Atletas fora desta faixa não poderão ser inscritos nesta categoria.</p>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${(!newCat.birth_year_min && !newCat.birth_year_max) ? "text-amber-700" : "text-indigo-700"}`}>
+                      🎂 Faixa de Nascimento (opcional, mas recomendado)
+                    </label>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Atletas fora desta faixa não poderão se inscrever. O nome da categoria não limita a idade automaticamente.
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -901,7 +905,7 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
                         min={1950}
                         max={currentYear}
                         placeholder={`Ex: ${currentYear - 15}`}
-                        className="w-full px-3 py-2.5 rounded-xl border border-indigo-200 outline-none font-medium text-sm text-slate-700 bg-white focus:border-indigo-400"
+                        className={`w-full px-3 py-2.5 rounded-xl border outline-none font-medium text-sm bg-white ${(!newCat.birth_year_min && !newCat.birth_year_max) ? "border-amber-200 focus:border-amber-400 text-slate-700" : "border-indigo-200 focus:border-indigo-400 text-slate-700"}`}
                         value={newCat.birth_year_min ?? ""}
                         onChange={e => setNewCat({...newCat, birth_year_min: e.target.value ? parseInt(e.target.value) : null})}
                       />
@@ -913,13 +917,21 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
                         min={1950}
                         max={currentYear}
                         placeholder={`Ex: ${currentYear - 12}`}
-                        className="w-full px-3 py-2.5 rounded-xl border border-indigo-200 outline-none font-medium text-sm text-slate-700 bg-white focus:border-indigo-400"
+                        className={`w-full px-3 py-2.5 rounded-xl border outline-none font-medium text-sm bg-white ${(!newCat.birth_year_min && !newCat.birth_year_max) ? "border-amber-200 focus:border-amber-400 text-slate-700" : "border-indigo-200 focus:border-indigo-400 text-slate-700"}`}
                         value={newCat.birth_year_max ?? ""}
                         onChange={e => setNewCat({...newCat, birth_year_max: e.target.value ? parseInt(e.target.value) : null})}
                       />
                     </div>
                   </div>
-                  {(newCat.birth_year_min || newCat.birth_year_max) && (
+                  
+                  {(!newCat.birth_year_min && !newCat.birth_year_max) ? (
+                    <div className="flex gap-2 items-start text-amber-600 bg-amber-100/50 p-2.5 rounded-xl">
+                      <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                      <p className="text-[11px] font-semibold leading-snug">
+                        Sem limites configurados! O sistema aceitará inscrições de atletas de QUALQUER idade.
+                      </p>
+                    </div>
+                  ) : (
                     <p className="text-xs text-indigo-600 font-semibold">
                       ℹ️{" "}
                       {newCat.birth_year_min && newCat.birth_year_max
