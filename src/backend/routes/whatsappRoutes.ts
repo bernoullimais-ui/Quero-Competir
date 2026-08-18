@@ -9,6 +9,11 @@ import {
 
 const router = Router();
 
+function isValidUUID(str: string | null | undefined): boolean {
+  if (!str) return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
 // ── POST /api/whatsapp/send-test ─────────────────────────────────────────────
 // Teste manual de envio (acesso admin)
 router.post("/send-test", requireAuth, async (req, res) => {
@@ -50,11 +55,21 @@ router.post("/broadcast", requireAuth, async (req, res) => {
 
   const supabase = getSupabaseAdmin();
 
+  let finalTournamentId = tournamentId;
+  if (!isValidUUID(tournamentId)) {
+    const { data: slugData } = await supabase
+      .from('tournaments')
+      .select('id')
+      .eq('slug', tournamentId)
+      .maybeSingle();
+    if (slugData) finalTournamentId = slugData.id;
+  }
+
   // Busca torneio e org para credenciais
   const { data: tournament } = await supabase
     .from("tournaments")
     .select("id, name, organization_id")
-    .eq("id", tournamentId)
+    .eq("id", finalTournamentId)
     .maybeSingle();
 
   if (!tournament) {
@@ -75,7 +90,7 @@ router.post("/broadcast", requireAuth, async (req, res) => {
       media: mediaUrl,
       mediaName,
       orgId: tournament.organization_id,
-      tournamentId,
+      tournamentId: finalTournamentId,
       messageType: "broadcast",
       athleteName: recipientName || "Contato Avulso",
       sentBy: "organizer",
@@ -91,7 +106,7 @@ router.post("/broadcast", requireAuth, async (req, res) => {
   let query = supabase
     .from("athlete_subscriptions")
     .select("id, athlete_name, parent_phone, additional_data, payment_status, category_id, institution_id")
-    .eq("tournament_id", tournamentId);
+    .eq("tournament_id", finalTournamentId);
 
   if (filter === "confirmed") {
     query = query.eq("payment_status", "paid");
@@ -164,10 +179,20 @@ router.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
 
   const supabase = getSupabaseAdmin();
 
+  let finalTournamentId = tournamentId;
+  if (!isValidUUID(tournamentId)) {
+    const { data: slugData } = await supabase
+      .from('tournaments')
+      .select('id')
+      .eq('slug', tournamentId)
+      .maybeSingle();
+    if (slugData) finalTournamentId = slugData.id;
+  }
+
   const { data: tournament } = await supabase
     .from("tournaments")
     .select("id, name, organization_id")
-    .eq("id", tournamentId)
+    .eq("id", finalTournamentId)
     .maybeSingle();
 
   if (!tournament) return res.status(404).json({ error: "Torneio não encontrado" });
@@ -182,7 +207,7 @@ router.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
   let query = supabase
     .from("athlete_subscriptions")
     .select("id, athlete_name, parent_phone, additional_data, payment_status, category_id")
-    .eq("tournament_id", tournamentId)
+    .eq("tournament_id", finalTournamentId)
     .neq("payment_status", "paid");
 
   if (subId) query = query.eq("id", subId);

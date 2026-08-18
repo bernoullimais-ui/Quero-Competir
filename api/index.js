@@ -60672,6 +60672,11 @@ init_auth();
 init_supabase();
 init_utalkService();
 var router7 = (0, import_express7.Router)();
+function isValidUUID2(str) {
+  if (!str) return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
 router7.post("/send-test", requireAuth, async (req, res) => {
   const { phone, message } = req.body;
   if (!phone || !message) {
@@ -60706,7 +60711,12 @@ router7.post("/broadcast", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "tournamentId e message s\xE3o obrigat\xF3rios" });
   }
   const supabase = getSupabaseAdmin();
-  const { data: tournament } = await supabase.from("tournaments").select("id, name, organization_id").eq("id", tournamentId).maybeSingle();
+  let finalTournamentId = tournamentId;
+  if (!isValidUUID2(tournamentId)) {
+    const { data: slugData } = await supabase.from("tournaments").select("id").eq("slug", tournamentId).maybeSingle();
+    if (slugData) finalTournamentId = slugData.id;
+  }
+  const { data: tournament } = await supabase.from("tournaments").select("id, name, organization_id").eq("id", finalTournamentId).maybeSingle();
   if (!tournament) {
     return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
   }
@@ -60721,7 +60731,7 @@ router7.post("/broadcast", requireAuth, async (req, res) => {
       media: mediaUrl,
       mediaName,
       orgId: tournament.organization_id,
-      tournamentId,
+      tournamentId: finalTournamentId,
       messageType: "broadcast",
       athleteName: recipientName || "Contato Avulso",
       sentBy: "organizer"
@@ -60731,7 +60741,7 @@ router7.post("/broadcast", requireAuth, async (req, res) => {
     }
     return res.json({ success: true, sent: 1, errors: 0, total: 1 });
   }
-  let query = supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, payment_status, category_id, institution_id").eq("tournament_id", tournamentId);
+  let query = supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, payment_status, category_id, institution_id").eq("tournament_id", finalTournamentId);
   if (filter === "confirmed") {
     query = query.eq("payment_status", "paid");
   } else if (filter === "pending") {
@@ -60785,10 +60795,15 @@ router7.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
   const { tournamentId } = req.params;
   const { subId } = req.body;
   const supabase = getSupabaseAdmin();
-  const { data: tournament } = await supabase.from("tournaments").select("id, name, organization_id").eq("id", tournamentId).maybeSingle();
+  let finalTournamentId = tournamentId;
+  if (!isValidUUID2(tournamentId)) {
+    const { data: slugData } = await supabase.from("tournaments").select("id").eq("slug", tournamentId).maybeSingle();
+    if (slugData) finalTournamentId = slugData.id;
+  }
+  const { data: tournament } = await supabase.from("tournaments").select("id, name, organization_id").eq("id", finalTournamentId).maybeSingle();
   if (!tournament) return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
   const { data: org } = await supabase.from("organizations").select("whatsapp_tpl_pre_registration").eq("id", tournament.organization_id).maybeSingle();
-  let query = supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, payment_status, category_id").eq("tournament_id", tournamentId).neq("payment_status", "paid");
+  let query = supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, payment_status, category_id").eq("tournament_id", finalTournamentId).neq("payment_status", "paid");
   if (subId) query = query.eq("id", subId);
   const { data: subs } = await query;
   if (!subs || subs.length === 0) return res.json({ success: true, sent: 0 });
