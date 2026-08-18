@@ -80,9 +80,13 @@ router.post("/broadcast", requireAuth, async (req, res) => {
     if (!customPhone) {
       return res.status(400).json({ error: "Número de telefone não informado." });
     }
+    const link = `https://querocompetir.com.br/torneios/${finalTournamentId}`;
     const personalizedMessage = message
       .replace(/\{nome_atleta\}/g, recipientName || "Atleta")
-      .replace(/\{torneio\}/g, tournament.name || "");
+      .replace(/\{torneio\}/g, tournament.name || "")
+      .replace(/\{provas\}/g, "")
+      .replace(/\{valor\}/g, "")
+      .replace(/\{link\}/g, link);
 
     const result = await sendWhatsAppMessage({
       phone: customPhone,
@@ -145,9 +149,19 @@ router.post("/broadcast", requireAuth, async (req, res) => {
 
   for (const sub of targets) {
     const phone = sub.parent_phone || sub.additional_data?.phone;
+    const provas = Array.isArray(sub.category_id) 
+      ? sub.category_id.join(", ") 
+      : (sub.category_id || "");
+    const fee = sub.additional_data?.athleteFee || sub.additional_data?.totalFee || 0;
+    const valor = fee > 0 ? `R$ ${Number(fee).toFixed(2)}` : "Gratuita";
+    const link = `https://querocompetir.com.br/torneios/${finalTournamentId}`;
+
     const personalizedMessage = message
       .replace(/\{nome_atleta\}/g, sub.athlete_name || "Atleta")
-      .replace(/\{torneio\}/g, tournament.name || "");
+      .replace(/\{torneio\}/g, tournament.name || "")
+      .replace(/\{provas\}/g, provas)
+      .replace(/\{valor\}/g, valor)
+      .replace(/\{link\}/g, link);
 
     const result = await sendWhatsAppMessage({
       phone,
