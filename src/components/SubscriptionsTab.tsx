@@ -37,7 +37,7 @@ export default function SubscriptionsTab({
   const [athleteSubs, setAthleteSubs] = useState<any[]>([]);
   const [subSettingsStatus, setSubSettingsStatus] = useState<{ type: "success" | "error"; text: string } | null>(null);
   
-  const [subViewMode, setSubViewMode] = useState<"institutions" | "athletes">("institutions");
+  const [subViewMode, setSubViewMode] = useState<"institutions" | "athletes">("athletes");
   const [subFilter, setSubFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [subSearch, setSubSearch] = useState("");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
@@ -200,20 +200,20 @@ export default function SubscriptionsTab({
       {/* SELETOR DE SUB-TABELAS */}
       <div className="flex border-b border-slate-200 gap-4">
         <button
-          onClick={() => setSubViewMode("institutions")}
-          className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
-            subViewMode === "institutions" ? "text-indigo-600 font-extrabold border-b-2 border-indigo-600" : "text-slate-400 hover:text-slate-600"
-          }`}
-        >
-          Instituições Confirmadas ({registrations.length})
-        </button>
-        <button
           onClick={() => setSubViewMode("athletes")}
           className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
             subViewMode === "athletes" ? "text-indigo-600 font-extrabold border-b-2 border-indigo-600" : "text-slate-400 hover:text-slate-600"
           }`}
         >
           Fichas de Validação de Atletas ({athleteSubs.length})
+        </button>
+        <button
+          onClick={() => setSubViewMode("institutions")}
+          className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
+            subViewMode === "institutions" ? "text-indigo-600 font-extrabold border-b-2 border-indigo-600" : "text-slate-400 hover:text-slate-600"
+          }`}
+        >
+          Instituições Confirmadas ({registrations.length})
         </button>
       </div>
 
