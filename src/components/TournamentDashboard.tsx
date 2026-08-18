@@ -1919,7 +1919,10 @@ export default function TournamentDashboard() {
                     <div>
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Descrição / Regulamento</span>
                       {tournament.description ? (
-                        <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-4 rounded-2xl border border-slate-105">{parseDescription(tournament.description).description}</p>
+                        <div 
+                          className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-4 rounded-2xl border border-slate-105 prose prose-sm max-w-none prose-p:text-justify break-words"
+                          dangerouslySetInnerHTML={{ __html: parseDescription(tournament.description).description }}
+                        />
                       ) : (
                         <p className="text-slate-400 text-sm italic">Nenhuma descrição ou regulamento detalhado foi informado para este torneio.</p>
                       )}
