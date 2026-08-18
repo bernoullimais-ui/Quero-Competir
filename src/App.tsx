@@ -30,6 +30,7 @@ import LiveVenueScoreboard from "./components/LiveVenueScoreboard.tsx";
 import StaffManagement from "./components/StaffManagement.tsx";
 import VenueManagement from "./components/VenueManagement.tsx";
 import PublicTournamentView from "./components/PublicTournamentView.tsx";
+import PublicSwimmingScoreboard from "./components/PublicSwimmingScoreboard.tsx";
 import InstitutionPortal from "./components/InstitutionPortal.tsx";
 import VenuePortal from "./components/VenuePortal.tsx";
 import MobileScannerView from "./components/MobileScannerView.tsx";
@@ -480,6 +481,12 @@ export default function App() {
               <Route path="/public/torneio/:id" element={
                 <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar o torneio.</div>}>
                   <PublicTournamentView />
+                </ErrorBoundary>
+              } />
+
+              <Route path="/public/tournament/:id/placar-natacao" element={
+                <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold">Erro ao carregar placar público de natação.</div>}>
+                  <PublicSwimmingScoreboard />
                 </ErrorBoundary>
               } />
 
