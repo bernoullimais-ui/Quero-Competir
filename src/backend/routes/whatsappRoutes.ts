@@ -300,7 +300,7 @@ router.get("/logs/:tournamentId", requireAuth, async (req, res) => {
 
 // ── POST /api/whatsapp/cron-cart-recovery ────────────────────────────────────
 // Chamado pelo Vercel Cron a cada hora. Envia lembrete para pré-inscrições
-// com 2h~2h30 de vida sem pagamento e sem lembrete enviado.
+// com mais de 2h de vida sem pagamento e sem lembrete enviado (limite 24h para não reviver inscrições muito antigas).
 router.post("/cron-cart-recovery", async (req, res) => {
   const cronSecret = req.headers["x-cron-secret"] || req.headers.authorization;
   if (process.env.CRON_SECRET && cronSecret !== process.env.CRON_SECRET) {
@@ -309,14 +309,14 @@ router.post("/cron-cart-recovery", async (req, res) => {
 
   const supabase = getSupabaseAdmin();
   const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-  const twoHalfHoursAgo = new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString();
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   const { data: subs } = await supabase
     .from("athlete_subscriptions")
-    .select("id, athlete_name, parent_phone, additional_data, tournament_id, category_id")
+    .select("id, athlete_name, parent_phone, additional_data, tournament_id, category_id, payment_status")
     .neq("payment_status", "paid")
     .eq("whatsapp_cart_recovery_sent", false)
-    .gte("created_at", twoHalfHoursAgo)
+    .gte("created_at", twentyFourHoursAgo)
     .lte("created_at", twoHoursAgo);
 
   if (!subs || subs.length === 0) {
