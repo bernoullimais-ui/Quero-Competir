@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Waves, Printer, Save, RefreshCw, Trophy, Users, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Waves, Printer, Save, RefreshCw, Trophy, Users, Clock, AlertCircle, CheckCircle2, Settings2 } from "lucide-react";
+import { supabase } from "../lib/supabaseClient.ts";
 import { useToast } from "./ui/Toast.tsx";
 
 interface SwimmingBalizamentoProps {
+  globalLanesCount?: number;
+  triggerRecalculate?: number;
+  onHeatsGenerated?: (categoryId: string, heats: Heat[]) => void;
   category: any;
   athleteSubs: any[];
   tournamentId: string;
@@ -19,6 +23,7 @@ interface LaneAssignment {
   seedTime?: string;
   resultTime?: string;
   rank?: number;
+  isManual?: boolean;
 }
 
 interface Heat {
@@ -26,8 +31,13 @@ interface Heat {
   lanes: LaneAssignment[];
 }
 
-export default function SwimmingBalizamento({ category, athleteSubs, tournamentId, institutions = [], readOnly = false, hideResults = false }: SwimmingBalizamentoProps) {
-  const [lanesCount, setLanesCount] = useState<number>(6);
+export default function SwimmingBalizamento({ category, athleteSubs, tournamentId, institutions = [], readOnly = false, hideResults = false, globalLanesCount, triggerRecalculate, onHeatsGenerated }: SwimmingBalizamentoProps) {
+  
+  const [lanesCount, setLanesCount] = useState<number>(globalLanesCount || 6);
+  const [editingManualAthId, setEditingManualAthId] = useState<string | null>(null);
+  const [manualHeatInput, setManualHeatInput] = useState<string>("");
+  const [manualLaneInput, setManualLaneInput] = useState<string>("");
+
   const [heats, setHeats] = useState<Heat[]>([]);
   const [editingResults, setEditingResults] = useState<Record<string, string>>({});
   const [isSavingResults, setIsSavingResults] = useState(false);
@@ -109,9 +119,11 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
   };
 
   // Generate Heats (Balizamento Equitativo FINA/CBDA)
+
   const generateBalizamento = () => {
     if (categoryAthletes.length === 0) {
       setHeats([]);
+      if (onHeatsGenerated) onHeatsGenerated(category.id, []);
       return;
     }
 
@@ -119,7 +131,26 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
     const totalAthletes = categoryAthletes.length;
     const numHeats = Math.max(1, Math.ceil(totalAthletes / lanesCount));
 
-    // Distribuir atletas equitativamente pelas séries (ex: 14 atletas em 6 raias -> 5, 5, 4)
+    // 1. Identificar atletas com posições manuais fixas
+    const fixedAthletes = categoryAthletes.filter(ath => {
+      const add = ath.additionalData || ath.additional_data || {};
+      return add.manual_heat && add.manual_lane;
+    });
+
+    const fixedAthletesIds = new Set(fixedAthletes.map(a => a.id));
+
+    // 2. Separar os demais atletas (não fixos)
+    const floatingAthletes = categoryAthletes.filter(ath => !fixedAthletesIds.has(ath.id));
+
+    // 3. Ordenar atletas flutuantes pelo tempo
+    const sortedFloating = [...floatingAthletes].sort((a, b) => {
+      const timeA = parseSeedTimeToMs(getAthleteSeedTime(a));
+      const timeB = parseSeedTimeToMs(getAthleteSeedTime(b));
+      return timeB - timeA; // Descending (lento -> rápido)
+    });
+
+    // 4. Determinar tamanho de cada bateria (para os flutuantes)
+    // Se fosse um cálculo ideal (equitativo)
     const baseCount = Math.floor(totalAthletes / numHeats);
     const remainder = totalAthletes % numHeats;
     const heatSizes: number[] = [];
@@ -127,53 +158,80 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
       heatSizes.push(baseCount + (h < remainder ? 1 : 0));
     }
 
-    // Ordenar atletas do mais LENTO/sem tempo (primeiras séries) ao mais RÁPIDO (última série)
-    const sortedAthletes = [...categoryAthletes].sort((a, b) => {
-      const timeA = parseSeedTimeToMs(getAthleteSeedTime(a));
-      const timeB = parseSeedTimeToMs(getAthleteSeedTime(b));
-      return timeB - timeA; // Descending order of timeMs (slowest first, fastest last)
-    });
-
     const newHeats: Heat[] = [];
-    let offset = 0;
+    let floatingOffset = 0;
 
     for (let h = 0; h < numHeats; h++) {
-      const count = heatSizes[h];
-      const heatAthletesRaw = sortedAthletes.slice(offset, offset + count);
-      offset += count;
-
-      // Dentro de cada série, ordenar do mais RÁPIDO ao mais LENTO para colocar os melhores tempos nas raias centrais
-      const heatAthletes = [...heatAthletesRaw].sort((a, b) => {
-        const timeA = parseSeedTimeToMs(getAthleteSeedTime(a));
-        const timeB = parseSeedTimeToMs(getAthleteSeedTime(b));
-        return timeA - timeB; // Ascending order of timeMs (fastest first)
-      });
-
+      const heatNum = h + 1;
+      
       // Inicializar raias 1..lanesCount
       const laneAssignments: LaneAssignment[] = Array.from({ length: lanesCount }, (_, i) => ({
         laneNumber: i + 1,
       }));
 
-      // Distribuir atletas nas raias segundo a ordem de raias centrais (FINA / CBDA)
-      heatAthletes.forEach((ath, index) => {
-        const targetLaneNum = laneOrder[index] || (index + 1);
-        const laneObj = laneAssignments.find(l => l.laneNumber === targetLaneNum);
+      // Inserir os fixos desta bateria
+      const fixedInThisHeat = fixedAthletes.filter(ath => {
+        const add = ath.additionalData || ath.additional_data || {};
+        return add.manual_heat === heatNum;
+      });
+
+      fixedInThisHeat.forEach(ath => {
+        const add = ath.additionalData || ath.additional_data || {};
+        const lNum = add.manual_lane;
+        const laneObj = laneAssignments.find(l => l.laneNumber === lNum);
         if (laneObj) {
           laneObj.athleteId = ath.id;
           laneObj.athleteName = ath.athleteName || ath.full_name || ath.athlete_name;
           laneObj.institutionName = getAthleteInstitutionName(ath);
           laneObj.seedTime = getAthleteSeedTime(ath);
           laneObj.resultTime = editingResults[ath.id] || ath.additionalData?.result_time || ath.additional_data?.result_time || "";
+          laneObj.isManual = true;
         }
       });
 
+      // Determinar quantas vagas flutuantes sobraram nesta bateria (respeitando o heatSizes[h] se possível)
+      // Se heatSizes for 5, e já tem 1 fixo, sobram 4 vagas para flutuantes
+      // Mas se o fixo já ocupou uma das raias, o flutuante só pode usar as livres.
+      let numFloatingNeeded = heatSizes[h] - fixedInThisHeat.length;
+      if (numFloatingNeeded < 0) numFloatingNeeded = 0;
+
+      const floatingInThisHeat = sortedFloating.slice(floatingOffset, floatingOffset + numFloatingNeeded);
+      floatingOffset += numFloatingNeeded;
+
+      // Ordenar os flutuantes da bateria (rápido -> lento)
+      floatingInThisHeat.sort((a, b) => {
+        const timeA = parseSeedTimeToMs(getAthleteSeedTime(a));
+        const timeB = parseSeedTimeToMs(getAthleteSeedTime(b));
+        return timeA - timeB;
+      });
+
+      // Distribuir os flutuantes nas raias vazias de acordo com a prioridade FINA (laneOrder)
+      let floatIndex = 0;
+      for (const targetLaneNum of laneOrder) {
+        if (floatIndex >= floatingInThisHeat.length) break;
+        
+        const laneObj = laneAssignments.find(l => l.laneNumber === targetLaneNum);
+        if (laneObj && !laneObj.athleteId) {
+          const ath = floatingInThisHeat[floatIndex];
+          laneObj.athleteId = ath.id;
+          laneObj.athleteName = ath.athleteName || ath.full_name || ath.athlete_name;
+          laneObj.institutionName = getAthleteInstitutionName(ath);
+          laneObj.seedTime = getAthleteSeedTime(ath);
+          laneObj.resultTime = editingResults[ath.id] || ath.additionalData?.result_time || ath.additional_data?.result_time || "";
+          floatIndex++;
+        }
+      }
+
       newHeats.push({
-        heatNumber: h + 1,
+        heatNumber: heatNum,
         lanes: laneAssignments,
       });
     }
 
     setHeats(newHeats);
+    if (onHeatsGenerated) {
+      onHeatsGenerated(category.id, newHeats);
+    }
   };
 
   useEffect(() => {
@@ -189,6 +247,37 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
       setEditingResults(prev => ({ ...savedTimes, ...prev }));
     }
   }, [category.id, categoryAthletes.length]);
+
+
+  useEffect(() => {
+    if (globalLanesCount && globalLanesCount !== lanesCount) {
+      setLanesCount(globalLanesCount);
+    }
+  }, [globalLanesCount]);
+
+  useEffect(() => {
+    if (triggerRecalculate > 0) {
+      // Wipe manual overrides
+      const wipeOverrides = async () => {
+        try {
+          const promises = categoryAthletes.map(async ath => {
+            const add = ath.additionalData || ath.additional_data || {};
+            if (add.manual_heat || add.manual_lane) {
+              const newAdd = { ...add };
+              delete newAdd.manual_heat;
+              delete newAdd.manual_lane;
+              ath.additionalData = newAdd;
+              ath.additional_data = newAdd;
+              return supabase.from('athlete_subscriptions').update({ additional_data: newAdd }).eq('id', ath.id);
+            }
+          });
+          await Promise.all(promises);
+          generateBalizamento();
+        } catch (e) {}
+      };
+      wipeOverrides();
+    }
+  }, [triggerRecalculate]);
 
   useEffect(() => {
     generateBalizamento();
@@ -234,6 +323,81 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
       ...prev,
       [athleteId]: formatted
     }));
+  };
+
+  
+  const handleSaveManualLane = async (athleteId: string) => {
+    if (!manualHeatInput || !manualLaneInput) return;
+    const h = parseInt(manualHeatInput);
+    const l = parseInt(manualLaneInput);
+    if (isNaN(h) || isNaN(l) || h < 1 || l < 1 || l > lanesCount) {
+      toastError("Valores de série e raia inválidos.");
+      return;
+    }
+    const ath = categoryAthletes.find(a => a.id === athleteId);
+    if (!ath) return;
+
+    // Verificar se já existe alguém fixo nesta posição
+    const conflict = categoryAthletes.find(a => {
+      const add = a.additionalData || a.additional_data || {};
+      return add.manual_heat === h && add.manual_lane === l && a.id !== athleteId;
+    });
+
+    if (conflict) {
+      toastError("Já existe um atleta fixado nesta série e raia.");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('athlete_subscriptions')
+        .update({
+          additional_data: {
+            ...(ath.additionalData || ath.additional_data || {}),
+            manual_heat: h,
+            manual_lane: l
+          }
+        })
+        .eq('id', athleteId);
+
+      if (error) throw error;
+      
+      // Update local state so it recalculates instantly
+      ath.additionalData = { ...(ath.additionalData || ath.additional_data || {}), manual_heat: h, manual_lane: l };
+      
+      setEditingManualAthId(null);
+      generateBalizamento();
+      success("Posição atualizada com sucesso!");
+    } catch (e: any) {
+      toastError("Erro ao salvar posição manual: " + e.message);
+    }
+  };
+
+  const handleClearManualLane = async (athleteId: string) => {
+    const ath = categoryAthletes.find(a => a.id === athleteId);
+    if (!ath) return;
+
+    try {
+      const newAdd = { ...(ath.additionalData || ath.additional_data || {}) };
+      delete newAdd.manual_heat;
+      delete newAdd.manual_lane;
+
+      const { error } = await supabase
+        .from('athlete_subscriptions')
+        .update({ additional_data: newAdd })
+        .eq('id', athleteId);
+
+      if (error) throw error;
+      
+      ath.additionalData = newAdd;
+      ath.additional_data = newAdd;
+
+      setEditingManualAthId(null);
+      generateBalizamento();
+      success("Posição livre restaurada!");
+    } catch (e: any) {
+      toastError("Erro ao limpar posição manual: " + e.message);
+    }
   };
 
   // Persistir tempo obtido de um único atleta no Supabase/backend
@@ -646,18 +810,40 @@ export default function SwimmingBalizamento({ category, athleteSubs, tournamentI
                           <td className="py-3 px-4 font-bold text-slate-800">
                             {lane.athleteName ? (
                               <div className="flex items-center gap-2">
-                                <span className="text-sm">{lane.athleteName}</span>
-                                {(() => {
-                                  const sub = athleteSubs.find(s => s.id === lane.athleteId);
-                                  if (sub?.checkedInAt) {
-                                    return (
-                                      <span title="Check-in Presencial Realizado" className="text-indigo-600 flex-shrink-0">
-                                        <CheckCircle2 size={14} className="stroke-[3px]" />
-                                      </span>
-                                    );
-                                  }
-                                  return null;
-                                })()}
+                                {editingManualAthId === lane.athleteId ? (
+                                  <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-lg border border-slate-200">
+                                    <input type="number" placeholder="Bat" title="Nova Bateria" className="w-16 px-2 py-1 rounded border text-xs" value={manualHeatInput} onChange={e => setManualHeatInput(e.target.value)} />
+                                    <input type="number" placeholder="Raia" title="Nova Raia" className="w-16 px-2 py-1 rounded border text-xs" value={manualLaneInput} onChange={e => setManualLaneInput(e.target.value)} />
+                                    <button onClick={() => handleSaveManualLane(lane.athleteId!)} className="text-emerald-600 hover:text-emerald-700 bg-white p-1 rounded shadow-sm" title="Salvar Posição Fixa">Salvar</button>
+                                    <button onClick={() => setEditingManualAthId(null)} className="text-slate-400 hover:text-slate-600 bg-white p-1 rounded shadow-sm" title="Cancelar">X</button>
+                                    {lane.isManual && <button onClick={() => handleClearManualLane(lane.athleteId!)} className="text-rose-500 hover:text-rose-600 text-[10px] font-bold underline ml-2">Remover Fixo</button>}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <span className="text-sm">{lane.athleteName}</span>
+                                    {lane.isManual && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-black border border-amber-200 shadow-sm" title="Este atleta foi fixado manualmente nesta bateria/raia.">FIXO</span>}
+                                    {(() => {
+                                      const sub = athleteSubs.find(s => s.id === lane.athleteId);
+                                      if (sub?.checkedInAt) {
+                                        return (
+                                          <span title="Check-in Presencial Realizado" className="text-indigo-600 flex-shrink-0">
+                                            <CheckCircle2 size={14} className="stroke-[3px]" />
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                    {!readOnly && (
+                                      <button onClick={() => {
+                                        setEditingManualAthId(lane.athleteId!);
+                                        setManualHeatInput(heat.heatNumber.toString());
+                                        setManualLaneInput(lane.laneNumber.toString());
+                                      }} className="text-slate-300 hover:text-indigo-500 transition-colors ml-2" title="Ajustar Bateria/Raia manualmente">
+                                        <Settings2 size={14} />
+                                      </button>
+                                    )}
+                                  </>
+                                )}
                               </div>
                             ) : (
                               <span className="text-slate-300 italic font-normal text-xs">Vazia</span>

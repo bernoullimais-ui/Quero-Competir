@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient.ts";
 import SwimmingBalizamento from "./SwimmingBalizamento.tsx";
+import AllSwimmingBalizamento from "./AllSwimmingBalizamento.tsx";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import StaffManagement from "./StaffManagement.tsx";
@@ -2699,11 +2700,16 @@ export default function TournamentDashboard() {
                       <select
                         value={selectedCatForBracket?.id || ""}
                         onChange={(e) => {
-                          const cat = categories.find(c => c.id === e.target.value);
-                          if (cat) setSelectedCatForBracket(cat);
+                          if (e.target.value === "ALL") {
+                            setSelectedCatForBracket({ id: "ALL", name: "Todas as provas (Visão Global)", rules_config: { sport_type: "swimming" } });
+                          } else {
+                            const cat = categories.find(c => c.id === e.target.value);
+                            if (cat) setSelectedCatForBracket(cat);
+                          }
                         }}
                         className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-250 rounded-2xl font-bold text-sm text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors shadow-sm cursor-pointer"
                       >
+                        <option value="ALL">⭐ Todas as provas (Visão Global)</option>
                         {displayList.map((cat) => {
                           const athleteCount = athleteSubs.filter((sub: any) => 
                             sub.categoryId === cat.id || sub.category_id === cat.id
@@ -2757,12 +2763,21 @@ export default function TournamentDashboard() {
                   tournament?.name?.toLowerCase().includes("natação") ||
                   tournament?.name?.toLowerCase().includes("natacao")
                 ) ? (
-                  <SwimmingBalizamento
-                    category={selectedCatForBracket}
-                    athleteSubs={athleteSubs}
-                    tournamentId={id!}
-                    institutions={institutions}
-                  />
+                  selectedCatForBracket.id === "ALL" ? (
+                    <AllSwimmingBalizamento
+                      categories={categories.filter(cat => !onlyWithAthletes || athleteSubs.some((sub: any) => sub.categoryId === cat.id || sub.category_id === cat.id))}
+                      athleteSubs={athleteSubs}
+                      tournamentId={id!}
+                      institutions={institutions}
+                    />
+                  ) : (
+                    <SwimmingBalizamento
+                      category={selectedCatForBracket}
+                      athleteSubs={athleteSubs}
+                      tournamentId={id!}
+                      institutions={institutions}
+                    />
+                  )
                 ) : (
                   /* MODALIDADES TRADICIONAIS (Combate, Esportes Coletivos, etc.) */
                   <div className="space-y-6">
