@@ -253,10 +253,15 @@ export default function PublicSelfRegistration() {
         body: JSON.stringify({ code: couponCode, categoryIds: selectedCategoryIds })
       });
       const data = await res.json();
-      if (data.success) {
-        setAppliedCoupon(data.data);
+      if (data.valid) {
+        // Map camelCase from backend if it returns that, or fallback to snake_case if we fix backend
+        setAppliedCoupon({
+          ...data.coupon,
+          discount_type: data.coupon.discountType || data.coupon.discount_type,
+          discount_value: data.coupon.discountValue || data.coupon.discount_value,
+        });
       } else {
-        setCouponError(data.error || "Cupom inválido");
+        setCouponError(data.message || data.error || "Cupom inválido");
       }
     } catch (err) {
       setCouponError("Erro ao validar cupom.");
