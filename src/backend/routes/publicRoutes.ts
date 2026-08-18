@@ -11,23 +11,34 @@ const router = Router();
 
 const DEFAULT_LOGO = "https://www.querocompetir.com.br/assets/logo.png"; // Usando logo padrao do Quero Competir
 
+const slugify = (text: string) => {
+  if (!text) return "";
+  return text.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/\s+/g, "-").replace(/[^\w\-]+/g, "").replace(/\-\-+/g, "-");
+};
+
 const handler = async (req: any, res: any) => {
   const { id } = req.params;
   const isScoreboard = req.originalUrl.includes("/placar");
 
   try {
     const supabase = getSupabaseAdmin();
+    const decoded = decodeURIComponent(id).trim();
     
     // Resolve slug to UUID if needed
-    let finalTournamentId = id;
-    if (!isValidUUID(id)) {
-      const { data: slugData } = await supabase
-        .from('tournaments')
-        .select('id')
-        .eq('slug', id)
-        .maybeSingle();
-      if (slugData) {
-        finalTournamentId = slugData.id;
+    let finalTournamentId = decoded;
+    if (!isValidUUID(decoded)) {
+      const { data: allTournaments } = await supabase.from('tournaments').select('id, name, owner_id');
+      if (allTournaments) {
+        const targetSlug = slugify(decoded);
+        const matched = allTournaments.find(t => 
+          slugify(t.name) === targetSlug || 
+          t.name.toLowerCase() === decoded.toLowerCase()
+        );
+        if (matched) {
+          finalTournamentId = matched.id;
+        } else {
+          return res.send(indexHtml);
+        }
       } else {
         return res.send(indexHtml);
       }
