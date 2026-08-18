@@ -5832,12 +5832,16 @@ router.post("/:id/auto-schedule", async (req, res) => {
 const COMMUNITY_POSTS_FILE = path.join(process.cwd(), "src", "backend", "data", "tournament_posts.json");
 
 function ensureCommunityFile() {
-  const dir = path.dirname(COMMUNITY_POSTS_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(COMMUNITY_POSTS_FILE)) {
-    fs.writeFileSync(COMMUNITY_POSTS_FILE, JSON.stringify([], null, 2), "utf-8");
+  try {
+    const dir = path.dirname(COMMUNITY_POSTS_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (!fs.existsSync(COMMUNITY_POSTS_FILE)) {
+      fs.writeFileSync(COMMUNITY_POSTS_FILE, JSON.stringify([], null, 2), "utf-8");
+    }
+  } catch (e) {
+    console.warn("Could not ensure community fallback file (read-only FS on Vercel)");
   }
 }
 
