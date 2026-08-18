@@ -556,8 +556,28 @@ export default function SubscriptionsTab({
                         </div>
                       </div>
 
-                      {/* Link de Pagamento para Responsável */}
-                      {group.paymentStatus !== "paid" && (
+                      {/* Status de Pagamento e Credencial */}
+                      {group.paymentStatus === "paid" ? (
+                        <div className="bg-emerald-50/70 border border-emerald-200/70 p-3 rounded-2xl flex items-center justify-between gap-2 flex-wrap">
+                          <div>
+                            <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block">✅ Pagamento Confirmado</span>
+                            <span className="text-[11px] font-semibold text-slate-600">Inscrição regularizada</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const ticketUrl = `${window.location.origin}/public/ticket/${group.id}`;
+                                window.open(ticketUrl, "_blank");
+                              }}
+                              className="px-2.5 py-1.5 bg-purple-500 text-white rounded-xl text-xs font-bold hover:bg-purple-600 transition shadow-xs flex items-center gap-1 cursor-pointer"
+                              title="Ver Credencial Digital do Atleta"
+                            >
+                              🎟️ Credencial
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
                         <div className="bg-amber-50/70 border border-amber-200/70 p-3 rounded-2xl flex items-center justify-between gap-2 flex-wrap">
                           <div>
                             <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider block">💳 Pagamento Pendente</span>
