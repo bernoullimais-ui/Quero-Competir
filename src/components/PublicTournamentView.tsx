@@ -301,8 +301,10 @@ export default function PublicTournamentView() {
         setCategories(catsList);
         setAthleteSubs(Array.isArray(subsData) ? subsData : []);
         setInstitutions(Array.isArray(instData) ? instData : []);
-        if (pubSettings && !pubSettings.error) {
+        if (pubSettings && !pubSettings.error && (!subSettings || subSettings.status !== "closed")) {
           setSelfRegEnabled(true);
+        } else {
+          setSelfRegEnabled(false);
         }
         let isPublic = true;
         if (subSettings && subSettings.showBracketsPublicly !== undefined) {
