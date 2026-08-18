@@ -57045,7 +57045,8 @@ router2.post("/:id/self-register", async (req, res) => {
     const phone = parentPhone || additionalData?.phone;
     if (phone && createdSubIds.length > 0) {
       try {
-        const { data: org } = await supabase.from("organizations").select("whatsapp_tpl_pre_registration, utalk_token, utalk_from_phone").eq("id", tData2.organization_id).maybeSingle();
+        const orgId = await getOrganizerReferenceIdAndSync(tData2.owner_id);
+        const { data: org } = await supabase.from("organizations").select("whatsapp_tpl_pre_registration, utalk_token, utalk_from_phone").eq("id", orgId).maybeSingle();
         const { data: cats } = await supabase.from("tournament_categories").select("name").in("id", targetCategoryIds);
         const categoryNames = cats?.map((c) => c.name) || targetCategoryIds;
         const pixLink = totalFee > 0 ? `${process.env.APP_URL || "https://querocompetir.com.br"}/public/register-athlete/${createdSubIds[0]}` : void 0;
@@ -57054,7 +57055,7 @@ router2.post("/:id/self-register", async (req, res) => {
           athleteName,
           tournamentName: tData2.name,
           tournamentId,
-          orgId: tData2.organization_id,
+          orgId,
           categoryNames,
           totalFee,
           paymentLink: pixLink,
@@ -57925,8 +57926,9 @@ async function updateSubscriptionPaymentStatus(subId, status, sub, tData2, setti
       const phone = sub?.parent_phone || sub?.parentPhone || sub?.additional_data?.phone;
       const athleteName = sub?.athlete_name || sub?.athleteName;
       if (phone && tournamentId) {
-        const { data: tournament } = await supabase.from("tournaments").select("id, name, organization_id").eq("id", tournamentId).maybeSingle();
-        const { data: org } = tournament?.organization_id ? await supabase.from("organizations").select("whatsapp_tpl_confirmed").eq("id", tournament.organization_id).maybeSingle() : { data: null };
+        const { data: tournament } = await supabase.from("tournaments").select("id, name, owner_id").eq("id", tournamentId).maybeSingle();
+        const orgId = tournament?.owner_id ? await getOrganizerReferenceIdAndSync(tournament.owner_id) : PRIMARY_ORG_UUID;
+        const { data: org } = await supabase.from("organizations").select("whatsapp_tpl_confirmed, utalk_token, utalk_from_phone").eq("id", orgId).maybeSingle();
         const { data: allSubs } = await supabase.from("athlete_subscriptions").select("category_id").eq("tournament_id", tournamentId).or(`document.eq.${sub?.document || ""},athlete_name.eq.${athleteName || ""}`);
         const catIds = [...new Set((allSubs || []).map((s) => s.category_id).filter(Boolean))];
         const { data: cats } = catIds.length > 0 ? await supabase.from("tournament_categories").select("name").in("id", catIds) : { data: [] };
@@ -57935,7 +57937,7 @@ async function updateSubscriptionPaymentStatus(subId, status, sub, tData2, setti
           athleteName: athleteName || "Atleta",
           tournamentName: tournament?.name || "Torneio",
           tournamentId,
-          orgId: tournament?.organization_id,
+          orgId,
           categoryNames: cats?.map((c) => c.name) || [],
           subId,
           orgTemplate: org?.whatsapp_tpl_confirmed

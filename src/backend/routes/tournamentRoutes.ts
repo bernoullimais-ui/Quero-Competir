@@ -3935,10 +3935,11 @@ router.post("/:id/self-register", async (req, res) => {
     if (phone && createdSubIds.length > 0) {
       try {
 
+        const orgId = await getOrganizerReferenceIdAndSync(tData.owner_id);
         const { data: org } = await supabase
           .from("organizations")
           .select("whatsapp_tpl_pre_registration, utalk_token, utalk_from_phone")
-          .eq("id", tData.organization_id)
+          .eq("id", orgId)
           .maybeSingle();
 
         // Busca nomes das provas para compor a mensagem
@@ -3956,7 +3957,7 @@ router.post("/:id/self-register", async (req, res) => {
           athleteName,
           tournamentName: tData.name,
           tournamentId,
-          orgId: tData.organization_id,
+          orgId: orgId,
           categoryNames,
           totalFee,
           paymentLink: pixLink,
@@ -5173,13 +5174,16 @@ async function updateSubscriptionPaymentStatus(subId: string, status: 'pending' 
       if (phone && tournamentId) {
         const { data: tournament } = await supabase
           .from("tournaments")
-          .select("id, name, organization_id")
+          .select("id, name, owner_id")
           .eq("id", tournamentId)
           .maybeSingle();
 
-        const { data: org } = tournament?.organization_id
-          ? await supabase.from("organizations").select("whatsapp_tpl_confirmed").eq("id", tournament.organization_id).maybeSingle()
-          : { data: null };
+        const orgId = tournament?.owner_id ? await getOrganizerReferenceIdAndSync(tournament.owner_id) : PRIMARY_ORG_UUID;
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("whatsapp_tpl_confirmed, utalk_token, utalk_from_phone")
+          .eq("id", orgId)
+          .maybeSingle();
 
         // Busca todas as inscrições confirmadas do atleta neste torneio para listar as provas
         const { data: allSubs } = await supabase
@@ -5198,7 +5202,7 @@ async function updateSubscriptionPaymentStatus(subId: string, status: 'pending' 
           athleteName: athleteName || "Atleta",
           tournamentName: tournament?.name || "Torneio",
           tournamentId,
-          orgId: tournament?.organization_id,
+          orgId: orgId,
           categoryNames: cats?.map((c: any) => c.name) || [],
           subId,
           orgTemplate: (org as any)?.whatsapp_tpl_confirmed,
