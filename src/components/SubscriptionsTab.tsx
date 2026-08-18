@@ -45,7 +45,7 @@ export default function SubscriptionsTab({
   const [selectedGenderFilter, setSelectedGenderFilter] = useState("all");
   const [selectedAgeGroupFilter, setSelectedAgeGroupFilter] = useState("all");
   
-  const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
+  const [showRejectModal, setShowRejectModal] = useState<string[] | null>(null);
   const [validationFeedback, setValidationFeedback] = useState("");
   const [viewingDocument, setViewingDocument] = useState<{ url: string; athleteName: string } | null>(null);
   
@@ -108,21 +108,22 @@ export default function SubscriptionsTab({
     }
   };
 
-  const handleValidateAthlete = async (subId: string, status: "approved" | "rejected") => {
+  const handleValidateAthlete = async (subIds: string[], status: "approved" | "rejected") => {
     if (status === "rejected" && !validationFeedback) {
-      setShowRejectModal(subId);
+      setShowRejectModal(subIds);
       return;
     }
     try {
-      const res = await fetch(`/api/tournaments/${tournamentId}/athlete-subscriptions/${subId}/validate`, {
+      const results = await Promise.all(subIds.map(subId => fetch(`/api/tournaments/${tournamentId}/athlete-subscriptions/${subId}/validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           validationStatus: status,
           validationFeedback: status === "rejected" ? validationFeedback : null
         })
-      });
-      if (res.ok) {
+      })));
+      
+      if (results.every(r => r.ok)) {
         setShowRejectModal(null);
         setValidationFeedback("");
         fetchSubscriptionDbs();
@@ -131,7 +132,7 @@ export default function SubscriptionsTab({
         }
         toastSuccess(status === "approved" ? "Inscrição aprovada com sucesso!" : "Inscrição rejeitada com sucesso!");
       } else {
-        toastError("Erro ao validar inscrição.");
+        toastError("Erro ao validar algumas inscrições.");
       }
     } catch (err) {
       console.error(err);
@@ -329,6 +330,19 @@ export default function SubscriptionsTab({
               toastSuccess(`Lista com ${filtered.length} participante(s) exportada com sucesso (CSV)!`);
             };
 
+            const groupedFiltered = Object.values(filtered.reduce((acc, sub) => {
+              const key = `${sub.athleteName}_${sub.document || sub.parentPhone}`;
+              if (!acc[key]) {
+                acc[key] = { ...sub, subIds: [sub.id], categoryIds: [sub.categoryId] };
+              } else {
+                acc[key].subIds.push(sub.id);
+                if (!acc[key].categoryIds.includes(sub.categoryId)) {
+                  acc[key].categoryIds.push(sub.categoryId);
+                }
+              }
+              return acc;
+            }, {} as Record<string, any>));
+
             return (
               <>
                 {/* Painel Completo de Filtros e Busca */}
@@ -445,39 +459,41 @@ export default function SubscriptionsTab({
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {filtered.map((sub) => {
-                  const inst = institutions.find(i => i.id === sub.institutionId);
-                  const cat = categories.find(c => c.id === sub.categoryId);
+                    {groupedFiltered.map((group) => {
+                  const inst = institutions.find(i => i.id === group.institutionId);
+                  const subCats = categories.filter(c => group.categoryIds.includes(c.id));
+                  const catNames = subCats.map(c => c.name).join(" + ");
+                  const ageGroups = [...new Set(subCats.map(c => c.age_group || group.additionalData?.age_group).filter(Boolean))].join(", ");
 
                   return (
-                    <div key={sub.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                    <div key={group.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
                       
                       {/* Header do Card Atleta */}
                       <div className="flex items-start justify-between border-b border-slate-100 pb-3">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="font-bold text-slate-800 text-md">{sub.athleteName}</h4>
-                            {sub.additionalData?.registration_source === "self" && (
+                            <h4 className="font-bold text-slate-800 text-md">{group.athleteName}</h4>
+                            {group.additionalData?.registration_source === "self" && (
                               <span className="px-2 py-0.5 rounded-md text-[9px] uppercase font-black bg-cyan-50 border border-cyan-200 text-cyan-700">Auto-Inscrição</span>
                             )}
                           </div>
                           <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">
-                            {inst?.name || "Independente"} • Cat: {cat?.name || "Mista"}
+                            {inst?.name || "Independente"} • Cat: {catNames || "Mista"}
                           </p>
-                          {(sub.additionalData?.age_group || cat?.age_group) && (
+                          {ageGroups && (
                             <span className="inline-block mt-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-150 text-[10px] font-extrabold rounded-md uppercase">
-                              Classe de Idade: {sub.additionalData?.age_group || cat?.age_group}
+                              Classe de Idade: {ageGroups}
                             </span>
                           )}
                         </div>
                         <span className={`px-2.5 py-1 rounded-md text-[10px] uppercase font-black border ${
-                          sub.validationStatus === "approved" ? "bg-emerald-50 border-emerald-250 text-emerald-600" :
-                          sub.validationStatus === "rejected" ? "bg-red-50 border-red-200 text-red-600" :
+                          group.validationStatus === "approved" ? "bg-emerald-50 border-emerald-250 text-emerald-600" :
+                          group.validationStatus === "rejected" ? "bg-red-50 border-red-200 text-red-600" :
                           "bg-amber-50 border-amber-250 text-amber-600"
                         }`}>
-                          {sub.validationStatus === "approved" && "Aprovado"}
-                          {sub.validationStatus === "rejected" && "Recusado"}
-                          {sub.validationStatus === "pending" && "Aguardando"}
+                          {group.validationStatus === "approved" && "Aprovado"}
+                          {group.validationStatus === "rejected" && "Recusado"}
+                          {group.validationStatus === "pending" && "Aguardando"}
                         </span>
                       </div>
 
@@ -485,35 +501,35 @@ export default function SubscriptionsTab({
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs font-medium text-slate-600">
                         <div>
                           <span className="block text-[10px] uppercase font-bold text-slate-400">Tipo Sanguíneo</span>
-                          <span>{sub.additionalData?.bloodType || "Não preenchido"}</span>
+                          <span>{group.additionalData?.bloodType || "Não preenchido"}</span>
                         </div>
                         <div>
                           <span className="block text-[10px] uppercase font-bold text-slate-400">Responsável</span>
-                          <span className="truncate block max-w-[150px]">{sub.parentName || "Não preenchido"}</span>
+                          <span className="truncate block max-w-[150px]">{group.parentName || "Não preenchido"}</span>
                         </div>
                         <div>
                           <span className="block text-[10px] uppercase font-bold text-slate-400">Alergias</span>
-                          <span className="truncate block max-w-[150px]">{sub.additionalData?.allergies || "Nenhuma registrada"}</span>
+                          <span className="truncate block max-w-[150px]">{group.additionalData?.allergies || "Nenhuma registrada"}</span>
                         </div>
                         <div>
                           <span className="block text-[10px] uppercase font-bold text-slate-400">Contato Resp.</span>
-                          <span>{sub.parentPhone || "Não Informado"}</span>
+                          <span>{group.parentPhone || "Não Informado"}</span>
                         </div>
                       </div>
 
-                      {cat?.rules_config?.sport_type === "combat" && sub.additionalData && (
+                      {group.additionalData && (
                         <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-xs font-semibold text-indigo-650 bg-indigo-50/20 p-2.5 rounded-xl border border-indigo-150">
                           <div>
                             <span className="block text-[9px] uppercase font-bold text-slate-400 leading-none mb-1">Classe</span>
-                            <span>{sub.additionalData.age_group || "N/A"}</span>
+                            <span>{group.additionalData.age_group || "N/A"}</span>
                           </div>
                           <div>
                             <span className="block text-[9px] uppercase font-bold text-slate-400 leading-none mb-1">Graduação</span>
-                            <span>{sub.additionalData.graduation || "N/A"}</span>
+                            <span>{group.additionalData.graduation || "N/A"}</span>
                           </div>
                           <div>
                             <span className="block text-[9px] uppercase font-bold text-slate-400 leading-none mb-1">Peso</span>
-                            <span>{sub.additionalData.weight_class || "N/A"}</span>
+                            <span>{group.additionalData.weight_class || "N/A"}</span>
                           </div>
                         </div>
                       )}
@@ -521,27 +537,27 @@ export default function SubscriptionsTab({
                       {/* Detalhes de conformidade */}
                       <div className="bg-slate-50 p-3 rounded-xl space-y-1.5 border border-slate-100">
                         <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                          <span className={`w-2 h-2 rounded-full ${sub.authorizedImageUse ? "bg-emerald-500" : "bg-slate-300"}`} />
-                          Autorização de Imagem: {sub.authorizedImageUse ? "Sim" : "Pendente"}
+                          <span className={`w-2 h-2 rounded-full ${group.authorizedImageUse ? "bg-emerald-500" : "bg-slate-300"}`} />
+                          Autorização de Imagem: {group.authorizedImageUse ? "Sim" : "Pendente"}
                         </div>
                         <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                          <span className={`w-2 h-2 rounded-full ${sub.liabilityWaiver ? "bg-emerald-500" : "bg-slate-300"}`} />
-                          Termo de Aptidão Física: {sub.liabilityWaiver ? "Sim" : "Pendente"}
+                          <span className={`w-2 h-2 rounded-full ${group.liabilityWaiver ? "bg-emerald-500" : "bg-slate-300"}`} />
+                          Termo de Aptidão Física: {group.liabilityWaiver ? "Sim" : "Pendente"}
                         </div>
                         {subSettings.feeType === "by_team_and_athlete_parent" && (
                           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                            <span className={`w-2 h-2 rounded-full ${sub.paymentStatus === "paid" ? "bg-emerald-500" : "bg-red-400"}`} />
-                            Taxa Individual Responsável: {sub.paymentStatus === "paid" ? "Pago" : "Pendente"}
+                            <span className={`w-2 h-2 rounded-full ${group.paymentStatus === "paid" ? "bg-emerald-500" : "bg-red-400"}`} />
+                            Taxa Individual Responsável: {group.paymentStatus === "paid" ? "Pago" : "Pendente"}
                           </div>
                         )}
                         <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                          <span className={`w-2 h-2 rounded-full ${sub.checkedInAt ? "bg-indigo-500" : "bg-slate-300"}`} />
-                          Check-in Presencial: {sub.checkedInAt ? `Realizado às ${new Date(sub.checkedInAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit', timeZone: 'America/Sao_Paulo'})}` : "Pendente"}
+                          <span className={`w-2 h-2 rounded-full ${group.checkedInAt ? "bg-indigo-500" : "bg-slate-300"}`} />
+                          Check-in Presencial: {group.checkedInAt ? `Realizado às ${new Date(group.checkedInAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit', timeZone: 'America/Sao_Paulo'})}` : "Pendente"}
                         </div>
                       </div>
 
                       {/* Link de Pagamento para Responsável */}
-                      {sub.paymentStatus !== "paid" && (
+                      {group.paymentStatus !== "paid" && (
                         <div className="bg-amber-50/70 border border-amber-200/70 p-3 rounded-2xl flex items-center justify-between gap-2 flex-wrap">
                           <div>
                             <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider block">💳 Pagamento Pendente</span>
@@ -551,7 +567,7 @@ export default function SubscriptionsTab({
                             <button
                               type="button"
                               onClick={() => {
-                                const ticketUrl = `${window.location.origin}/public/ticket/${sub.id}`;
+                                const ticketUrl = `${window.location.origin}/public/ticket/${group.id}`;
                                 window.open(ticketUrl, "_blank");
                               }}
                               className="px-2.5 py-1.5 bg-purple-500 text-white rounded-xl text-xs font-bold hover:bg-purple-600 transition shadow-xs flex items-center gap-1 cursor-pointer"
@@ -562,9 +578,9 @@ export default function SubscriptionsTab({
                             <button
                               type="button"
                               onClick={() => {
-                                const payUrl = `${window.location.origin}/public/register-athlete/${sub.id}`;
+                                const payUrl = `${window.location.origin}/public/register-athlete/${group.id}`;
                                 navigator.clipboard.writeText(payUrl);
-                                toastSuccess(`Link de pagamento copiado para ${sub.athleteName}!`);
+                                toastSuccess(`Link de pagamento copiado para ${group.athleteName}!`);
                               }}
                               className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs flex items-center gap-1 cursor-pointer"
                             >
@@ -573,9 +589,9 @@ export default function SubscriptionsTab({
                             <button
                               type="button"
                               onClick={() => {
-                                const payUrl = `${window.location.origin}/public/register-athlete/${sub.id}`;
-                                const msg = `Olá! Segue o link para pagamento da inscrição de *${sub.athleteName}*:\n\n${payUrl}`;
-                                const phone = (sub.parentPhone || sub.additionalData?.phone || "").replace(/\D/g, "");
+                                const payUrl = `${window.location.origin}/public/register-athlete/${group.id}`;
+                                const msg = `Olá! Segue o link para pagamento da inscrição de *${group.athleteName}*:\n\n${payUrl}`;
+                                const phone = (group.parentPhone || group.additionalData?.phone || "").replace(/\D/g, "");
                                 const waUrl = phone ? `https://api.whatsapp.com/send?phone=55${phone}&text=${encodeURIComponent(msg)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
                                 window.open(waUrl, "_blank");
                               }}
@@ -589,13 +605,13 @@ export default function SubscriptionsTab({
 
                       {/* Preview de Foto e Documento */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                        {sub.photoUrl && (
+                        {group.photoUrl && (
                           <div>
                             <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Foto do Aluno</span>
                             <button
                               type="button"
                               onClick={() => {
-                                setViewingDocument({ url: sub.photoUrl, athleteName: `Foto do Aluno - ${sub.athleteName}` });
+                                setViewingDocument({ url: group.photoUrl, athleteName: `Foto do Aluno - ${group.athleteName}` });
                               }}
                               className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold border border-slate-200 rounded-lg hover:bg-slate-50 duration-150 text-indigo-600 hover:text-indigo-700 bg-white cursor-pointer"
                             >
@@ -603,13 +619,13 @@ export default function SubscriptionsTab({
                             </button>
                           </div>
                         )}
-                        {sub.documentUrl ? (
+                        {group.documentUrl ? (
                           <div>
                             <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Documento de Identidade</span>
                             <button
                               type="button"
                               onClick={() => {
-                                setViewingDocument({ url: sub.documentUrl, athleteName: sub.athleteName });
+                                setViewingDocument({ url: group.documentUrl, athleteName: group.athleteName });
                               }}
                               className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold border border-slate-200 rounded-lg hover:bg-slate-50 duration-150 text-indigo-600 hover:text-indigo-700 bg-white cursor-pointer"
                             >
@@ -620,11 +636,11 @@ export default function SubscriptionsTab({
                       </div>
 
                       {/* Ações de Auditoria */}
-                      {sub.validationStatus === "pending" && (
+                      {group.validationStatus === "pending" && (
                         <div className="pt-3 border-t border-slate-50 flex gap-2">
                           <button
                             type="button"
-                            onClick={() => handleValidateAthlete(sub.id, "approved")}
+                            onClick={() => handleValidateAthlete(group.subIds, "approved")}
                             className="flex-1 min-h-[36px] bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition cursor-pointer"
                           >
                             Validar / Aprovar
@@ -633,7 +649,7 @@ export default function SubscriptionsTab({
                             type="button"
                             onClick={() => {
                               setValidationFeedback("");
-                              setShowRejectModal(sub.id);
+                              setShowRejectModal(group.subIds);
                             }}
                             className="px-4 min-h-[36px] bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 transition cursor-pointer"
                           >
@@ -642,10 +658,10 @@ export default function SubscriptionsTab({
                         </div>
                       )}
 
-                      {sub.validationStatus === "rejected" && sub.validationFeedback && (
+                      {group.validationStatus === "rejected" && group.validationFeedback && (
                         <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-700 text-xs">
                           <strong className="block mb-1">Motivo da Recusa:</strong>
-                          {sub.validationFeedback}
+                          {group.validationFeedback}
                         </div>
                       )}
                     </div>
@@ -832,7 +848,11 @@ export default function SubscriptionsTab({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => handleValidateAthlete(showRejectModal, "rejected")}
+                onClick={() => {
+                  if (showRejectModal) {
+                    handleValidateAthlete(showRejectModal, "rejected");
+                  }
+                }}
                 className="flex-1 min-h-[38px] bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition cursor-pointer"
               >
                 Confirmar Recusa
