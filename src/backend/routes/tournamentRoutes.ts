@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "../middleware/auth";
 import fs from "fs";
 import path from "path";
 import bcrypt from "bcryptjs";
+import { sendPreRegistrationMessage, sendConfirmedMessage } from "../services/utalkService";
 
 const router = Router();
 
@@ -3933,7 +3934,7 @@ router.post("/:id/self-register", async (req, res) => {
     const phone = parentPhone || additionalData?.phone;
     if (phone && createdSubIds.length > 0) {
       try {
-        const { sendPreRegistrationMessage } = await import("../services/utalkService");
+
         const { data: org } = await supabase
           .from("organizations")
           .select("whatsapp_tpl_pre_registration, utalk_token, utalk_from_phone")
@@ -5163,7 +5164,7 @@ async function updateSubscriptionPaymentStatus(subId: string, status: 'pending' 
   // ── WhatsApp: Confirmação de Pagamento ───────────────────────────────────
   if (status === "paid") {
     try {
-      const { sendConfirmedMessage } = await import("../services/utalkService");
+
       const supabase = getSupabaseAdmin();
       const tournamentId = sub?.tournament_id || sub?.tournamentId;
       const phone = sub?.parent_phone || sub?.parentPhone || sub?.additional_data?.phone;
