@@ -182,19 +182,6 @@ export default function PublicAthleteTicket() {
             </div>
           )}
 
-          {/* Emergency / Medical Details */}
-          {(subscription?.additionalData?.bloodType || subscription?.parentPhone) && (
-            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-800 text-xs">
-              <div>
-                <span className="text-[9px] font-black text-slate-400 uppercase block mb-0.5">Tipo Sanguíneo</span>
-                <span className="font-bold text-white">{subscription?.additionalData?.bloodType || "Não informado"}</span>
-              </div>
-              <div>
-                <span className="text-[9px] font-black text-slate-400 uppercase block mb-0.5">Contato do Responsável</span>
-                <span className="font-bold text-white">{subscription?.parentPhone || "Não informado"}</span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Ticket Footer */}
