@@ -387,12 +387,18 @@ export default function PublicSelfRegistration() {
           {totalAthleteFee > 0 && (
             <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-left mb-6">
               <p className="text-xs font-bold text-indigo-700 mb-1">
-                💳 Taxa Total: R$ {totalAthleteFee.toFixed(2)}
+                💳 Taxa Total: R$ {(() => {
+                  const discount = appliedCoupon?.discount_type === "percent"
+                    ? totalAthleteFee * (appliedCoupon.discount_value / 100)
+                    : Number(appliedCoupon?.discount_value || 0);
+                  return Math.max(0, totalAthleteFee - discount).toFixed(2);
+                })()}
               </p>
               <p className="text-xs text-slate-500">
                 {feePricingModel === "fixed_package"
                   ? `Pacote único (R$ ${unitAthleteFee.toFixed(2)}) para até ${maxEvents} prova(s)`
                   : `${selectedCategoryIds.length} prova(s) × R$ ${unitAthleteFee.toFixed(2)}`}
+                {appliedCoupon && ` (- Desconto aplicado)`}
               </p>
             </div>
           )}

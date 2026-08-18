@@ -1272,7 +1272,12 @@ export default function PublicAthleteRegistration() {
           {currentStep === "payment" && (
             <div className="space-y-6">
               {(() => {
-                const athleteFee = (settings.feeType === "by_team_and_athlete_parent" || settings.feeType === "by_individual_self") ? (settings.athleteFee || 0) : 0;
+                const baseAthleteFee = data?.subscription?.totalFee != null 
+                  ? data.subscription.totalFee 
+                  : ((settings.feeType === "by_team_and_athlete_parent" || settings.feeType === "by_individual_self") ? (settings.athleteFee || 0) : 0);
+                const discountAmount = data?.subscription?.discountAmount || 0;
+                const athleteFee = Math.max(0, baseAthleteFee - discountAmount);
+
                 const membershipFee = (settings.requireMembership && data?.membershipStatus === "pending") 
                   ? (data?.organization?.membership_fee_amount || 50) 
                   : 0;
