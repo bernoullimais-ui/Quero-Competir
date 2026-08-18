@@ -5190,7 +5190,7 @@ async function updateSubscriptionPaymentStatus(subId: string, status: 'pending' 
           .from("athlete_subscriptions")
           .select("category_id")
           .eq("tournament_id", tournamentId)
-          .or(`document.eq.${sub?.document || ""},athlete_name.eq.${athleteName || ""}`);
+          .or(`document.eq."${sub?.document || "none"}",athlete_name.eq."${athleteName || "none"}"`);
 
         const catIds = [...new Set((allSubs || []).map((s: any) => s.category_id).filter(Boolean))];
         const { data: cats } = catIds.length > 0

@@ -57929,7 +57929,7 @@ async function updateSubscriptionPaymentStatus(subId, status, sub, tData2, setti
         const { data: tournament } = await supabase.from("tournaments").select("id, name, owner_id").eq("id", tournamentId).maybeSingle();
         const orgId = tournament?.owner_id ? await getOrganizerReferenceIdAndSync(tournament.owner_id) : PRIMARY_ORG_UUID;
         const { data: org } = await supabase.from("organizations").select("whatsapp_tpl_confirmed, utalk_token, utalk_from_phone").eq("id", orgId).maybeSingle();
-        const { data: allSubs } = await supabase.from("athlete_subscriptions").select("category_id").eq("tournament_id", tournamentId).or(`document.eq.${sub?.document || ""},athlete_name.eq.${athleteName || ""}`);
+        const { data: allSubs } = await supabase.from("athlete_subscriptions").select("category_id").eq("tournament_id", tournamentId).or(`document.eq."${sub?.document || "none"}",athlete_name.eq."${athleteName || "none"}"`);
         const catIds = [...new Set((allSubs || []).map((s) => s.category_id).filter(Boolean))];
         const { data: cats } = catIds.length > 0 ? await supabase.from("tournament_categories").select("name").in("id", catIds) : { data: [] };
         await sendConfirmedMessage({
