@@ -60554,28 +60554,9 @@ router6.post("/webhook", async (req, res) => {
       }
       if (sub) {
         console.log(`[Pagar.me Webhook] Inscri\xE7\xE3o de atleta ${sub.id} (${sub.athlete_name}) PAGA com sucesso.`);
-        let updateQuery = supabase.from("athlete_subscriptions").update({ payment_status: "paid" }).eq("tournament_id", sub.tournament_id);
-        if (sub.document) {
-          updateQuery = updateQuery.eq("document", sub.document);
-        } else if (sub.athlete_name) {
-          updateQuery = updateQuery.eq("athlete_name", sub.athlete_name);
-        } else {
-          updateQuery = updateQuery.eq("id", sub.id);
-        }
-        await updateQuery;
-        try {
-          if (import_fs4.default.existsSync(DATA_FILE2)) {
-            const db = JSON.parse(import_fs4.default.readFileSync(DATA_FILE2, "utf-8"));
-            if (db.athleteSubscriptions) {
-              const idx = db.athleteSubscriptions.findIndex((s) => s.id === sub.id);
-              if (idx !== -1) {
-                db.athleteSubscriptions[idx].paymentStatus = "paid";
-                import_fs4.default.writeFileSync(DATA_FILE2, JSON.stringify(db, null, 2));
-              }
-            }
-          }
-        } catch (_) {
-        }
+        const { data: tournament } = await supabase.from("tournaments").select("*").eq("id", sub.tournament_id).maybeSingle();
+        const settings = tournament?.settings || {};
+        await updateSubscriptionPaymentStatus(sub.id, "paid", sub, tournament, settings);
         return res.json({ received: true, status: "updated_athlete_subscription", subId: sub.id });
       }
       try {

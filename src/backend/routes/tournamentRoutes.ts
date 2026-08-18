@@ -5088,7 +5088,7 @@ async function updateSubscriptionAdditionalData(subId: string, additionalData: a
   }
 }
 
-async function updateSubscriptionPaymentStatus(subId: string, status: 'pending' | 'paid', sub: any, tData?: any, settings?: any) {
+export async function updateSubscriptionPaymentStatus(subId: string, status: 'pending' | 'paid', sub: any, tData?: any, settings?: any) {
   try {
     const supabase = getSupabaseAdmin();
     const tournamentId = sub?.tournament_id || sub?.tournamentId;

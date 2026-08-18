@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "../lib/supabase";
 import { requireAuth, requireRole } from "../middleware/auth";
 import fs from "fs";
 import path from "path";
+import { updateSubscriptionPaymentStatus } from "./tournamentRoutes";
 
 const router = Router();
 
@@ -919,34 +920,12 @@ router.post("/webhook", async (req, res) => {
       if (sub) {
         console.log(`[Pagar.me Webhook] Inscrição de atleta ${sub.id} (${sub.athlete_name}) PAGA com sucesso.`);
         
-        let updateQuery = supabase
-          .from("athlete_subscriptions")
-          .update({ payment_status: "paid" })
-          .eq("tournament_id", sub.tournament_id);
+        // Pegar tData e settings para passar ao updateSubscriptionPaymentStatus se possível
+        const { data: tournament } = await supabase.from("tournaments").select("*").eq("id", sub.tournament_id).maybeSingle();
+        const settings = tournament?.settings || {};
 
-        if (sub.document) {
-          updateQuery = updateQuery.eq("document", sub.document);
-        } else if (sub.athlete_name) {
-          updateQuery = updateQuery.eq("athlete_name", sub.athlete_name);
-        } else {
-          updateQuery = updateQuery.eq("id", sub.id);
-        }
-
-        await updateQuery;
-
-        // Fallback local JSON
-        try {
-          if (fs.existsSync(DATA_FILE)) {
-            const db = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
-            if (db.athleteSubscriptions) {
-              const idx = db.athleteSubscriptions.findIndex((s: any) => s.id === sub.id);
-              if (idx !== -1) {
-                db.athleteSubscriptions[idx].paymentStatus = "paid";
-                fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
-              }
-            }
-          }
-        } catch (_) {}
+        // Em vez de atualizar manualmente, usamos a função unificada que lida com WhatsApp, filiações, e fallback
+        await updateSubscriptionPaymentStatus(sub.id, "paid", sub, tournament, settings);
 
         return res.json({ received: true, status: "updated_athlete_subscription", subId: sub.id });
       }
