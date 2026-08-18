@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Palette, Link as LinkIcon, Globe, Image as ImageIcon, Save, Phone, Mail, FileText, ExternalLink, CreditCard } from 'lucide-react';
+import { Building2, Palette, Link as LinkIcon, Globe, Image as ImageIcon, Save, Phone, Mail, FileText, ExternalLink, CreditCard, Webhook } from 'lucide-react';
 import { useToast } from './ui/Toast.tsx';
 import { applyBrandColors } from '../utils/theme';
 import { BankDataTab } from './BankDataTab.tsx';
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<'geral' | 'visual' | 'redes' | 'avancado' | 'bancario'>('geral');
+  const [activeTab, setActiveTab] = useState<'geral' | 'visual' | 'redes' | 'avancado' | 'bancario' | 'integracoes'>('geral');
   const [organizationId, setOrganizationId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -29,6 +29,9 @@ export default function Settings() {
     show_incomplete_brackets: true,
     requires_membership_fee: false,
     membership_fee_amount: 0,
+    utalk_token: '',
+    utalk_from_phone: '',
+    utalk_organization_id: '',
   });
 
   useEffect(() => {
@@ -173,6 +176,15 @@ export default function Settings() {
             >
               <CreditCard size={18} />
               Dados Bancários & Split
+            </button>
+            <button
+              onClick={() => setActiveTab('integracoes')}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'integracoes' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <Webhook size={18} />
+              Integrações
             </button>
           </nav>
         </div>
@@ -374,6 +386,62 @@ export default function Settings() {
 
           {activeTab === 'bancario' && (
             <BankDataTab organizationId={organizationId} />
+          )}
+
+          {activeTab === 'integracoes' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-semibold text-gray-900 border-b border-gray-100 pb-4 flex items-center gap-2">
+                <Webhook size={24} className="text-indigo-600" />
+                Integrações
+              </h2>
+              
+              <div className="bg-emerald-50 rounded-xl p-6 border border-emerald-100 space-y-4">
+                <div>
+                  <h3 className="text-emerald-800 font-bold text-lg mb-1">WhatsApp Automático (uTalk)</h3>
+                  <p className="text-emerald-700 text-sm">Configure o disparo de mensagens para notificar os atletas sobre suas inscrições e chaves PIX. Se não preenchido, será utilizado o número genérico da plataforma (se configurado).</p>
+                </div>
+
+                <div className="space-y-4 pt-2">
+                  <div>
+                    <label className="block text-sm font-medium text-emerald-900 mb-1">Token da API (UTALK_TOKEN)</label>
+                    <input 
+                      type="text" 
+                      name="utalk_token" 
+                      value={formData.utalk_token || ''} 
+                      onChange={handleChange} 
+                      placeholder="Ex: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." 
+                      className="w-full px-4 py-2 border border-emerald-200 bg-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono text-sm" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-emerald-900 mb-1">Telefone Disparador (UTALK_FROM_PHONE)</label>
+                      <input 
+                        type="text" 
+                        name="utalk_from_phone" 
+                        value={formData.utalk_from_phone || ''} 
+                        onChange={handleChange} 
+                        placeholder="Ex: 5511999999999" 
+                        className="w-full px-4 py-2 border border-emerald-200 bg-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" 
+                      />
+                      <p className="text-[11px] text-emerald-600 mt-1">Apenas números, com DDI (55) e DDD.</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-emerald-900 mb-1">ID da Organização uTalk (UTALK_ORGANIZATION_ID)</label>
+                      <input 
+                        type="text" 
+                        name="utalk_organization_id" 
+                        value={formData.utalk_organization_id || ''} 
+                        onChange={handleChange} 
+                        placeholder="Ex: org_123456" 
+                        className="w-full px-4 py-2 border border-emerald-200 bg-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
           )}
         </div>
       </div>
