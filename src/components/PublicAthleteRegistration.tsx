@@ -1471,7 +1471,12 @@ export default function PublicAthleteRegistration() {
                           type="text" 
                           placeholder="MM/AA"
                           value={simulatedCard.expiry}
-                          onChange={e => setSimulatedCard({...simulatedCard, expiry: e.target.value})}
+                          onChange={e => {
+                            const val = e.target.value.replace(/\D/g, "");
+                            let formatted = val;
+                            if (val.length > 2) formatted = val.substring(0, 2) + "/" + val.substring(2, 4);
+                            setSimulatedCard({...simulatedCard, expiry: formatted.substring(0, 5)});
+                          }}
                           className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-center focus:border-indigo-500"
                         />
                       </div>

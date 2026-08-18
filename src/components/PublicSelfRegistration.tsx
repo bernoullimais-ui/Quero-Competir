@@ -104,6 +104,7 @@ export default function PublicSelfRegistration() {
   // Step 1 — Athlete
   const [athleteName, setAthleteName] = useState("");
   const [birthDate, setBirthDate] = useState("");
+  const [birthDateInput, setBirthDateInput] = useState("");
   const [docNum, setDocNum] = useState("");
   const [gender, setGender] = useState("Masculino");
   const [bloodType, setBloodType] = useState("O+");
@@ -491,7 +492,19 @@ export default function PublicSelfRegistration() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Data de Nascimento *</label>
-                      <input type="date" value={birthDate} max={new Date().toISOString().split("T")[0]} onChange={e => setBirthDate(e.target.value)}
+                      <input type="tel" placeholder="DD/MM/AAAA" value={birthDateInput} onChange={e => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        let formatted = val;
+                        if (val.length > 2) formatted = val.substring(0, 2) + "/" + val.substring(2);
+                        if (val.length > 4) formatted = val.substring(0, 2) + "/" + val.substring(2, 4) + "/" + val.substring(4, 8);
+                        setBirthDateInput(formatted);
+                        if (formatted.length === 10) {
+                          const [d, m, y] = formatted.split("/");
+                          setBirthDate(`${y}-${m}-${d}`);
+                        } else {
+                          setBirthDate("");
+                        }
+                      }}
                         className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 focus:border-indigo-400" />
                       {age !== null && (
                         <p className={`text-xs font-semibold mt-1 ${isAdult ? "text-emerald-600" : "text-indigo-600"}`}>
