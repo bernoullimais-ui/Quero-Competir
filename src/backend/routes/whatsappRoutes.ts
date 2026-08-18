@@ -144,14 +144,33 @@ router.post("/broadcast", requireAuth, async (req, res) => {
     return true;
   });
 
+  // Busca nomes das categorias
+  const allCategoryIds = new Set<string>();
+  for (const sub of targets) {
+    if (Array.isArray(sub.category_id)) sub.category_id.forEach((id: string) => allCategoryIds.add(id));
+    else if (sub.category_id) allCategoryIds.add(sub.category_id);
+  }
+  
+  const categoryNamesMap: Record<string, string> = {};
+  if (allCategoryIds.size > 0) {
+    const { data: catData } = await supabase
+      .from('tournament_categories')
+      .select('id, name')
+      .in('id', Array.from(allCategoryIds));
+    if (catData) {
+      catData.forEach((c: any) => categoryNamesMap[c.id] = c.name);
+    }
+  }
+
   let sent = 0;
   let errors = 0;
 
   for (const sub of targets) {
     const phone = sub.parent_phone || sub.additional_data?.phone;
-    const provas = Array.isArray(sub.category_id) 
-      ? sub.category_id.join(", ") 
-      : (sub.category_id || "");
+    
+    const provasIds = Array.isArray(sub.category_id) ? sub.category_id : (sub.category_id ? [sub.category_id] : []);
+    const provas = provasIds.map((id: string) => categoryNamesMap[id] || id).join(", ");
+    
     const fee = sub.additional_data?.athleteFee || sub.additional_data?.totalFee || 0;
     const valor = fee > 0 ? `R$ ${Number(fee).toFixed(2)}` : "Gratuita";
     const link = `https://querocompetir.com.br/torneios/${finalTournamentId}`;
