@@ -54247,7 +54247,7 @@ async function sendPreRegistrationMessage(params) {
     torneio: params.tournamentName,
     nome_atleta: params.athleteName,
     provas: params.categoryNames.join(", "),
-    valor: params.totalFee > 0 ? `R$ ${params.totalFee.toFixed(2)}` : "Gratuita",
+    valor: params.discountAmount && params.discountAmount > 0 && params.finalFee !== void 0 ? `R$ ${params.finalFee.toFixed(2)} (Valor Original: R$ ${params.totalFee.toFixed(2)} | Desconto: R$ ${params.discountAmount.toFixed(2)})` : params.totalFee > 0 ? `R$ ${params.totalFee.toFixed(2)}` : "Gratuita",
     pix_block: pixBlock,
     link: params.paymentLink || "",
     pix: params.pixCopyPaste || ""
@@ -57058,6 +57058,8 @@ router2.post("/:id/self-register", async (req, res) => {
           orgId,
           categoryNames,
           totalFee,
+          finalFee,
+          discountAmount: couponDiscountAmount,
           paymentLink: pixLink,
           orgTemplate: org?.whatsapp_tpl_pre_registration
         });

@@ -3960,6 +3960,8 @@ router.post("/:id/self-register", async (req, res) => {
           orgId: orgId,
           categoryNames,
           totalFee,
+          finalFee,
+          discountAmount: couponDiscountAmount,
           paymentLink: pixLink,
           orgTemplate: org?.whatsapp_tpl_pre_registration,
         });
