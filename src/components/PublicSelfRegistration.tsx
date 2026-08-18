@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   User, Calendar, FileText, Building2, Trophy, Heart, Upload,
   Shield, CheckCircle2, AlertCircle, ChevronRight,
-  ChevronLeft, Eye, EyeOff, Lock, Mail, Loader2, Check, Info, UserCheck
+  ChevronLeft, Eye, EyeOff, Lock, Mail, Loader2, Check, Info, UserCheck,
+  Ticket, Tag, X
 } from "lucide-react";
 import { useToast } from "./ui/Toast.tsx";
 
@@ -253,8 +254,7 @@ export default function PublicSelfRegistration() {
         body: JSON.stringify({ code: couponCode, categoryIds: selectedCategoryIds })
       });
       const data = await res.json();
-      if (data.valid) {
-        // Map camelCase from backend if it returns that, or fallback to snake_case if we fix backend
+      if (data.valid && data.coupon) {
         setAppliedCoupon({
           ...data.coupon,
           discount_type: data.coupon.discountType || data.coupon.discount_type,
