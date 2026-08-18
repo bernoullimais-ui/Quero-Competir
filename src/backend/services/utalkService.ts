@@ -17,7 +17,9 @@ const DEFAULT_TPL_CONFIRMED = `✅ *Inscrição Confirmada!*
 
 📋 *Prova(s):* {provas}
 🆔 *Protocolo:* {protocolo}
-🎟️ *Sua Credencial Digital:* {link_credencial}
+
+Segue link para a credencial de participação que deve ser apresentada na chegada ao evento através do smartphone ou impressa:
+🎟️ {link_credencial}
 
 Boa sorte e bom evento! 💪🏊`;
 
