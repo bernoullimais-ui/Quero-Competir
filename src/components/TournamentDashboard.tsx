@@ -111,6 +111,7 @@ import { TrendingUp, MessageSquare, ShieldCheck } from "lucide-react";
 import { useToast } from "./ui/Toast.tsx";
 import { useConfirm } from "./ui/ConfirmDialog.tsx";
 import CategoriesTab from "./CategoriesTab.tsx";
+import { CouponsTab } from "./CouponsTab";
 import SubscriptionsTab from "./SubscriptionsTab.tsx";
 import TournamentSettingsTab from "./TournamentSettingsTab.tsx";
 import MatchModal from "./MatchModal.tsx";
@@ -354,6 +355,7 @@ export default function TournamentDashboard() {
 
   const loading = tLoading || cLoading || rLoading;
   const [activeTab, setActiveTab] = useState<Tab>("geral");
+  const [activeFinanceTab, setActiveFinanceTab] = useState<"pagamentos" | "cupons">("pagamentos");
   const [isSavingVisibility, setIsSavingVisibility] = useState(false);
   const [showBracketsPubliclyState, setShowBracketsPubliclyState] = useState<boolean>(true);
 
@@ -1915,12 +1917,34 @@ export default function TournamentDashboard() {
 
         {activeTab === "financeiro" && (
           <div className="space-y-8 animate-in fade-in duration-300">
-            {/* Header & Filter */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-              <div>
-                <h3 className="text-xl font-bold text-slate-800">Controle Financeiro</h3>
-                <p className="text-slate-500 text-sm">Gerencie o pagamento das taxas de inscrição de equipes e atletas.</p>
-              </div>
+            {/* Financeiro Sub-tabs */}
+            <div className="flex border-b border-slate-200">
+              <button
+                onClick={() => setActiveFinanceTab("pagamentos")}
+                className={`px-6 py-4 text-sm font-bold border-b-2 transition-colors ${
+                  activeFinanceTab === "pagamentos" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                💰 Pagamentos
+              </button>
+              <button
+                onClick={() => setActiveFinanceTab("cupons")}
+                className={`px-6 py-4 text-sm font-bold border-b-2 transition-colors ${
+                  activeFinanceTab === "cupons" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                🏷️ Cupons de Desconto
+              </button>
+            </div>
+
+            {activeFinanceTab === "pagamentos" && (
+              <>
+                {/* Header & Filter */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800">Controle Financeiro</h3>
+                    <p className="text-slate-500 text-sm">Gerencie o pagamento das taxas de inscrição de equipes e atletas.</p>
+                  </div>
               
               <div className="flex items-center gap-3">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Filtrar por Entidade:</span>
@@ -2421,6 +2445,19 @@ export default function TournamentDashboard() {
                 </>
               );
             })()}
+              </>
+            )}
+
+            {activeFinanceTab === "cupons" && (
+              <ErrorBoundary fallback={<div className="p-8 text-center text-red-500 font-bold bg-white rounded-2xl shadow-sm border border-red-100">Erro ao carregar cupons.</div>}>
+                <CouponsTab 
+                  tournamentId={id!} 
+                  athleteSubs={athleteSubs} 
+                  registrations={registrations} 
+                  categories={categories} 
+                />
+              </ErrorBoundary>
+            )}
           </div>
         )}
 

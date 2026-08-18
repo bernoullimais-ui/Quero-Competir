@@ -138,6 +138,12 @@ export default function PublicSelfRegistration() {
   const [guardianToken, setGuardianToken] = useState<string | null>(null);
   const [athleteFee, setAthleteFee] = useState(0);
 
+  // Coupon
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+
   useEffect(() => {
     if (!tournamentId) return;
     fetch(`/api/tournaments/${tournamentId}/public-settings`)
@@ -226,6 +232,35 @@ export default function PublicSelfRegistration() {
     if (idx > 0) setStep(order[idx - 1]);
   };
 
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim() || selectedCategoryIds.length === 0) return;
+    setValidatingCoupon(true);
+    setCouponError(null);
+    try {
+      const res = await fetch(`/api/tournaments/${tournamentId}/validate-coupon`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponCode, categoryIds: selectedCategoryIds })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppliedCoupon(data.data);
+      } else {
+        setCouponError(data.error || "Cupom inválido");
+      }
+    } catch (err) {
+      setCouponError("Erro ao validar cupom.");
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setCouponError(null);
+  };
+
   const handleSubmit = async () => {
     setStep("submitting");
     setSubmitError(null);
@@ -246,6 +281,7 @@ export default function PublicSelfRegistration() {
           liabilityWaiver: true,
           acceptedTerms,
           isSelfGuardian,
+          couponCode: appliedCoupon?.code || undefined,
           additionalData: { bloodType, allergies, emergencyContact, seedTimes },
         })
       });
@@ -808,6 +844,63 @@ export default function PublicSelfRegistration() {
                     <span className="font-bold text-slate-700">{isSelfGuardian ? athleteName + " (próprio atleta)" : parentName}</span>
                   </div>
                 </div>
+
+                {/* Coupon Input */}
+                {totalAthleteFee > 0 && (
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Cupom de Desconto</label>
+                    {appliedCoupon ? (
+                      <div className="flex items-center justify-between bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Ticket size={18} className="text-emerald-600" />
+                          <div>
+                            <p className="text-sm font-bold text-emerald-800">{appliedCoupon.code}</p>
+                            <p className="text-xs text-emerald-600">
+                              Desconto de {appliedCoupon.discount_type === "percent" ? `${appliedCoupon.discount_value}%` : `R$ ${Number(appliedCoupon.discount_value).toFixed(2)}`}
+                            </p>
+                          </div>
+                        </div>
+                        <button onClick={handleRemoveCoupon} className="p-1.5 hover:bg-emerald-100 rounded-lg text-emerald-600 transition-colors">
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={couponCode}
+                          onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                          placeholder="Código do cupom"
+                          className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:border-indigo-500 outline-none transition-colors uppercase"
+                        />
+                        <button
+                          onClick={handleApplyCoupon}
+                          disabled={!couponCode.trim() || validatingCoupon}
+                          className="px-6 py-3 bg-slate-800 text-white font-bold text-sm rounded-xl hover:bg-slate-900 transition-colors disabled:opacity-50"
+                        >
+                          {validatingCoupon ? "Aplicando..." : "Aplicar"}
+                        </button>
+                      </div>
+                    )}
+                    {couponError && <p className="text-rose-500 text-xs font-semibold mt-2">{couponError}</p>}
+                    
+                    {/* Final Fee calculation display if coupon applied */}
+                    {appliedCoupon && (
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
+                        <span className="text-sm font-bold text-slate-600">Total com desconto:</span>
+                        <span className="text-lg font-black text-emerald-600">
+                          {(() => {
+                            const discount = appliedCoupon.discount_type === "percent" 
+                              ? totalAthleteFee * (appliedCoupon.discount_value / 100)
+                              : Number(appliedCoupon.discount_value);
+                            const finalFee = Math.max(0, totalAthleteFee - discount);
+                            return finalFee > 0 ? `R$ ${finalFee.toFixed(2)}` : "Gratuito";
+                          })()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Termos dinâmicos configurados no Torneio */}
                 {(() => {
