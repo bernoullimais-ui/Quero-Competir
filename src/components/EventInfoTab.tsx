@@ -31,19 +31,26 @@ export interface Sponsor {
   title: string;
 }
 
+export interface Attachment {
+  title: string;
+  url: string;
+}
+
 interface ParsedDesc {
   description: string;
   photos: string[];
   bannerUrl: string;
   sponsors: Sponsor[];
+  attachments: Attachment[];
 }
 
 function parseDescription(raw?: string): ParsedDesc {
-  if (!raw) return { description: "", photos: [], bannerUrl: "", sponsors: [] };
+  if (!raw) return { description: "", photos: [], bannerUrl: "", sponsors: [], attachments: [] };
   let description = raw;
   let photos: string[] = [];
   let bannerUrl = "";
   let sponsors: Sponsor[] = [];
+  let attachments: Attachment[] = [];
 
   const photosRegex = /<!--OFFICIAL_PHOTOS:(.*?)-->/;
   const photosMatch = raw.match(photosRegex);
@@ -65,10 +72,18 @@ function parseDescription(raw?: string): ParsedDesc {
     } catch(e){}
   }
 
+  const attachmentsRegex = /<!--ATTACHMENTS:(.*?)-->/;
+  const attachmentsMatch = raw.match(attachmentsRegex);
+  if (attachmentsMatch) {
+    try {
+      attachments = JSON.parse(attachmentsMatch[1]);
+    } catch(e){}
+  }
+
   // Completely remove ALL metadata HTML comments (<!--...-->) from displayed description text
   const cleanDescription = description.replace(/<!--[\s\S]*?-->/g, "").trim();
 
-  return { description: cleanDescription, photos, bannerUrl, sponsors };
+  return { description: cleanDescription, photos, bannerUrl, sponsors, attachments };
 }
 
 export default function EventInfoTab({ tournament, categories }: EventInfoTabProps) {
@@ -181,15 +196,40 @@ export default function EventInfoTab({ tournament, categories }: EventInfoTabPro
               <Sparkles className="text-indigo-600" size={20} /> Sobre o Evento
             </h2>
             {parsedDesc.description ? (
-              <div className="text-slate-650 text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-medium">
-                {parsedDesc.description}
-              </div>
+              <div 
+                className="prose prose-sm sm:prose-base prose-indigo max-w-none prose-p:leading-relaxed prose-headings:font-black prose-a:text-indigo-600 prose-a:no-underline hover:prose-a:underline"
+                dangerouslySetInnerHTML={{ __html: parsedDesc.description }}
+              />
             ) : (
               <p className="text-slate-400 text-sm italic">
                 Nenhuma descrição disponível para este torneio. Jogue com garra, respeito e aproveite a competição ao máximo!
               </p>
             )}
           </div>
+
+          {/* Anexos / Documentos (Optional) */}
+          {parsedDesc.attachments && parsedDesc.attachments.length > 0 && (
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-2 h-full bg-emerald-500"></div>
+              <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-4">
+                <FileText className="text-emerald-500" size={20} /> Documentos e Anexos
+              </h2>
+              <div className="flex flex-wrap gap-3">
+                {parsedDesc.attachments.map((att, idx) => (
+                  <a
+                    key={idx}
+                    href={att.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 transition-all text-sm font-bold text-slate-700 group shadow-sm"
+                  >
+                    <Download size={16} className="text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                    {att.title || "Documento"}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Modalities/Categories Section */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm">

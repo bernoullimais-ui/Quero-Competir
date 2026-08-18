@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient.ts";
 import SwimmingBalizamento from "./SwimmingBalizamento.tsx";
+import ReactQuill from "react-quill-new";
+import "react-quill-new/dist/quill.snow.css";
 import StaffManagement from "./StaffManagement.tsx";
 
 export const getSportIcon = (sportName: string, size = 24) => {
@@ -125,6 +127,11 @@ export interface Sponsor {
   title: string;
 }
 
+export interface Attachment {
+  title: string;
+  url: string;
+}
+
 interface ParsedDesc {
   description: string;
   photos: string[];
@@ -133,6 +140,7 @@ interface ParsedDesc {
   location: string;
   sponsors: Sponsor[];
   collectSeedTime: boolean;
+  attachments: Attachment[];
 }
 
 function parseDescription(raw?: string): ParsedDesc {
@@ -178,6 +186,16 @@ function parseDescription(raw?: string): ParsedDesc {
     } catch(e){}
   }
 
+  let attachments: Attachment[] = [];
+  const attachmentsRegex = /<!--ATTACHMENTS:(.*?)-->/;
+  const attachmentsMatch = raw.match(attachmentsRegex);
+  if (attachmentsMatch && attachmentsMatch[1]) {
+    try {
+      const parsed = JSON.parse(attachmentsMatch[1]);
+      if (Array.isArray(parsed)) attachments = parsed;
+    } catch(e){}
+  }
+
   const seedTimeRegex = /<!--COLLECT_SEED_TIME:(.*?)-->/;
   const seedTimeMatch = raw.match(seedTimeRegex);
   let collectSeedTime = true;
@@ -194,11 +212,12 @@ function parseDescription(raw?: string): ParsedDesc {
     eventTime: eventTime || "",
     location: location || "",
     sponsors: Array.isArray(sponsors) ? sponsors : [],
-    collectSeedTime
+    collectSeedTime,
+    attachments: Array.isArray(attachments) ? attachments : []
   };
 }
 
-function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string, eventTime?: string, location?: string, sponsors?: Sponsor[], collectSeedTime: boolean = true): string {
+function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string, eventTime?: string, location?: string, sponsors?: Sponsor[], collectSeedTime: boolean = true, attachments?: Attachment[]): string {
   let result = (cleanDesc || "").replace(/<!--[\s\S]*?-->/g, "").trim();
   const filtered = photos.map(p => p.trim()).filter(Boolean);
   if (filtered.length > 0) {
@@ -215,6 +234,9 @@ function buildDescription(cleanDesc: string, photos: string[], bannerUrl: string
   }
   if (sponsors && sponsors.length > 0) {
     result += `\n\n<!--SPONSORS:${JSON.stringify(sponsors)}-->`;
+  }
+  if (attachments && attachments.length > 0) {
+    result += `\n\n<!--ATTACHMENTS:${JSON.stringify(attachments)}-->`;
   }
   if (collectSeedTime !== undefined) {
     result += `\n\n<!--COLLECT_SEED_TIME:${collectSeedTime ? "true" : "false"}-->`;
@@ -383,7 +405,8 @@ export default function TournamentDashboard() {
     location: "",
     event_time: "",
     photos: [] as string[],
-    sponsors: [] as Sponsor[]
+    sponsors: [] as Sponsor[],
+    attachments: [] as Attachment[]
   });
   const [savingTournament, setSavingTournament] = useState(false);
 
@@ -402,7 +425,8 @@ export default function TournamentDashboard() {
         event_time: tournament.event_time || parsed.eventTime || "",
         photos: initialPhotos,
         sponsors: parsed.sponsors || [],
-        collect_seed_time: parsed.collectSeedTime ?? true
+        collect_seed_time: parsed.collectSeedTime ?? true,
+        attachments: parsed.attachments || []
       });
     }
   }, [tournament]);
@@ -431,6 +455,24 @@ export default function TournamentDashboard() {
     setEditForm({ ...editForm, sponsors: updated });
   };
 
+  const handleAddAttachment = () => {
+    setEditForm({
+      ...editForm,
+      attachments: [...editForm.attachments, { title: "", url: "" }]
+    });
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    const updated = editForm.attachments.filter((_, i) => i !== index);
+    setEditForm({ ...editForm, attachments: updated });
+  };
+
+  const handleAttachmentChange = (index: number, field: keyof Attachment, value: string) => {
+    const updated = [...editForm.attachments];
+    updated[index] = { ...updated[index], [field]: value };
+    setEditForm({ ...editForm, attachments: updated });
+  };
+
   const handleSaveTournamentDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingTournament(true);
@@ -442,7 +484,8 @@ export default function TournamentDashboard() {
         editForm.event_time,
         editForm.location,
         editForm.sponsors,
-        editForm.collect_seed_time
+        editForm.collect_seed_time,
+        editForm.attachments
       );
       const res = await fetch(`/api/tournaments/${id}`, {
         method: "PATCH",
@@ -1545,17 +1588,92 @@ export default function TournamentDashboard() {
                       )}
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-505 uppercase tracking-wider mb-1">
+                    <div className="flex flex-col gap-1">
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                         Descrição / Regulamento
                       </label>
-                      <textarea
-                        rows={3}
-                        value={editForm.description}
-                        onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                        placeholder="Descreva as principais regras, regulamentos e informações do evento..."
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900 text-sm leading-relaxed"
-                      />
+                      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                        <ReactQuill
+                          theme="snow"
+                          value={editForm.description}
+                          onChange={(val) => setEditForm({ ...editForm, description: val })}
+                          modules={{
+                            toolbar: [
+                              [{ 'header': [1, 2, false] }],
+                              ['bold', 'italic', 'underline'],
+                              [{ 'color': [] }, { 'background': [] }],
+                              [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                              ['link'],
+                              ['clean']
+                            ]
+                          }}
+                          className="w-full text-slate-900 text-sm leading-relaxed"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Documentos e Anexos */}
+                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/60 space-y-3.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="block text-xs font-black text-slate-700 uppercase tracking-wider">
+                            📎 Documentos e Anexos
+                          </span>
+                          <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                            Adicione links para regulamentos, termos de responsabilidade ou formulários.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAddAttachment}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-indigo-600 border border-slate-200 rounded-lg text-[11px] font-bold hover:bg-indigo-50 hover:border-indigo-200 transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Adicionar Anexo
+                        </button>
+                      </div>
+
+                      {editForm.attachments.length === 0 ? (
+                        <div className="text-center py-4 bg-white rounded-xl border border-dashed border-slate-200">
+                          <p className="text-xs text-slate-400 font-medium">Nenhum anexo adicionado ainda.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {editForm.attachments.map((att, idx) => (
+                            <div key={idx} className="flex gap-3 bg-white p-3 rounded-xl border border-slate-200 items-start">
+                              <div className="flex-1 space-y-2">
+                                <div>
+                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Título do Documento</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Ex: Regulamento Oficial"
+                                    value={att.title}
+                                    onChange={(e) => handleAttachmentChange(idx, "title", e.target.value)}
+                                    className="w-full text-sm border-b border-slate-200 px-1 py-1 focus:outline-none focus:border-indigo-400"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Link (URL)</label>
+                                  <input
+                                    type="url"
+                                    placeholder="https://..."
+                                    value={att.url}
+                                    onChange={(e) => handleAttachmentChange(idx, "url", e.target.value)}
+                                    className="w-full text-sm border-b border-slate-200 px-1 py-1 focus:outline-none focus:border-indigo-400"
+                                  />
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAttachment(idx)}
+                                className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors mt-2"
+                                title="Remover anexo"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Galeria de Fotos oficial do Evento */}
