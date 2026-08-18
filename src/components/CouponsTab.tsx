@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Plus, Trash2, Copy, Check, Ticket, DollarSign, Percent, CheckCircle2, AlertCircle, X, Search } from "lucide-react";
-import { useAuth } from "../contexts/AuthContext";
 
 interface Coupon {
   id: string;
@@ -24,7 +23,14 @@ interface CouponsTabProps {
 }
 
 export function CouponsTab({ tournamentId, athleteSubs, registrations, categories }: CouponsTabProps) {
-  const { token } = useAuth();
+  const token = React.useMemo(() => {
+    try {
+      const savedUser = localStorage.getItem("currentUser");
+      if (savedUser) return JSON.parse(savedUser).token;
+    } catch {}
+    return null;
+  }, []);
+
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<"list" | "history">("list");
