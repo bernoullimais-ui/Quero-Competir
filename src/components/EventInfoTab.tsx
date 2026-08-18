@@ -257,7 +257,7 @@ export default function EventInfoTab({ tournament, categories }: EventInfoTabPro
                 if (isSwimming) {
                   const uniqueProvas = Array.from(new Set(categories.map(c => 
                     c.name.replace(/natação\s*-\s*/i, "").replace(/natacao\s*-\s*/i, "").trim()
-                  ))).sort((a,b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+                  )));
 
                   const uniqueAges = Array.from(new Set(categories.map(c => c.age_group).filter(Boolean))).sort((a, b) => {
                     const numA = parseInt(a!.replace(/\D/g, '')) || 0;
