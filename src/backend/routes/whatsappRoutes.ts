@@ -237,17 +237,6 @@ router.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
     .eq("id", tournament.owner_id)
     .maybeSingle();
 
-  let query = supabase
-    .from("athlete_subscriptions")
-    .select("id, athlete_name, parent_phone, additional_data, payment_status, category_id")
-    .eq("tournament_id", finalTournamentId)
-    .neq("payment_status", "paid");
-
-  if (subId) query = query.eq("id", subId);
-
-  const { data: subs } = await query;
-  if (!subs || subs.length === 0) return res.json({ success: true, sent: 0 });
-
   // Busca nomes das categorias
   const allCategoryIds = new Set<string>();
   for (const sub of subs) {
@@ -266,15 +255,35 @@ router.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
     }
   }
 
-  let sent = 0;
+  const groupedSubs = new Map<string, any[]>();
   for (const sub of subs) {
     const phone = sub.parent_phone || sub.additional_data?.phone;
     if (!phone) continue;
+    const key = `${phone}_${sub.athlete_name}`;
+    if (!groupedSubs.has(key)) groupedSubs.set(key, []);
+    groupedSubs.get(key)!.push(sub);
+  }
 
-    const provasIds = Array.isArray(sub.category_id) ? sub.category_id : (sub.category_id ? [sub.category_id] : []);
-    const categoryNames = provasIds.map((id: string) => categoryNamesMap[id] || id);
-    const fee = sub.additional_data?.athleteFee || sub.additional_data?.totalFee || 0;
-    const paymentLink = `https://querocompetir.com.br/public/payment/${sub.id}`;
+  let sent = 0;
+  for (const group of groupedSubs.values()) {
+    const sub = group[0];
+    const phone = sub.parent_phone || sub.additional_data?.phone;
+
+    let allProvasIds: string[] = [];
+    let totalFee = 0;
+    let totalDiscount = 0;
+    for(const s of group) {
+      const pIds = Array.isArray(s.category_id) ? s.category_id : (s.category_id ? [s.category_id] : []);
+      allProvasIds.push(...pIds);
+      const fee = s.additional_data?.athleteFee || s.additional_data?.totalFee || 0;
+      totalFee += fee;
+      totalDiscount += s.discount_amount || 0;
+    }
+    allProvasIds = [...new Set(allProvasIds)];
+
+    const categoryNames = allProvasIds.map((id: string) => categoryNamesMap[id] || id);
+    const finalFee = Math.max(0, totalFee - totalDiscount);
+    const paymentLink = `https://querocompetir.com.br/public/register-athlete/${sub.id}`;
     const pixCopyPaste = sub.additional_data?.pixCopyPaste || undefined;
 
     await sendCartRecoveryMessage({
@@ -284,21 +293,23 @@ router.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
       tournamentId,
       orgId: tournament.owner_id,
       categoryNames,
-      totalFee: fee,
+      totalFee: totalFee,
+      discountAmount: totalDiscount,
+      finalFee: finalFee,
       paymentLink,
       pixCopyPaste,
       orgTemplate: org?.whatsapp_tpl_pre_registration,
       sentBy: "organizer_manual",
     });
-
-    // Marca que lembrete foi enviado
-    await supabase
-      .from("athlete_subscriptions")
-      .update({
-        whatsapp_cart_recovery_sent: true,
-        whatsapp_cart_recovery_sent_at: new Date().toISOString(),
-      })
-      .eq("id", sub.id);
+    for (const s of group) {
+      await supabase
+        .from("athlete_subscriptions")
+        .update({
+          whatsapp_cart_recovery_sent: true,
+          whatsapp_cart_recovery_sent_at: new Date().toISOString(),
+        })
+        .eq("id", s.id);
+    }
 
     sent++;
     await new Promise(r => setTimeout(r, 300));
@@ -339,7 +350,7 @@ router.all("/cron-cart-recovery", async (req, res) => {
 
   const { data: subs } = await supabase
     .from("athlete_subscriptions")
-    .select("id, athlete_name, parent_phone, additional_data, tournament_id, category_id, payment_status")
+    .select("id, athlete_name, parent_phone, additional_data, tournament_id, category_id, payment_status, discount_amount")
     .neq("payment_status", "paid")
     .eq("whatsapp_cart_recovery_sent", false)
     .gte("created_at", twentyFourHoursAgo)
@@ -377,18 +388,38 @@ router.all("/cron-cart-recovery", async (req, res) => {
     }
   }
 
-  let processed = 0;
+  const groupedSubs = new Map<string, any[]>();
   for (const sub of subs) {
     const phone = sub.parent_phone || sub.additional_data?.phone;
     if (!phone) continue;
+    const key = `${sub.tournament_id}_${phone}_${sub.athlete_name}`;
+    if (!groupedSubs.has(key)) groupedSubs.set(key, []);
+    groupedSubs.get(key)!.push(sub);
+  }
+
+  let processed = 0;
+  for (const group of groupedSubs.values()) {
+    const sub = group[0];
+    const phone = sub.parent_phone || sub.additional_data?.phone;
 
     const tournament = tMap[sub.tournament_id];
     if (!tournament) continue;
 
-    const provasIds = Array.isArray(sub.category_id) ? sub.category_id : (sub.category_id ? [sub.category_id] : []);
-    const categoryNames = provasIds.map((id: string) => categoryNamesMap[id] || id);
-    const fee = sub.additional_data?.athleteFee || sub.additional_data?.totalFee || 0;
-    const paymentLink = `https://querocompetir.com.br/public/payment/${sub.id}`;
+    let allProvasIds: string[] = [];
+    let totalFee = 0;
+    let totalDiscount = 0;
+    for(const s of group) {
+      const pIds = Array.isArray(s.category_id) ? s.category_id : (s.category_id ? [s.category_id] : []);
+      allProvasIds.push(...pIds);
+      const fee = s.additional_data?.athleteFee || s.additional_data?.totalFee || 0;
+      totalFee += fee;
+      totalDiscount += s.discount_amount || 0;
+    }
+    allProvasIds = [...new Set(allProvasIds)];
+
+    const categoryNames = allProvasIds.map((id: string) => categoryNamesMap[id] || id);
+    const finalFee = Math.max(0, totalFee - totalDiscount);
+    const paymentLink = `https://querocompetir.com.br/public/register-athlete/${sub.id}`;
     const pixCopyPaste = sub.additional_data?.pixCopyPaste || undefined;
 
     await sendCartRecoveryMessage({
@@ -398,19 +429,23 @@ router.all("/cron-cart-recovery", async (req, res) => {
       tournamentId: sub.tournament_id,
       orgId: tournament.owner_id,
       categoryNames,
-      totalFee: fee,
+      totalFee: totalFee,
+      discountAmount: totalDiscount,
+      finalFee: finalFee,
       paymentLink,
       pixCopyPaste,
       sentBy: "cron",
     });
 
-    await supabase
-      .from("athlete_subscriptions")
-      .update({
-        whatsapp_cart_recovery_sent: true,
-        whatsapp_cart_recovery_sent_at: new Date().toISOString(),
-      })
-      .eq("id", sub.id);
+    for (const s of group) {
+      await supabase
+        .from("athlete_subscriptions")
+        .update({
+          whatsapp_cart_recovery_sent: true,
+          whatsapp_cart_recovery_sent_at: new Date().toISOString(),
+        })
+        .eq("id", s.id);
+    }
 
     processed++;
     await new Promise(r => setTimeout(r, 200));
