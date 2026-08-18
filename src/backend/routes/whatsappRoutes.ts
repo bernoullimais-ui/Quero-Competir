@@ -301,7 +301,7 @@ router.get("/logs/:tournamentId", requireAuth, async (req, res) => {
 // ── POST /api/whatsapp/cron-cart-recovery ────────────────────────────────────
 // Chamado pelo Vercel Cron a cada hora. Envia lembrete para pré-inscrições
 // com mais de 2h de vida sem pagamento e sem lembrete enviado (limite 24h para não reviver inscrições muito antigas).
-router.post("/cron-cart-recovery", async (req, res) => {
+router.all("/cron-cart-recovery", async (req, res) => {
   const cronSecret = req.headers["x-cron-secret"] || req.headers.authorization;
   if (process.env.CRON_SECRET && cronSecret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
