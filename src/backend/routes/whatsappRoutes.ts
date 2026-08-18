@@ -68,7 +68,7 @@ router.post("/broadcast", requireAuth, async (req, res) => {
   // Busca torneio e org para credenciais
   const { data: tournament } = await supabase
     .from("tournaments")
-    .select("id, name, organization_id")
+    .select("id, name, owner_id")
     .eq("id", finalTournamentId)
     .maybeSingle();
 
@@ -89,7 +89,7 @@ router.post("/broadcast", requireAuth, async (req, res) => {
       message: personalizedMessage,
       media: mediaUrl,
       mediaName,
-      orgId: tournament.organization_id,
+      orgId: tournament.owner_id,
       tournamentId: finalTournamentId,
       messageType: "broadcast",
       athleteName: recipientName || "Contato Avulso",
@@ -154,7 +154,7 @@ router.post("/broadcast", requireAuth, async (req, res) => {
       message: personalizedMessage,
       media: mediaUrl,
       mediaName,
-      orgId: tournament.organization_id,
+      orgId: tournament.owner_id,
       tournamentId,
       messageType: "broadcast",
       athleteName: sub.athlete_name,
@@ -191,7 +191,7 @@ router.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
 
   const { data: tournament } = await supabase
     .from("tournaments")
-    .select("id, name, organization_id")
+    .select("id, name, owner_id")
     .eq("id", finalTournamentId)
     .maybeSingle();
 
@@ -201,7 +201,7 @@ router.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
   const { data: org } = await supabase
     .from("organizations")
     .select("whatsapp_tpl_pre_registration")
-    .eq("id", tournament.organization_id)
+    .eq("id", tournament.owner_id)
     .maybeSingle();
 
   let query = supabase
@@ -225,7 +225,7 @@ router.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
       athleteName: sub.athlete_name,
       tournamentName: tournament.name,
       tournamentId,
-      orgId: tournament.organization_id,
+      orgId: tournament.owner_id,
       categoryNames: [sub.category_id], // simplificado; enriched em produção
       totalFee: 0,
       orgTemplate: org?.whatsapp_tpl_pre_registration,
@@ -294,7 +294,7 @@ router.post("/cron-cart-recovery", async (req, res) => {
   const tournamentIds = [...new Set(subs.map((s: any) => s.tournament_id))];
   const { data: tournaments } = await supabase
     .from("tournaments")
-    .select("id, name, organization_id")
+    .select("id, name, owner_id")
     .in("id", tournamentIds);
 
   const tMap: Record<string, any> = {};
@@ -313,7 +313,7 @@ router.post("/cron-cart-recovery", async (req, res) => {
       athleteName: sub.athlete_name,
       tournamentName: tournament.name,
       tournamentId: sub.tournament_id,
-      orgId: tournament.organization_id,
+      orgId: tournament.owner_id,
       categoryNames: [],
       totalFee: 0,
       sentBy: "cron",

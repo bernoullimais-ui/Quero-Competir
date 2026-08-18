@@ -60716,7 +60716,7 @@ router7.post("/broadcast", requireAuth, async (req, res) => {
     const { data: slugData } = await supabase.from("tournaments").select("id").eq("slug", tournamentId).maybeSingle();
     if (slugData) finalTournamentId = slugData.id;
   }
-  const { data: tournament } = await supabase.from("tournaments").select("id, name, organization_id").eq("id", finalTournamentId).maybeSingle();
+  const { data: tournament } = await supabase.from("tournaments").select("id, name, owner_id").eq("id", finalTournamentId).maybeSingle();
   if (!tournament) {
     return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
   }
@@ -60730,7 +60730,7 @@ router7.post("/broadcast", requireAuth, async (req, res) => {
       message: personalizedMessage,
       media: mediaUrl,
       mediaName,
-      orgId: tournament.organization_id,
+      orgId: tournament.owner_id,
       tournamentId: finalTournamentId,
       messageType: "broadcast",
       athleteName: recipientName || "Contato Avulso",
@@ -60779,7 +60779,7 @@ router7.post("/broadcast", requireAuth, async (req, res) => {
       message: personalizedMessage,
       media: mediaUrl,
       mediaName,
-      orgId: tournament.organization_id,
+      orgId: tournament.owner_id,
       tournamentId,
       messageType: "broadcast",
       athleteName: sub.athlete_name,
@@ -60800,9 +60800,9 @@ router7.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
     const { data: slugData } = await supabase.from("tournaments").select("id").eq("slug", tournamentId).maybeSingle();
     if (slugData) finalTournamentId = slugData.id;
   }
-  const { data: tournament } = await supabase.from("tournaments").select("id, name, organization_id").eq("id", finalTournamentId).maybeSingle();
+  const { data: tournament } = await supabase.from("tournaments").select("id, name, owner_id").eq("id", finalTournamentId).maybeSingle();
   if (!tournament) return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
-  const { data: org } = await supabase.from("organizations").select("whatsapp_tpl_pre_registration").eq("id", tournament.organization_id).maybeSingle();
+  const { data: org } = await supabase.from("organizations").select("whatsapp_tpl_pre_registration").eq("id", tournament.owner_id).maybeSingle();
   let query = supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, payment_status, category_id").eq("tournament_id", finalTournamentId).neq("payment_status", "paid");
   if (subId) query = query.eq("id", subId);
   const { data: subs } = await query;
@@ -60816,7 +60816,7 @@ router7.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
       athleteName: sub.athlete_name,
       tournamentName: tournament.name,
       tournamentId,
-      orgId: tournament.organization_id,
+      orgId: tournament.owner_id,
       categoryNames: [sub.category_id],
       // simplificado; enriched em produção
       totalFee: 0,
@@ -60852,7 +60852,7 @@ router7.post("/cron-cart-recovery", async (req, res) => {
     return res.json({ success: true, processed: 0 });
   }
   const tournamentIds = [...new Set(subs.map((s) => s.tournament_id))];
-  const { data: tournaments } = await supabase.from("tournaments").select("id, name, organization_id").in("id", tournamentIds);
+  const { data: tournaments } = await supabase.from("tournaments").select("id, name, owner_id").in("id", tournamentIds);
   const tMap = {};
   for (const t of tournaments || []) tMap[t.id] = t;
   let processed = 0;
@@ -60866,7 +60866,7 @@ router7.post("/cron-cart-recovery", async (req, res) => {
       athleteName: sub.athlete_name,
       tournamentName: tournament.name,
       tournamentId: sub.tournament_id,
-      orgId: tournament.organization_id,
+      orgId: tournament.owner_id,
       categoryNames: [],
       totalFee: 0,
       sentBy: "cron"
