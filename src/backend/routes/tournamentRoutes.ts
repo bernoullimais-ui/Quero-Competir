@@ -3608,11 +3608,30 @@ router.post("/:id/coupons", requireAuth, requireRole("super_admin", "organizer")
 router.patch("/:id/coupons/:couponId", requireAuth, requireRole("super_admin", "organizer"), async (req, res) => {
   try {
     const supabase = getSupabaseAdmin();
-    const { is_active } = req.body;
+    const { 
+      is_active, 
+      code, 
+      description, 
+      discountType, 
+      discountValue, 
+      maxUses, 
+      validUntil, 
+      categoryIds 
+    } = req.body;
     
+    const updates: any = {};
+    if (is_active !== undefined) updates.is_active = is_active;
+    if (code !== undefined) updates.code = code;
+    if (description !== undefined) updates.description = description;
+    if (discountType !== undefined) updates.discount_type = discountType;
+    if (discountValue !== undefined) updates.discount_value = discountValue;
+    if (maxUses !== undefined) updates.max_uses = maxUses;
+    if (validUntil !== undefined) updates.valid_until = validUntil;
+    if (categoryIds !== undefined) updates.category_ids = categoryIds;
+
     const { data, error } = await supabase
       .from("tournament_coupons")
-      .update({ is_active })
+      .update(updates)
       .eq("id", req.params.couponId)
       .eq("tournament_id", req.params.id)
       .select()

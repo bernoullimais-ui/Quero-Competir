@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Copy, Check, Ticket, DollarSign, Percent, CheckCircle2, AlertCircle, X, Search } from "lucide-react";
+import { Plus, Trash2, Copy, Check, Ticket, DollarSign, Percent, CheckCircle2, AlertCircle, X, Search, Edit2 } from "lucide-react";
 
 interface Coupon {
   id: string;
@@ -45,6 +45,7 @@ export function CouponsTab({ tournamentId, athleteSubs, registrations, categorie
   const [validUntil, setValidUntil] = useState<string>("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
 
   // Copy state
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -70,12 +71,18 @@ export function CouponsTab({ tournamentId, athleteSubs, registrations, categorie
     }
   };
 
-  const handleCreateCoupon = async (e: React.FormEvent) => {
+  const handleSaveCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/tournaments/${tournamentId}/coupons`, {
-        method: "POST",
+      const isEdit = !!editingCouponId;
+      const url = isEdit 
+        ? `/api/tournaments/${tournamentId}/coupons/${editingCouponId}` 
+        : `/api/tournaments/${tournamentId}/coupons`;
+      const method = isEdit ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
@@ -92,24 +99,42 @@ export function CouponsTab({ tournamentId, athleteSubs, registrations, categorie
       });
       const data = await res.json();
       if (data.success) {
-        setCoupons([data.data, ...coupons]);
-        setShowCreateModal(false);
-        // Reset form
-        setCode("");
-        setDescription("");
-        setDiscountType("percent");
-        setDiscountValue("");
-        setMaxUses("");
-        setValidUntil("");
-        setSelectedCategories([]);
-      } else {
-        alert(data.error || "Erro ao criar cupom");
+        if (isEdit) {
+          setCoupons(coupons.map(c => c.id === editingCouponId ? data.data : c));
+        } else {
+          setCoupons([data.data, ...coupons]);
+        }
+        closeModal();
       }
     } catch (err) {
-      alert("Erro de conexão");
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const closeModal = () => {
+    setShowCreateModal(false);
+    setEditingCouponId(null);
+    setCode("");
+    setDescription("");
+    setDiscountType("percent");
+    setDiscountValue("");
+    setMaxUses("");
+    setValidUntil("");
+    setSelectedCategories([]);
+  };
+
+  const openEditModal = (coupon: Coupon) => {
+    setEditingCouponId(coupon.id);
+    setCode(coupon.code);
+    setDescription(coupon.description || "");
+    setDiscountType(coupon.discount_type);
+    setDiscountValue(coupon.discount_value.toString());
+    setMaxUses(coupon.max_uses ? coupon.max_uses.toString() : "");
+    setValidUntil(coupon.valid_until ? new Date(coupon.valid_until).toISOString().slice(0, 16) : "");
+    setSelectedCategories(coupon.category_ids || []);
+    setShowCreateModal(true);
   };
 
   const handleToggleStatus = async (id: string, currentStatus: boolean) => {
@@ -373,8 +398,16 @@ export function CouponsTab({ tournamentId, athleteSubs, registrations, categorie
                                 {coupon.is_active ? "Desativar" : "Ativar"}
                               </button>
                               <button
+                                onClick={() => openEditModal(coupon)}
+                                className="p-1.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors"
+                                title="Editar Cupom"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
                                 onClick={() => handleDelete(coupon.id)}
                                 className="p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+                                title="Excluir Cupom"
                               >
                                 <Trash2 size={16} />
                               </button>
@@ -447,33 +480,36 @@ export function CouponsTab({ tournamentId, athleteSubs, registrations, categorie
         </div>
       </div>
 
-      {/* Create Modal */}
+      {/* Create/Edit Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                <Ticket className="text-indigo-600" size={20} />
-                Criar Novo Cupom
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-xl flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
+              <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                <Ticket className="text-indigo-600" /> {editingCouponId ? "Editar Cupom" : "Criar Novo Cupom"}
               </h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+              <button
+                onClick={closeModal}
+                className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"
+              >
                 <X size={20} />
               </button>
             </div>
             
-            <form onSubmit={handleCreateCoupon} className="p-6 space-y-5">
-              <div className="grid grid-cols-2 gap-5">
-                <div className="col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Código do Cupom *</label>
-                  <input
-                    type="text"
-                    required
-                    value={code}
-                    onChange={e => setCode(e.target.value.toUpperCase().replace(/\s/g, ""))}
-                    placeholder="Ex: BLACKFRIDAY20"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all uppercase"
-                  />
-                </div>
+            <div className="p-6 overflow-y-auto">
+              <form id="couponForm" onSubmit={handleSaveCoupon} className="space-y-5">
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Código do Cupom *</label>
+                    <input
+                      type="text"
+                      required
+                      value={code}
+                      onChange={e => setCode(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                      placeholder="Ex: BLACKFRIDAY20"
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all uppercase"
+                    />
+                  </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Tipo de Desconto *</label>
@@ -569,7 +605,7 @@ export function CouponsTab({ tournamentId, athleteSubs, registrations, categorie
               <div className="pt-4 flex gap-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={closeModal}
                   className="flex-1 px-6 py-3 rounded-xl font-bold text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
                 >
                   Cancelar
@@ -579,10 +615,11 @@ export function CouponsTab({ tournamentId, athleteSubs, registrations, categorie
                   disabled={submitting}
                   className="flex-1 px-6 py-3 rounded-xl font-bold text-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200 disabled:opacity-70 flex items-center justify-center"
                 >
-                  {submitting ? "Criando..." : "Criar Cupom"}
+                  {submitting ? "Salvando..." : editingCouponId ? "Salvar Alterações" : "Criar Cupom"}
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}
