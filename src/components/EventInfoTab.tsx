@@ -81,7 +81,7 @@ function parseDescription(raw?: string): ParsedDesc {
   }
 
   // Completely remove ALL metadata HTML comments (<!--...-->) from displayed description text
-  const cleanDescription = description.replace(/<!--[\s\S]*?-->/g, "").trim();
+  const cleanDescription = description.replace(/<!--[\s\S]*?-->/g, "").replace(/&nbsp;/g, " ").trim();
 
   return { description: cleanDescription, photos, bannerUrl, sponsors, attachments };
 }
@@ -197,7 +197,7 @@ export default function EventInfoTab({ tournament, categories }: EventInfoTabPro
             </h2>
             {parsedDesc.description ? (
               <div 
-                className="prose prose-sm sm:prose-base prose-indigo max-w-none prose-p:leading-relaxed prose-headings:font-black prose-a:text-indigo-600 prose-a:no-underline hover:prose-a:underline"
+                className="prose prose-sm sm:prose-base prose-indigo max-w-none prose-p:leading-relaxed prose-p:text-justify prose-headings:font-black prose-a:text-indigo-600 prose-a:no-underline hover:prose-a:underline break-words"
                 dangerouslySetInnerHTML={{ __html: parsedDesc.description }}
               />
             ) : (
