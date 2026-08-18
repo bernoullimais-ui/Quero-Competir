@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Calendar, MapPin, Trophy, Users, Image as ImageIcon, Sparkles, User, Shield, ArrowRight, Award } from "lucide-react";
+import { Calendar, MapPin, Trophy, Users, Image as ImageIcon, Sparkles, User, Shield, ArrowRight, Award, FileText, Download } from "lucide-react";
 import { motion } from "motion/react";
 
 interface Category {
