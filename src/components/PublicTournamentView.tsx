@@ -348,11 +348,11 @@ export default function PublicTournamentView() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* 1. Full-width Top Banner (edge-to-edge, preenchendo toda a dimensão da página) */}
-      <div className="w-full h-48 sm:h-64 md:h-80 lg:h-96 relative overflow-hidden bg-slate-900 shadow-inner">
+      <div className="w-full bg-slate-900 shadow-inner flex justify-center">
         <img
           src={bannerUrl || defaultBannerUrl}
           alt={tournament.name}
-          className="w-full h-full object-cover object-top"
+          className="w-full max-h-[300px] sm:max-h-[400px] md:max-h-[500px] lg:max-h-[600px] object-contain object-center"
         />
       </div>
 
