@@ -18835,17 +18835,17 @@ var require_router = __commonJS({
     var toString = Object.prototype.toString;
     var proto = module2.exports = function(options) {
       var opts = options || {};
-      function router9(req, res, next) {
-        router9.handle(req, res, next);
+      function router10(req, res, next) {
+        router10.handle(req, res, next);
       }
-      setPrototypeOf(router9, proto);
-      router9.params = {};
-      router9._params = [];
-      router9.caseSensitive = opts.caseSensitive;
-      router9.mergeParams = opts.mergeParams;
-      router9.strict = opts.strict;
-      router9.stack = [];
-      return router9;
+      setPrototypeOf(router10, proto);
+      router10.params = {};
+      router10._params = [];
+      router10.caseSensitive = opts.caseSensitive;
+      router10.mergeParams = opts.mergeParams;
+      router10.strict = opts.strict;
+      router10.stack = [];
+      return router10;
     };
     proto.param = function param(name, fn) {
       if (typeof name === "function") {
@@ -21862,7 +21862,7 @@ var require_application = __commonJS({
   "node_modules/express/lib/application.js"(exports2, module2) {
     "use strict";
     var finalhandler = require_finalhandler();
-    var Router9 = require_router();
+    var Router10 = require_router();
     var methods = require_methods();
     var middleware = require_init();
     var query = require_query();
@@ -21927,7 +21927,7 @@ var require_application = __commonJS({
     };
     app2.lazyrouter = function lazyrouter() {
       if (!this._router) {
-        this._router = new Router9({
+        this._router = new Router10({
           caseSensitive: this.enabled("case sensitive routing"),
           strict: this.enabled("strict routing")
         });
@@ -21936,17 +21936,17 @@ var require_application = __commonJS({
       }
     };
     app2.handle = function handle(req, res, callback) {
-      var router9 = this._router;
+      var router10 = this._router;
       var done = callback || finalhandler(req, res, {
         env: this.get("env"),
         onerror: logerror.bind(this)
       });
-      if (!router9) {
+      if (!router10) {
         debug("no routes defined on app");
         done();
         return;
       }
-      router9.handle(req, res, done);
+      router10.handle(req, res, done);
     };
     app2.use = function use(fn) {
       var offset = 0;
@@ -21966,15 +21966,15 @@ var require_application = __commonJS({
         throw new TypeError("app.use() requires a middleware function");
       }
       this.lazyrouter();
-      var router9 = this._router;
+      var router10 = this._router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router9.use(path7, fn2);
+          return router10.use(path7, fn2);
         }
         debug(".use app under %s", path7);
         fn2.mountpath = path7;
         fn2.parent = this;
-        router9.use(path7, function mounted_app(req, res, next) {
+        router10.use(path7, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             setPrototypeOf(req, orig.request);
@@ -23791,7 +23791,7 @@ var require_express = __commonJS({
     var mixin = require_merge_descriptors();
     var proto = require_application();
     var Route = require_route();
-    var Router9 = require_router();
+    var Router10 = require_router();
     var req = require_request();
     var res = require_response();
     exports2 = module2.exports = createApplication;
@@ -23814,7 +23814,7 @@ var require_express = __commonJS({
     exports2.request = req;
     exports2.response = res;
     exports2.Route = Route;
-    exports2.Router = Router9;
+    exports2.Router = Router10;
     exports2.json = bodyParser.json;
     exports2.query = require_query();
     exports2.raw = bodyParser.raw;
@@ -43629,7 +43629,7 @@ __export(entry_exports, {
 module.exports = __toCommonJS(entry_exports);
 
 // src/backend/app.ts
-var import_express9 = __toESM(require_express2(), 1);
+var import_express10 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // node_modules/helmet/index.mjs
@@ -60833,15 +60833,15 @@ router7.get("/logs/:tournamentId", requireAuth, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   res.json(data || []);
 });
-router7.post("/cron-cart-recovery", async (req, res) => {
+router7.all("/cron-cart-recovery", async (req, res) => {
   const cronSecret = req.headers["x-cron-secret"] || req.headers.authorization;
   if (process.env.CRON_SECRET && cronSecret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   const supabase = getSupabaseAdmin();
   const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1e3).toISOString();
-  const twoHalfHoursAgo = new Date(Date.now() - 2.5 * 60 * 60 * 1e3).toISOString();
-  const { data: subs } = await supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, tournament_id, category_id").neq("payment_status", "paid").eq("whatsapp_cart_recovery_sent", false).gte("created_at", twoHalfHoursAgo).lte("created_at", twoHoursAgo);
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1e3).toISOString();
+  const { data: subs } = await supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, tournament_id, category_id, payment_status").neq("payment_status", "paid").eq("whatsapp_cart_recovery_sent", false).gte("created_at", twentyFourHoursAgo).lte("created_at", twoHoursAgo);
   if (!subs || subs.length === 0) {
     return res.json({ success: true, processed: 0 });
   }
@@ -61005,9 +61005,72 @@ router8.get("/public-organizations", async (_req, res) => {
 });
 var platformRoutes_default = router8;
 
+// src/backend/routes/publicRoutes.ts
+var import_express9 = __toESM(require_express2(), 1);
+
+// src/backend/indexHtml.ts
+var indexHtml = '<!doctype html>\n<html lang="pt-BR" translate="no">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <meta name="google" content="notranslate">\n    <title>Quero Competir</title>\n    <link rel="preconnect" href="https://fonts.googleapis.com">\n    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto:ital,wght@0,400;0,500;0,700;0,900;1,400;1,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">\n    <script type="module" crossorigin src="/assets/index-BdfgjwBe.js"></script>\n    <link rel="modulepreload" crossorigin href="/assets/vendor-react-DdCDPtko.js">\n    <link rel="modulepreload" crossorigin href="/assets/vendor-ui-CzhfXNEe.js">\n    <link rel="modulepreload" crossorigin href="/assets/vendor-motion-3qZ3xKb7.js">\n    <link rel="modulepreload" crossorigin href="/assets/vendor-supabase-DQh0Fvtg.js">\n    <link rel="modulepreload" crossorigin href="/assets/vendor-pdf-DY7VEzpH.js">\n    <link rel="stylesheet" crossorigin href="/assets/index-RGp_RkCC.css">\n  </head>\n  <body>\n    <div id="root"></div>\n  </body>\n</html>\n\n';
+
+// src/backend/routes/publicRoutes.ts
+var isValidUUID3 = (uuid) => {
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return regex.test(uuid);
+};
+var router9 = (0, import_express9.Router)();
+var DEFAULT_LOGO = "https://www.querocompetir.com.br/assets/logo.png";
+var handler = async (req, res) => {
+  const { id } = req.params;
+  const isScoreboard = req.originalUrl.includes("/placar");
+  try {
+    const supabase = getSupabaseAdmin();
+    let finalTournamentId = id;
+    if (!isValidUUID3(id)) {
+      const { data: slugData } = await supabase.from("tournaments").select("id").eq("slug", id).maybeSingle();
+      if (slugData) {
+        finalTournamentId = slugData.id;
+      } else {
+        return res.send(indexHtml);
+      }
+    }
+    const { data: tournament } = await supabase.from("tournaments").select("name, owner_id").eq("id", finalTournamentId).maybeSingle();
+    if (!tournament) {
+      return res.send(indexHtml);
+    }
+    const { data: org } = await supabase.from("organizations").select("name, logo_url").eq("id", tournament.owner_id).maybeSingle();
+    const titlePrefix = tournament.name || "Torneio";
+    const finalTitle = isScoreboard ? `${titlePrefix} - Placar ao Vivo` : titlePrefix;
+    const orgName = org?.name || "Organizador";
+    const logoUrl = org?.logo_url || DEFAULT_LOGO;
+    const description = `Participe deste evento organizado pela ${orgName}!`;
+    const appUrl = process.env.APP_URL || "https://www.querocompetir.com.br";
+    const currentUrl = `${appUrl}${req.originalUrl}`;
+    const metaTags = `
+    <meta property="og:title" content="${finalTitle}" />
+    <meta property="og:site_name" content="${orgName}" />
+    <meta property="og:image" content="${logoUrl}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="${currentUrl}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${finalTitle}" />
+    <meta name="twitter:description" content="${description}" />
+    <meta name="twitter:image" content="${logoUrl}" />
+    `;
+    const modifiedHtml = indexHtml.replace("</head>", `${metaTags}
+</head>`);
+    res.send(modifiedHtml);
+  } catch (error) {
+    console.error("Error generating public tournament page:", error);
+    res.send(indexHtml);
+  }
+};
+router9.get("/tournament/:id", handler);
+router9.get("/tournament/:id/*", handler);
+var publicRoutes_default = router9;
+
 // src/backend/app.ts
 init_auth();
-var app = (0, import_express9.default)();
+var app = (0, import_express10.default)();
 var isProduction = process.env.NODE_ENV === "production";
 app.use(
   helmet({
@@ -61049,8 +61112,8 @@ app.use(
   })
 );
 app.use((0, import_morgan.default)(isProduction ? "combined" : "dev"));
-app.use(import_express9.default.json({ limit: "10mb" }));
-app.use(import_express9.default.urlencoded({ limit: "10mb", extended: true }));
+app.use(import_express10.default.json({ limit: "10mb" }));
+app.use(import_express10.default.urlencoded({ limit: "10mb", extended: true }));
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", version: "1.0.0", env: process.env.NODE_ENV || "development" });
 });
@@ -61079,6 +61142,7 @@ app.use("/api/memberships", membershipRoutes_default);
 app.use("/api/payments", paymentRoutes_default);
 app.use("/api/whatsapp", whatsappRoutes_default);
 app.use("/api/platform", platformRoutes_default);
+app.use("/public", publicRoutes_default);
 app.use((err, _req, res, _next) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Erro interno do servidor.";

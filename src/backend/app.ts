@@ -10,6 +10,7 @@ import membershipRoutes from "./routes/membershipRoutes";
 import paymentRoutes from "./routes/paymentRoutes";
 import whatsappRoutes from "./routes/whatsappRoutes";
 import platformRoutes from "./routes/platformRoutes";
+import publicRoutes from "./routes/publicRoutes";
 import { optionalAuth } from "./middleware/auth";
 
 const app = express();
@@ -113,6 +114,9 @@ app.use("/api/memberships", membershipRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
 app.use("/api/platform", platformRoutes);
+
+// ─── Public Routes (Open Graph / SEO) ─────────────────────────────────────────
+app.use("/public", publicRoutes);
 
 // ─── Global Error Handler (must be last) ─────────────────────────────────────
 // Catches any unhandled errors and returns JSON instead of HTML/plain-text.

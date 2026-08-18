@@ -16,6 +16,10 @@
       "destination": "/api/index.js"
     },
     {
+      "source": "/public/tournament/:path*",
+      "destination": "/api/index.js"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

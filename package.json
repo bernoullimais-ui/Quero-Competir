@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && npm run build:api",
+    "build": "vite build && npm run build:html && npm run build:api",
+    "build:html": "node -e \"const fs = require('fs'); fs.writeFileSync('src/backend/indexHtml.ts', 'export const indexHtml = ' + JSON.stringify(fs.readFileSync('dist/index.html', 'utf8')) + ';')\"",
     "build:api": "esbuild src/backend/entry.ts --bundle --platform=node --target=node20 --format=cjs \"--footer:js=module.exports = module.exports.default || module.exports;\" --outfile=api/index.js",
     "build:server": "esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "NODE_ENV=production node dist/server.cjs",
