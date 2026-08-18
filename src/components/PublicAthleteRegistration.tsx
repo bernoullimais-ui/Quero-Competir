@@ -1328,6 +1328,7 @@ export default function PublicAthleteRegistration() {
                         <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">CPF do Titular da Cobrança (para Emissão Pix/Cartão)</label>
                         <input
                           type="text"
+                          inputMode="numeric"
                           value={parentDocument}
                           onChange={e => setParentDocument(e.target.value)}
                           placeholder="Digite seu CPF (ex: 000.000.000-00)"

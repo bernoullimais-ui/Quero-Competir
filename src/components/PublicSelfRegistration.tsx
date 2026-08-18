@@ -523,7 +523,7 @@ export default function PublicSelfRegistration() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">CPF / Documento *</label>
-                    <input type="text" placeholder="000.000.000-00" value={docNum} onChange={e => setDocNum(e.target.value)}
+                    <input type="text" inputMode="numeric" placeholder="000.000.000-00" value={docNum} onChange={e => setDocNum(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 focus:border-indigo-400" />
                   </div>
                   {/* Informações Médicas (somente solicitadas se habilitadas nas configurações pelo organizador) */}
