@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { Plus, ListChecks, X, Edit2, Trash2, Waves, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, GripVertical } from "lucide-react";
+import { Plus, ListChecks, X, Edit2, Trash2, Waves, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown, GripVertical, AlertCircle } from "lucide-react";
 import { getSportIcon, getSportBgClass } from "./TournamentDashboard.tsx";
 import { useToast } from "./ui/Toast.tsx";
 
