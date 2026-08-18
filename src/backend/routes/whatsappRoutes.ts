@@ -248,10 +248,34 @@ router.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
   const { data: subs } = await query;
   if (!subs || subs.length === 0) return res.json({ success: true, sent: 0 });
 
+  // Busca nomes das categorias
+  const allCategoryIds = new Set<string>();
+  for (const sub of subs) {
+    if (Array.isArray(sub.category_id)) sub.category_id.forEach((id: string) => allCategoryIds.add(id));
+    else if (sub.category_id) allCategoryIds.add(sub.category_id);
+  }
+  
+  const categoryNamesMap: Record<string, string> = {};
+  if (allCategoryIds.size > 0) {
+    const { data: catData } = await supabase
+      .from('tournament_categories')
+      .select('id, name')
+      .in('id', Array.from(allCategoryIds));
+    if (catData) {
+      catData.forEach((c: any) => categoryNamesMap[c.id] = c.name);
+    }
+  }
+
   let sent = 0;
   for (const sub of subs) {
     const phone = sub.parent_phone || sub.additional_data?.phone;
     if (!phone) continue;
+
+    const provasIds = Array.isArray(sub.category_id) ? sub.category_id : (sub.category_id ? [sub.category_id] : []);
+    const categoryNames = provasIds.map((id: string) => categoryNamesMap[id] || id);
+    const fee = sub.additional_data?.athleteFee || sub.additional_data?.totalFee || 0;
+    const paymentLink = `https://querocompetir.com.br/public/payment/${sub.id}`;
+    const pixCopyPaste = sub.additional_data?.pixCopyPaste || undefined;
 
     await sendCartRecoveryMessage({
       phone,
@@ -259,8 +283,10 @@ router.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
       tournamentName: tournament.name,
       tournamentId,
       orgId: tournament.owner_id,
-      categoryNames: [sub.category_id], // simplificado; enriched em produção
-      totalFee: 0,
+      categoryNames,
+      totalFee: fee,
+      paymentLink,
+      pixCopyPaste,
       orgTemplate: org?.whatsapp_tpl_pre_registration,
       sentBy: "organizer_manual",
     });
@@ -333,6 +359,24 @@ router.all("/cron-cart-recovery", async (req, res) => {
   const tMap: Record<string, any> = {};
   for (const t of tournaments || []) tMap[t.id] = t;
 
+  // Busca nomes das categorias
+  const allCategoryIds = new Set<string>();
+  for (const sub of subs) {
+    if (Array.isArray(sub.category_id)) sub.category_id.forEach((id: string) => allCategoryIds.add(id));
+    else if (sub.category_id) allCategoryIds.add(sub.category_id);
+  }
+  
+  const categoryNamesMap: Record<string, string> = {};
+  if (allCategoryIds.size > 0) {
+    const { data: catData } = await supabase
+      .from('tournament_categories')
+      .select('id, name')
+      .in('id', Array.from(allCategoryIds));
+    if (catData) {
+      catData.forEach((c: any) => categoryNamesMap[c.id] = c.name);
+    }
+  }
+
   let processed = 0;
   for (const sub of subs) {
     const phone = sub.parent_phone || sub.additional_data?.phone;
@@ -341,14 +385,22 @@ router.all("/cron-cart-recovery", async (req, res) => {
     const tournament = tMap[sub.tournament_id];
     if (!tournament) continue;
 
+    const provasIds = Array.isArray(sub.category_id) ? sub.category_id : (sub.category_id ? [sub.category_id] : []);
+    const categoryNames = provasIds.map((id: string) => categoryNamesMap[id] || id);
+    const fee = sub.additional_data?.athleteFee || sub.additional_data?.totalFee || 0;
+    const paymentLink = `https://querocompetir.com.br/public/payment/${sub.id}`;
+    const pixCopyPaste = sub.additional_data?.pixCopyPaste || undefined;
+
     await sendCartRecoveryMessage({
       phone,
       athleteName: sub.athlete_name,
       tournamentName: tournament.name,
       tournamentId: sub.tournament_id,
       orgId: tournament.owner_id,
-      categoryNames: [],
-      totalFee: 0,
+      categoryNames,
+      totalFee: fee,
+      paymentLink,
+      pixCopyPaste,
       sentBy: "cron",
     });
 
