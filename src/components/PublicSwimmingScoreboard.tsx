@@ -191,28 +191,32 @@ export default function PublicSwimmingScoreboard() {
   });
 
   // Find Current, Last and Next
+  let eventToHighlight = [...categoriesWithStatus].reverse().find(c => c.withTimeCount > 0);
+  let nextEvent = null;
+
+  if (eventToHighlight) {
+    if (eventToHighlight.status === 'finished') {
+      // If the top highlighted event is finished, the next event is the first pending/progress one
+      nextEvent = categoriesWithStatus.find(c => (c.status === 'pending' || c.status === 'progress') && c.athletesCount > 0);
+    } else {
+      // If the top highlighted event is in progress, the next event is the one strictly AFTER it
+      const idx = categoriesWithStatus.findIndex(c => c.id === eventToHighlight.id);
+      nextEvent = categoriesWithStatus.slice(idx + 1).find(c => c.athletesCount > 0);
+    }
+  } else {
+    // No results at all yet
+    eventToHighlight = null;
+    nextEvent = categoriesWithStatus.find(c => c.athletesCount > 0);
+  }
+
+  // Define currentEvent explicitly for sidebar styling
   let currentEventIndex = categoriesWithStatus.findIndex(c => c.status === "progress");
   if (currentEventIndex === -1) {
     currentEventIndex = categoriesWithStatus.findIndex(c => c.status === "pending" && c.athletesCount > 0);
   }
-  
   const currentEvent = currentEventIndex !== -1 ? categoriesWithStatus[currentEventIndex] : null;
-  
-  let lastEvent = null;
-  if (currentEventIndex > 0) {
-    lastEvent = [...categoriesWithStatus].slice(0, currentEventIndex).reverse().find(c => c.status === "finished");
-  } else if (!currentEvent) {
-    // If all finished
-    lastEvent = [...categoriesWithStatus].reverse().find(c => c.status === "finished");
-  }
-
-  let nextEvent = null;
-  if (currentEventIndex !== -1) {
-    nextEvent = categoriesWithStatus.slice(currentEventIndex + 1).find(c => c.athletesCount > 0);
-  }
 
   // Generate view data for main focus
-  const eventToHighlight = currentEvent || lastEvent;
   const highlightHeats = eventToHighlight ? generateHeats(eventToHighlight.athletes, lanesCount) : [];
   const nextHeats = nextEvent ? generateHeats(nextEvent.athletes, lanesCount) : [];
 
