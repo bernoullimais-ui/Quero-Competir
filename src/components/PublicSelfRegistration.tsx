@@ -739,7 +739,7 @@ export default function PublicSelfRegistration() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Telefone de Contato *</label>
-                    <input type="tel" placeholder="(41) 99999-9999" value={parentPhone} onChange={e => setParentPhone(e.target.value)}
+                    <input type="tel" placeholder="(41) 99999-9999" value={parentPhone} onChange={e => setParentPhone(e.target.value.replace(/\D/g, "").substring(0, 11))}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none text-sm font-semibold text-slate-700 focus:border-indigo-400" />
                   </div>
 

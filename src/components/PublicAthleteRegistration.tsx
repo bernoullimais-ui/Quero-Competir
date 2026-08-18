@@ -824,7 +824,7 @@ export default function PublicAthleteRegistration() {
                                     required={field.required || isMinor()}
                                     placeholder="(DD) 99999-9999"
                                     value={parentPhone}
-                                    onChange={e => setParentPhone(e.target.value)}
+                                    onChange={e => setParentPhone(e.target.value.replace(/\D/g, "").substring(0, 11))}
                                     className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 text-sm font-medium transition-colors bg-white"
                                   />
                                   <Phone size={18} className="text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
