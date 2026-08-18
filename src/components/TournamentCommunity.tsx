@@ -7,6 +7,15 @@ interface Props {
   isOrganizer?: boolean; // Checks if current logged-in user is organizer for moderation
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+}
+
 interface PostComment {
   id: string;
   authorName: string;
@@ -557,7 +566,7 @@ export default function TournamentCommunity({ tournamentId, isOrganizer: isOrgan
                     mediaType === "image" ? "bg-indigo-650 border-indigo-650 text-white shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}
                 >
-                  <Image size={14} /> Imagem (URL)
+                  <Image size={14} /> Foto
                 </button>
                 <button
                   type="button"
@@ -571,19 +580,59 @@ export default function TournamentCommunity({ tournamentId, isOrganizer: isOrgan
               </div>
 
               {mediaType !== "none" && (
-                <div className="mt-3 animate-in slide-in-from-top-2 duration-300">
-                  <input
-                    type="url"
-                    placeholder={mediaType === 'image' ? "Cole a URL da sua imagem (ex: https://...)" : "Cole a URL do vídeo (ex: Youtube, direct link)"}
-                    value={mediaUrl}
-                    onChange={(e) => setMediaUrl(e.target.value)}
-                    className="w-full px-4 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-all font-medium"
-                  />
-                  <p className="text-[10px] text-slate-400 font-semibold mt-1.5">
-                    {mediaType === 'image' 
-                      ? "Use URLs da internet, como fotos hospedadas publicamente." 
-                      : "Insira links padrão do YouTube para gerarmos o player interativo."}
-                  </p>
+                <div className="mt-3 animate-in slide-in-from-top-2 duration-300 space-y-3">
+                  {mediaType === "image" && (
+                    <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-4 text-center hover:bg-slate-100 transition-all">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        id="community-image-upload"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              const base64 = await fileToBase64(file);
+                              setMediaUrl(base64);
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }
+                        }}
+                      />
+                      <label htmlFor="community-image-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                        <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center">
+                          <Image size={18} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-700">Clique para enviar uma foto do seu dispositivo</p>
+                          <p className="text-[10px] text-slate-500 font-medium">Será anexada diretamente à sua postagem</p>
+                        </div>
+                      </label>
+                      {mediaUrl && mediaUrl.startsWith("data:image") && (
+                        <div className="mt-3 p-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-200 flex items-center justify-center gap-1.5">
+                          <span>✓</span> Imagem anexada com sucesso!
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    {mediaType === "image" && <span className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap px-2">Ou URL externa:</span>}
+                    <input
+                      type="url"
+                      placeholder={mediaType === 'image' ? "https://..." : "Cole a URL do vídeo (ex: Youtube, direct link)"}
+                      value={mediaUrl && !mediaUrl.startsWith("data:image") ? mediaUrl : ""}
+                      onChange={(e) => setMediaUrl(e.target.value)}
+                      className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-all font-medium"
+                    />
+                  </div>
+                  
+                  {mediaType === 'video' && (
+                    <p className="text-[10px] text-slate-400 font-semibold mt-1.5 px-2">
+                      Insira links padrão do YouTube para gerarmos o player interativo.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
