@@ -135,7 +135,7 @@ export default function WhatsAppBroadcastTab({
         mediaName = mediaFile.name;
       }
 
-      const body: any = {
+      const body = {
         tournamentId,
         filter,
         message,
