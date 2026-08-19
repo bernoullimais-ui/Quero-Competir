@@ -154,7 +154,9 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
     }
   };
 
-  const sortSwimmingCategoriesByDefault = (cats: any[]) => {
+  const [primarySortCriteria, setPrimarySortCriteria] = useState<"idade" | "prova">("idade");
+
+  const sortSwimmingCategoriesByDefault = (cats: any[], primaryCriteria: "idade" | "prova") => {
     return [...cats].sort((a, b) => {
       // 1. Idade: dos mais novos para os mais velhos
       const getAgeWeight = (cat: any) => {
@@ -167,7 +169,6 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
 
       const ageA = getAgeWeight(a);
       const ageB = getAgeWeight(b);
-      if (ageA !== ageB) return ageA - ageB;
 
       // 2. Estilo: Livre (1), Costas (2), Borbo (3), Peito (4), Medley (5), Revezamento (6)
       const getStrokeWeight = (cat: any) => {
@@ -183,7 +184,6 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
 
       const strokeA = getStrokeWeight(a);
       const strokeB = getStrokeWeight(b);
-      if (strokeA !== strokeB) return strokeA - strokeB;
 
       // 3. Distância: das mais curtas para as mais longas
       const getDistance = (cat: any) => {
@@ -193,14 +193,24 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
 
       const distA = getDistance(a);
       const distB = getDistance(b);
-      if (distA !== distB) return distA - distB;
+
+      if (primaryCriteria === "idade") {
+        if (ageA !== ageB) return ageA - ageB;
+        if (strokeA !== strokeB) return strokeA - strokeB;
+        if (distA !== distB) return distA - distB;
+      } else {
+        if (strokeA !== strokeB) return strokeA - strokeB;
+        if (distA !== distB) return distA - distB;
+        if (ageA !== ageB) return ageA - ageB;
+      }
 
       return (a.name || "").localeCompare(b.name || "");
     });
   };
 
-  const handleApplyDefaultOfficialOrder = async () => {
-    const sorted = sortSwimmingCategoriesByDefault(categories);
+  const handleApplyDefaultOfficialOrder = async (criteria?: "idade" | "prova") => {
+    const selectedCriteria = criteria || primarySortCriteria;
+    const sorted = sortSwimmingCategoriesByDefault(categories, selectedCriteria);
     const orderedIds = sorted.map(c => c.id).filter(Boolean);
 
     if (orderedIds.length > 0) {
@@ -212,7 +222,7 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
           body: JSON.stringify({ orderedIds }),
         });
         if (!res.ok) throw new Error("Erro ao salvar ordem oficial");
-        toastSuccess("Provas reordenadas pelo Padrão Oficial (Idade ➔ Estilo ➔ Distância)!");
+        toastSuccess("Provas reordenadas com sucesso!");
         refreshCategories();
       } catch (err: any) {
         toastError(err.message || "Erro ao reordenar provas.");
@@ -482,13 +492,13 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
           {categories.length > 1 && (
             <>
               <button
-                onClick={handleApplyDefaultOfficialOrder}
+                onClick={() => handleApplyDefaultOfficialOrder()}
                 disabled={isSavingOrder}
                 className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 text-sm cursor-pointer shadow-xs disabled:opacity-50"
-                title="Ordenar por Idade (mais novos aos mais velhos), Estilo (Livre, Costas, Borbo, Peito, Medley) e Distância"
+                title="Aplicar ordenação automática"
               >
                 <Waves size={16} />
-                Ordenar por Padrão Oficial 🏊‍♂️
+                Auto-Ordenar 🏊‍♂️
               </button>
               <button
                 onClick={() => setShowReorderModal(true)}
@@ -1114,9 +1124,46 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
                 <ArrowUpDown size={16} /> Programação & Sequência
               </div>
               <h3 className="text-2xl font-bold text-slate-800">Ordem Oficial das Provas</h3>
-              <p className="text-slate-500 text-xs mt-1">
+              <p className="text-slate-500 text-xs mt-1 mb-4">
                 Ajuste a ordem sequencial das provas. Essa ordem será refletida no balizamento geral e nas súmulas impressas.
               </p>
+
+              {categories.some(c => isNatacao(c.name || "")) && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                  <h4 className="text-xs font-bold text-slate-600 uppercase mb-3">Ordenação Automática (Natação)</h4>
+                  <div className="flex gap-4 mb-3">
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">1º Critério</label>
+                      <select
+                        value={primarySortCriteria}
+                        onChange={(e) => setPrimarySortCriteria(e.target.value as "idade" | "prova")}
+                        className="w-full bg-white border border-slate-300 text-sm rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
+                      >
+                        <option value="idade">Classe de Idade</option>
+                        <option value="prova">Prova (Estilo e Distância)</option>
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">2º Critério</label>
+                      <select
+                        value={primarySortCriteria === "idade" ? "prova" : "idade"}
+                        disabled
+                        className="w-full bg-slate-100 border border-slate-200 text-slate-400 text-sm rounded-xl px-3 py-2 opacity-80 cursor-not-allowed"
+                      >
+                        <option value="idade">Classe de Idade</option>
+                        <option value="prova">Prova (Estilo e Distância)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleApplyDefaultOfficialOrder()}
+                    disabled={isSavingOrder}
+                    className="w-full bg-white border border-indigo-200 hover:border-indigo-400 text-indigo-700 font-bold text-sm py-2 px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <ArrowUpDown size={14} /> Aplicar Ordenação
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
