@@ -111,6 +111,77 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
     }
   };
 
+  const isSwimModal = categories.some(c => isNatacao(c.name || ""));
+
+  const [groupedEvents, setGroupedEvents] = useState<any[]>([]);
+  const [ageOrderDirection, setAgeOrderDirection] = useState<"asc" | "desc">("asc");
+
+  useEffect(() => {
+    if (showReorderModal && isSwimModal) {
+      const unique = new Map<string, any>();
+      categories.forEach(c => {
+        const eventLabel = c.rules_config?.swim_event_label || c.name.replace(/natação\s*-\s*/i, "").replace(/natacao\s*-\s*/i, "").trim();
+        const key = `${eventLabel}_${c.gender}`;
+        if (!unique.has(key)) {
+          unique.set(key, { id: key, eventLabel, gender: c.gender });
+        }
+      });
+      setGroupedEvents(Array.from(unique.values()));
+    }
+  }, [showReorderModal, categories, isSwimModal]);
+
+  const handleDragDropGrouped = (fromIdx: number, toIdx: number) => {
+    if (toIdx < 0 || toIdx >= groupedEvents.length) return;
+    const newGrouped = [...groupedEvents];
+    const [moved] = newGrouped.splice(fromIdx, 1);
+    newGrouped.splice(toIdx, 0, moved);
+    setGroupedEvents(newGrouped);
+  };
+
+  const handleSaveGroupedOrder = async () => {
+    setIsSavingOrder(true);
+    try {
+      const orderedIds: string[] = [];
+      groupedEvents.forEach(group => {
+        const matchingCats = categories.filter(c => {
+          const cLabel = c.rules_config?.swim_event_label || c.name.replace(/natação\s*-\s*/i, "").replace(/natacao\s*-\s*/i, "").trim();
+          return cLabel === group.eventLabel && c.gender === group.gender;
+        });
+        
+        matchingCats.sort((a, b) => {
+          const getAgeWeight = (cat: any) => {
+            if (cat.birth_year_max !== null && cat.birth_year_max !== undefined) {
+              return -cat.birth_year_max;
+            }
+            const match = (cat.age_group || cat.name || "").match(/\d+/);
+            return match ? parseInt(match[0], 10) : 999;
+          };
+          const ageA = getAgeWeight(a);
+          const ageB = getAgeWeight(b);
+          return ageOrderDirection === "asc" ? ageA - ageB : ageB - ageA;
+        });
+        
+        matchingCats.forEach(c => {
+          if (c.id) orderedIds.push(c.id);
+        });
+      });
+      
+      const res = await fetch(`/api/tournaments/${tournamentId}/categories/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+      if (!res.ok) throw new Error("Erro ao salvar ordem oficial");
+      toastSuccess("Ordem das provas e idades salva com sucesso!");
+      setShowReorderModal(false);
+      refreshCategories();
+    } catch (err: any) {
+      toastError(err.message || "Erro ao salvar.");
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === dropIndex) {
@@ -121,7 +192,12 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
     const fromIdx = draggedIndex;
     setDraggedIndex(null);
     setDragOverIndex(null);
-    handleMoveCategory(fromIdx, dropIndex);
+    
+    if (isSwimModal) {
+      handleDragDropGrouped(fromIdx, dropIndex);
+    } else {
+      handleMoveCategory(fromIdx, dropIndex);
+    }
   };
 
   const handleDragEnd = () => {
@@ -1128,52 +1204,30 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
                 Ajuste a ordem sequencial das provas. Essa ordem será refletida no balizamento geral e nas súmulas impressas.
               </p>
 
-              {categories.some(c => isNatacao(c.name || "")) && (
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                  <h4 className="text-xs font-bold text-slate-600 uppercase mb-3">Ordenação Automática (Natação)</h4>
-                  <div className="flex gap-4 mb-3">
-                    <div className="flex-1">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">1º Critério</label>
-                      <select
-                        value={primarySortCriteria}
-                        onChange={(e) => setPrimarySortCriteria(e.target.value as "idade" | "prova")}
-                        className="w-full bg-white border border-slate-300 text-sm rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
-                      >
-                        <option value="idade">Classe de Idade</option>
-                        <option value="prova">Prova (Estilo e Distância)</option>
-                      </select>
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">2º Critério</label>
-                      <select
-                        value={primarySortCriteria === "idade" ? "prova" : "idade"}
-                        disabled
-                        className="w-full bg-slate-100 border border-slate-200 text-slate-400 text-sm rounded-xl px-3 py-2 opacity-80 cursor-not-allowed"
-                      >
-                        <option value="idade">Classe de Idade</option>
-                        <option value="prova">Prova (Estilo e Distância)</option>
-                      </select>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleApplyDefaultOfficialOrder()}
-                    disabled={isSavingOrder}
-                    className="w-full bg-white border border-indigo-200 hover:border-indigo-400 text-indigo-700 font-bold text-sm py-2 px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              {isSwimModal && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-4">
+                  <h4 className="text-xs font-bold text-slate-600 uppercase mb-2">Ordenação de Classes de Idade</h4>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Organizar Faixas Etárias Por</label>
+                  <select
+                    value={ageOrderDirection}
+                    onChange={(e) => setAgeOrderDirection(e.target.value as "asc" | "desc")}
+                    className="w-full bg-white border border-slate-300 text-sm rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
                   >
-                    <ArrowUpDown size={14} /> Aplicar Ordenação
-                  </button>
+                    <option value="asc">Crescente (Mais novos para Mais velhos)</option>
+                    <option value="desc">Decrescente (Mais velhos para Mais novos)</option>
+                  </select>
                 </div>
               )}
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-              {categories.map((cat, idx) => {
+              {(isSwimModal ? groupedEvents : categories).map((item, idx) => {
                 const isDragging = draggedIndex === idx;
                 const isDragOver = dragOverIndex === idx;
 
                 return (
                   <div
-                    key={cat.id || idx}
+                    key={item.id || idx}
                     draggable={!isSavingOrder}
                     onDragStart={(e) => handleDragStart(e, idx)}
                     onDragOver={(e) => handleDragOver(e, idx)}
@@ -1193,8 +1247,8 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
                         #{idx + 1}
                       </span>
                       <div>
-                        <h4 className="font-bold text-sm text-slate-800">{cat.name}</h4>
-                        <p className="text-xs text-slate-500 font-medium">{cat.gender} • {cat.age_group}</p>
+                        <h4 className="font-bold text-sm text-slate-800">{isSwimModal ? item.eventLabel : item.name}</h4>
+                        <p className="text-xs text-slate-500 font-medium">{item.gender} {isSwimModal ? "" : `• ${item.age_group}`}</p>
                       </div>
                     </div>
 
@@ -1202,7 +1256,7 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
                       <button
                         type="button"
                         disabled={idx === 0 || isSavingOrder}
-                        onClick={(e) => { e.stopPropagation(); handleMoveCategory(idx, idx - 1); }}
+                        onClick={(e) => { e.stopPropagation(); isSwimModal ? handleDragDropGrouped(idx, idx - 1) : handleMoveCategory(idx, idx - 1); }}
                         className="p-2 bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 rounded-xl transition-all disabled:opacity-30 cursor-pointer shadow-2xs"
                         title="Mover para cima"
                       >
@@ -1210,8 +1264,8 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
                       </button>
                       <button
                         type="button"
-                        disabled={idx === categories.length - 1 || isSavingOrder}
-                        onClick={(e) => { e.stopPropagation(); handleMoveCategory(idx, idx + 1); }}
+                        disabled={idx === (isSwimModal ? groupedEvents.length : categories.length) - 1 || isSavingOrder}
+                        onClick={(e) => { e.stopPropagation(); isSwimModal ? handleDragDropGrouped(idx, idx + 1) : handleMoveCategory(idx, idx + 1); }}
                         className="p-2 bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 rounded-xl transition-all disabled:opacity-30 cursor-pointer shadow-2xs"
                         title="Mover para baixo"
                       >
@@ -1223,14 +1277,35 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
               })}
             </div>
 
-            <div className="pt-5 mt-4 border-t border-slate-100 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowReorderModal(false)}
-                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-indigo-200 cursor-pointer"
-              >
-                Concluído
-              </button>
+            <div className="pt-5 mt-4 border-t border-slate-100 flex justify-end gap-3">
+              {isSwimModal ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowReorderModal(false)}
+                    className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSavingOrder}
+                    onClick={handleSaveGroupedOrder}
+                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isSavingOrder ? <span className="animate-spin text-lg leading-none">↻</span> : <ArrowUpDown size={16} />}
+                    Salvar Ordem Oficial
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowReorderModal(false)}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-indigo-200 cursor-pointer"
+                >
+                  Concluído
+                </button>
+              )}
             </div>
           </motion.div>
         </div>
