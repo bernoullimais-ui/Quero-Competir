@@ -77,6 +77,13 @@ function getSwimAgeClasses(currentYear: number) {
       birth_year_max: currentYear - 70,
       age_group: "+70 anos",
     },
+    {
+      label: "ABSOLUTO(Equipe)",
+      description: "Idade Livre (Equipes)",
+      birth_year_min: null,
+      birth_year_max: null,
+      age_group: "ABSOLUTO",
+    },
   ];
 }
 
