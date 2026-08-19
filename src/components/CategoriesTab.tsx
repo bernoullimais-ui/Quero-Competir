@@ -153,11 +153,13 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
         
         matchingCats.sort((a, b) => {
           const getAgeWeight = (cat: any) => {
-            if (cat.birth_year_max !== null && cat.birth_year_max !== undefined) {
-              return -cat.birth_year_max;
-            }
-            const match = (cat.age_group || cat.name || "").match(/\d+/);
-            return match ? parseInt(match[0], 10) : 999;
+            if (cat.age_group === "ABSOLUTO" || cat.name?.includes("ABSOLUTO")) return 999;
+            const text = (cat.age_group || cat.name || "");
+            const match = text.match(/\d+/);
+            if (!match) return 998;
+            let val = parseInt(match[0], 10);
+            if (text.includes("+")) val += 0.5;
+            return val;
           };
           const ageA = getAgeWeight(a);
           const ageB = getAgeWeight(b);
@@ -239,11 +241,13 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
     return [...cats].sort((a, b) => {
       // 1. Idade: dos mais novos para os mais velhos
       const getAgeWeight = (cat: any) => {
-        if (cat.birth_year_max !== null && cat.birth_year_max !== undefined) {
-          return -cat.birth_year_max;
-        }
-        const match = (cat.age_group || cat.name || "").match(/\d+/);
-        return match ? parseInt(match[0], 10) : 999;
+        if (cat.age_group === "ABSOLUTO" || cat.name?.includes("ABSOLUTO")) return 999;
+        const text = (cat.age_group || cat.name || "");
+        const match = text.match(/\d+/);
+        if (!match) return 998;
+        let val = parseInt(match[0], 10);
+        if (text.includes("+")) val += 0.5;
+        return val;
       };
 
       const ageA = getAgeWeight(a);
