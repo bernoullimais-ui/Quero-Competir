@@ -287,7 +287,7 @@ export default function EventInfoTab({ tournament, categories }: EventInfoTabPro
                         <div className="flex flex-wrap gap-2">
                           {uniqueAges.map((age, idx) => (
                             <span key={idx} className="px-3 py-1.5 bg-white text-slate-700 border border-slate-200/60 text-xs font-black rounded-xl shadow-sm">
-                              {age}
+                              {age === "ABSOLUTO" ? "ABSOLUTO(Equipe)" : age}
                             </span>
                           ))}
                         </div>
