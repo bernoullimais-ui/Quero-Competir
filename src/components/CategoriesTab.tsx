@@ -87,6 +87,9 @@ function getSwimAgeClasses(currentYear: number) {
   ];
 }
 
+const isNatacao = (name: string) =>
+  name.toLowerCase().includes("nata") || name.toLowerCase().includes("swim");
+
 export default function CategoriesTab({ categories, refreshCategories, tournamentId }: CategoriesTabProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showReorderModal, setShowReorderModal] = useState(false);
@@ -315,9 +318,6 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
 
   const currentYear = new Date().getFullYear();
   const swimAgeClasses = getSwimAgeClasses(currentYear);
-
-  const isNatacao = (name: string) =>
-    name.toLowerCase().includes("nata") || name.toLowerCase().includes("swim");
 
   const getInitialRulesConfig = (sportName: string) => {
     const name = sportName.toLowerCase();
