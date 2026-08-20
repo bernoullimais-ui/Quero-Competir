@@ -2165,11 +2165,17 @@ export default function TournamentDashboard() {
               const aPago = allGroupedAthletes.reduce((sum, g) => g.paymentStatus === "paid" ? sum + (hasAFee ? g.fee : 0) : sum, 0);
               const aPendente = aPrevisto - aPago;
 
+              const qtyTeamsPaid = registrations.filter((r: any) => r.status === "confirmed").length;
+              const qtyTeamsTotal = registrations.length;
+              const qtyTeamsPending = qtyTeamsTotal - qtyTeamsPaid;
+
+              const qtyAthletesPaid = allGroupedAthletes.filter(g => g.paymentStatus === "paid").length;
+              const qtyAthletesTotal = allGroupedAthletes.length;
+              const qtyAthletesPending = qtyAthletesTotal - qtyAthletesPaid;
+
               const totalPrev = tPrevisto + aPrevisto;
               const totalPg = tPago + aPago;
               const totalPend = totalPrev - totalPg;
-
-
 
               const filteredRegistrations = [...(selectedInstFilter 
                 ? registrations.filter((r: any) => r.institution_id === selectedInstFilter)
@@ -2193,7 +2199,10 @@ export default function TournamentDashboard() {
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total Previsto</span>
                         <span className="text-2xl font-black text-slate-800">{formatCurrency(totalPrev)}</span>
                         <span className="text-[10px] text-slate-400 block mt-1">
-                          Times: {formatCurrency(tPrevisto)} | Atletas: {formatCurrency(aPrevisto)}
+                          Taxas: {formatCurrency(tPrevisto)} | Atletas: {formatCurrency(aPrevisto)}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500 block mt-0.5">
+                          {qtyTeamsTotal + qtyAthletesTotal} Inscrições
                         </span>
                       </div>
                     </div>
@@ -2207,7 +2216,10 @@ export default function TournamentDashboard() {
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total Pago</span>
                         <span className="text-2xl font-black text-emerald-650">{formatCurrency(totalPg)}</span>
                         <span className="text-[10px] text-slate-400 block mt-1">
-                          Times: {formatCurrency(tPago)} | Atletas: {formatCurrency(aPago)}
+                          Taxas: {formatCurrency(tPago)} | Atletas: {formatCurrency(aPago)}
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-650 block mt-0.5">
+                          {qtyTeamsPaid + qtyAthletesPaid} Inscrições Pagas
                         </span>
                       </div>
                     </div>
@@ -2221,7 +2233,10 @@ export default function TournamentDashboard() {
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total Pendente</span>
                         <span className="text-2xl font-black text-amber-600">{formatCurrency(totalPend)}</span>
                         <span className="text-[10px] text-slate-400 block mt-1">
-                          Times: {formatCurrency(tPendente)} | Atletas: {formatCurrency(aPendente)}
+                          Taxas: {formatCurrency(tPendente)} | Atletas: {formatCurrency(aPendente)}
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-600 block mt-0.5">
+                          {qtyTeamsPending + qtyAthletesPending} Inscrições Pendentes
                         </span>
                       </div>
                     </div>
