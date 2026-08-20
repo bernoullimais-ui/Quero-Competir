@@ -31,10 +31,7 @@ function calcAge(birthDate: string) {
   if (!birthDate) return null;
   const today = new Date();
   const b = new Date(birthDate);
-  let age = today.getFullYear() - b.getFullYear();
-  const m = today.getMonth() - b.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
-  return age;
+  return today.getFullYear() - b.getFullYear();
 }
 
 function formatSeedTimeInput(val: string): string {
