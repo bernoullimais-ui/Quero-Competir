@@ -54289,7 +54289,7 @@ async function sendCartRecoveryMessage(params) {
     torneio: params.tournamentName,
     nome_atleta: params.athleteName,
     provas: params.categoryNames.join(", "),
-    valor: params.totalFee > 0 ? `R$ ${params.totalFee.toFixed(2)}` : "Gratuita",
+    valor: params.discountAmount && params.discountAmount > 0 && params.finalFee !== void 0 ? `R$ ${params.finalFee.toFixed(2)} (Valor Original: R$ ${params.totalFee.toFixed(2)} | Desconto: R$ ${params.discountAmount.toFixed(2)})` : params.totalFee > 0 ? `R$ ${params.totalFee.toFixed(2)}` : "Gratuita",
     pix_block: pixBlock,
     link: params.paymentLink || "",
     pix: params.pixCopyPaste || ""
@@ -55587,7 +55587,7 @@ router2.post("/:id/categories/:categoryId/matches/generate", async (req, res) =>
     const isCombat = category?.rules_config?.sport_type === "combat";
     let competitors = [];
     if (isCombat) {
-      const { data: subs, error: subsError } = await supabase.from("athlete_subscriptions").select(`
+      const { data: subs2, error: subsError } = await supabase.from("athlete_subscriptions").select(`
           id,
           athlete_name,
           institution_id,
@@ -55595,7 +55595,7 @@ router2.post("/:id/categories/:categoryId/matches/generate", async (req, res) =>
           institution:institutions(id, name)
         `).eq("tournament_id", tournamentId).eq("category_id", categoryId).eq("validation_status", "approved");
       if (subsError) throw subsError;
-      const filteredSubs = (subs || []).filter((sub) => {
+      const filteredSubs = (subs2 || []).filter((sub) => {
         const age = sub.additional_data?.age_group || "";
         const grad = sub.additional_data?.graduation || "";
         const wt = sub.additional_data?.weight_class || "";
@@ -56593,11 +56593,11 @@ async function getAthleteSubscriptions(tournamentId, institutionId) {
     console.warn("Supabase exception on athlete subscriptions, using JSON fallback", err.message);
   }
   const db = loadDb();
-  const subs = db.athleteSubscriptions.filter((s) => s.tournamentId === tournamentId);
+  const subs2 = db.athleteSubscriptions.filter((s) => s.tournamentId === tournamentId);
   if (institutionId) {
-    return subs.filter((s) => s.institutionId === institutionId);
+    return subs2.filter((s) => s.institutionId === institutionId);
   }
-  return subs;
+  return subs2;
 }
 router2.get("/:id/subscription-settings", async (req, res) => {
   try {
@@ -56674,8 +56674,8 @@ router2.patch("/:id/brackets-visibility", async (req, res) => {
 router2.get("/:id/athlete-subscriptions", async (req, res) => {
   try {
     const tournamentId = req.params.id;
-    const subs = await getAthleteSubscriptions(tournamentId);
-    res.json(subs);
+    const subs2 = await getAthleteSubscriptions(tournamentId);
+    res.json(subs2);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -56684,14 +56684,14 @@ router2.get("/:id/athlete-subscriptions/institution/:instId", async (req, res) =
   try {
     const tournamentId = req.params.id;
     const instId = req.params.instId;
-    const subs = await getAthleteSubscriptions(tournamentId, instId);
+    const subs2 = await getAthleteSubscriptions(tournamentId, instId);
     const supabase = getSupabaseAdmin();
     const settings = await getSubscriptionSettings(tournamentId);
-    if (settings?.requireMembership && subs && subs.length > 0) {
+    if (settings?.requireMembership && subs2 && subs2.length > 0) {
       const { data: tournament } = await supabase.from("tournaments").select("owner_id, start_date").eq("id", tournamentId).maybeSingle();
       if (tournament) {
         const year = new Date(tournament.start_date).getFullYear();
-        const documents = subs.map((s) => s.document || s.documentNumber).filter(Boolean);
+        const documents = subs2.map((s) => s.document || s.documentNumber).filter(Boolean);
         if (documents.length > 0) {
           const { data: members } = await supabase.from("members").select("id, document_number").in("document_number", documents);
           if (members && members.length > 0) {
@@ -56699,32 +56699,32 @@ router2.get("/:id/athlete-subscriptions/institution/:instId", async (req, res) =
             const { data: memberships } = await supabase.from("memberships").select("member_id, status, payment_status").eq("organization_id", tournament.owner_id).eq("year", year).eq("status", "active").eq("payment_status", "paid").in("member_id", memberIds);
             const activeMemberIds = new Set(memberships?.map((m) => m.member_id) || []);
             const docToMemberMap = new Map(members.map((m) => [m.document_number, m.id]));
-            subs.forEach((s) => {
+            subs2.forEach((s) => {
               const doc = s.document || s.documentNumber;
               const mId = docToMemberMap.get(doc);
               s.isMembershipPaid = mId ? activeMemberIds.has(mId) : false;
             });
           } else {
-            subs.forEach((s) => {
+            subs2.forEach((s) => {
               s.isMembershipPaid = false;
             });
           }
         } else {
-          subs.forEach((s) => {
+          subs2.forEach((s) => {
             s.isMembershipPaid = false;
           });
         }
       } else {
-        subs.forEach((s) => {
+        subs2.forEach((s) => {
           s.isMembershipPaid = true;
         });
       }
     } else {
-      subs.forEach((s) => {
+      subs2.forEach((s) => {
         s.isMembershipPaid = true;
       });
     }
-    res.json(subs);
+    res.json(subs2);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -58943,17 +58943,17 @@ router2.get("/public/guardian/:email/matches-with-visitors", requireAuth, async 
   try {
     const supabase = getSupabaseAdmin();
     const db = loadDb();
-    let subs = [];
+    let subs2 = [];
     try {
       const { data, error } = await supabase.from("athlete_subscriptions").select("*").eq("validation_status", "approved");
-      if (!error && data) subs = data.map(mapSubToFrontend);
+      if (!error && data) subs2 = data.map(mapSubToFrontend);
     } catch (err) {
     }
-    if (subs.length === 0) {
-      subs = db.athleteSubscriptions.filter((s) => s.validationStatus === "approved");
+    if (subs2.length === 0) {
+      subs2 = db.athleteSubscriptions.filter((s) => s.validationStatus === "approved");
     }
     const uEmail = email.toLowerCase().trim();
-    const guardianSubs = subs.filter((s) => {
+    const guardianSubs = subs2.filter((s) => {
       return s.parentName && s.parentName.toLowerCase().includes(uEmail) || s.additionalData && s.additionalData.parentEmail && s.additionalData.parentEmail.toLowerCase() === uEmail || s.createdBy === req.user.id;
     });
     if (guardianSubs.length === 0) {
@@ -59663,21 +59663,21 @@ router4.get("/guardian/:email/athletes", requireAuth, async (req, res) => {
   res.setHeader("Expires", "0");
   try {
     const supabase = getSupabaseAdmin();
-    const { data: subs, error: subError } = await supabase.from("athlete_subscriptions").select(`
+    const { data: subs2, error: subError } = await supabase.from("athlete_subscriptions").select(`
         *,
         institutions:institution_id(name),
         tournaments:tournament_id(name, owner_id)
       `);
     console.log("=== DEBUG GUARDIAN ATHLETES ===");
     console.log("subError:", subError);
-    console.log("subs length:", subs?.length);
-    if (subs && subs.length > 0) {
-      console.log("subs[0] keys:", Object.keys(subs[0]));
-      console.log("subs[0] institutions:", subs[0].institutions);
-      console.log("subs[0] tournaments:", subs[0].tournaments);
+    console.log("subs length:", subs2?.length);
+    if (subs2 && subs2.length > 0) {
+      console.log("subs[0] keys:", Object.keys(subs2[0]));
+      console.log("subs[0] institutions:", subs2[0].institutions);
+      console.log("subs[0] tournaments:", subs2[0].tournaments);
     }
-    if (!subError && subs) {
-      const ownerIds = Array.from(new Set(subs.map((s) => s.tournaments?.owner_id).filter(Boolean)));
+    if (!subError && subs2) {
+      const ownerIds = Array.from(new Set(subs2.map((s) => s.tournaments?.owner_id).filter(Boolean)));
       const orgMap = /* @__PURE__ */ new Map();
       if (ownerIds.length > 0) {
         const { data: orgs } = await supabase.from("organizations").select("id, name").in("id", ownerIds);
@@ -59685,7 +59685,7 @@ router4.get("/guardian/:email/athletes", requireAuth, async (req, res) => {
           orgs.forEach((o) => orgMap.set(o.id, o.name));
         }
       }
-      const enriched = subs.map((s) => {
+      const enriched = subs2.map((s) => {
         const ownerId = s.tournaments?.owner_id;
         return {
           ...s,
@@ -60797,30 +60797,63 @@ router7.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
   const { data: tournament } = await supabase.from("tournaments").select("id, name, owner_id").eq("id", finalTournamentId).maybeSingle();
   if (!tournament) return res.status(404).json({ error: "Torneio n\xE3o encontrado" });
   const { data: org } = await supabase.from("organizations").select("whatsapp_tpl_pre_registration").eq("id", tournament.owner_id).maybeSingle();
-  let query = supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, payment_status, category_id").eq("tournament_id", finalTournamentId).neq("payment_status", "paid");
-  if (subId) query = query.eq("id", subId);
-  const { data: subs } = await query;
-  if (!subs || subs.length === 0) return res.json({ success: true, sent: 0 });
-  let sent = 0;
+  const allCategoryIds = /* @__PURE__ */ new Set();
+  for (const sub of subs) {
+    if (Array.isArray(sub.category_id)) sub.category_id.forEach((id) => allCategoryIds.add(id));
+    else if (sub.category_id) allCategoryIds.add(sub.category_id);
+  }
+  const categoryNamesMap = {};
+  if (allCategoryIds.size > 0) {
+    const { data: catData } = await supabase.from("tournament_categories").select("id, name").in("id", Array.from(allCategoryIds));
+    if (catData) {
+      catData.forEach((c) => categoryNamesMap[c.id] = c.name);
+    }
+  }
+  const groupedSubs = /* @__PURE__ */ new Map();
   for (const sub of subs) {
     const phone = sub.parent_phone || sub.additional_data?.phone;
     if (!phone) continue;
+    const key = `${phone}_${sub.athlete_name}`;
+    if (!groupedSubs.has(key)) groupedSubs.set(key, []);
+    groupedSubs.get(key).push(sub);
+  }
+  let sent = 0;
+  for (const group of groupedSubs.values()) {
+    const sub = group[0];
+    const phone = sub.parent_phone || sub.additional_data?.phone;
+    let allProvasIds = [];
+    for (const s of group) {
+      const pIds = Array.isArray(s.category_id) ? s.category_id : s.category_id ? [s.category_id] : [];
+      allProvasIds.push(...pIds);
+    }
+    allProvasIds = [...new Set(allProvasIds)];
+    const totalFee = sub.additional_data?.totalFee || sub.additional_data?.athleteFee || 0;
+    const totalDiscount = sub.discount_amount || 0;
+    const categoryNames = allProvasIds.map((id) => categoryNamesMap[id] || id);
+    const finalFee = Math.max(0, totalFee - totalDiscount);
+    const paymentLink = `https://querocompetir.com.br/public/register-athlete/${sub.id}`;
+    const pixCopyPaste = sub.additional_data?.pixCopyPaste || void 0;
     await sendCartRecoveryMessage({
       phone,
       athleteName: sub.athlete_name,
       tournamentName: tournament.name,
       tournamentId,
       orgId: tournament.owner_id,
-      categoryNames: [sub.category_id],
-      // simplificado; enriched em produção
-      totalFee: 0,
+      categoryNames,
+      totalFee,
+      discountAmount: totalDiscount,
+      finalFee,
+      paymentLink,
+      pixCopyPaste,
       orgTemplate: org?.whatsapp_tpl_pre_registration,
       sentBy: "organizer_manual"
     });
-    await supabase.from("athlete_subscriptions").update({
-      whatsapp_cart_recovery_sent: true,
-      whatsapp_cart_recovery_sent_at: (/* @__PURE__ */ new Date()).toISOString()
-    }).eq("id", sub.id);
+    for (const s of group) {
+      await supabase.from("athlete_subscriptions").update({
+        whatsapp_cart_recovery_sent: true,
+        whatsapp_cart_recovery_sent_at: (/* @__PURE__ */ new Date()).toISOString()
+      }).eq("id", s.id);
+    }
     sent++;
     await new Promise((r) => setTimeout(r, 300));
   }
@@ -60841,34 +60874,72 @@ router7.all("/cron-cart-recovery", async (req, res) => {
   const supabase = getSupabaseAdmin();
   const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1e3).toISOString();
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1e3).toISOString();
-  const { data: subs } = await supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, tournament_id, category_id, payment_status").neq("payment_status", "paid").eq("whatsapp_cart_recovery_sent", false).gte("created_at", twentyFourHoursAgo).lte("created_at", twoHoursAgo);
-  if (!subs || subs.length === 0) {
+  const { data: subs2 } = await supabase.from("athlete_subscriptions").select("id, athlete_name, parent_phone, additional_data, tournament_id, category_id, payment_status, discount_amount").neq("payment_status", "paid").eq("whatsapp_cart_recovery_sent", false).gte("created_at", twentyFourHoursAgo).lte("created_at", twoHoursAgo);
+  if (!subs2 || subs2.length === 0) {
     return res.json({ success: true, processed: 0 });
   }
-  const tournamentIds = [...new Set(subs.map((s) => s.tournament_id))];
+  const tournamentIds = [...new Set(subs2.map((s) => s.tournament_id))];
   const { data: tournaments } = await supabase.from("tournaments").select("id, name, owner_id").in("id", tournamentIds);
   const tMap = {};
   for (const t of tournaments || []) tMap[t.id] = t;
-  let processed = 0;
-  for (const sub of subs) {
+  const allCategoryIds = /* @__PURE__ */ new Set();
+  for (const sub of subs2) {
+    if (Array.isArray(sub.category_id)) sub.category_id.forEach((id) => allCategoryIds.add(id));
+    else if (sub.category_id) allCategoryIds.add(sub.category_id);
+  }
+  const categoryNamesMap = {};
+  if (allCategoryIds.size > 0) {
+    const { data: catData } = await supabase.from("tournament_categories").select("id, name").in("id", Array.from(allCategoryIds));
+    if (catData) {
+      catData.forEach((c) => categoryNamesMap[c.id] = c.name);
+    }
+  }
+  const groupedSubs = /* @__PURE__ */ new Map();
+  for (const sub of subs2) {
     const phone = sub.parent_phone || sub.additional_data?.phone;
     if (!phone) continue;
+    const key = `${sub.tournament_id}_${phone}_${sub.athlete_name}`;
+    if (!groupedSubs.has(key)) groupedSubs.set(key, []);
+    groupedSubs.get(key).push(sub);
+  }
+  let processed = 0;
+  for (const group of groupedSubs.values()) {
+    const sub = group[0];
+    const phone = sub.parent_phone || sub.additional_data?.phone;
     const tournament = tMap[sub.tournament_id];
     if (!tournament) continue;
+    let allProvasIds = [];
+    for (const s of group) {
+      const pIds = Array.isArray(s.category_id) ? s.category_id : s.category_id ? [s.category_id] : [];
+      allProvasIds.push(...pIds);
+    }
+    allProvasIds = [...new Set(allProvasIds)];
+    const totalFee = sub.additional_data?.totalFee || sub.additional_data?.athleteFee || 0;
+    const totalDiscount = sub.discount_amount || 0;
+    const categoryNames = allProvasIds.map((id) => categoryNamesMap[id] || id);
+    const finalFee = Math.max(0, totalFee - totalDiscount);
+    const paymentLink = `https://querocompetir.com.br/public/register-athlete/${sub.id}`;
+    const pixCopyPaste = sub.additional_data?.pixCopyPaste || void 0;
     await sendCartRecoveryMessage({
       phone,
       athleteName: sub.athlete_name,
       tournamentName: tournament.name,
       tournamentId: sub.tournament_id,
       orgId: tournament.owner_id,
-      categoryNames: [],
-      totalFee: 0,
+      categoryNames,
+      totalFee,
+      discountAmount: totalDiscount,
+      finalFee,
+      paymentLink,
+      pixCopyPaste,
       sentBy: "cron"
     });
-    await supabase.from("athlete_subscriptions").update({
-      whatsapp_cart_recovery_sent: true,
-      whatsapp_cart_recovery_sent_at: (/* @__PURE__ */ new Date()).toISOString()
-    }).eq("id", sub.id);
+    for (const s of group) {
+      await supabase.from("athlete_subscriptions").update({
+        whatsapp_cart_recovery_sent: true,
+        whatsapp_cart_recovery_sent_at: (/* @__PURE__ */ new Date()).toISOString()
+      }).eq("id", s.id);
+    }
     processed++;
     await new Promise((r) => setTimeout(r, 200));
   }
@@ -61009,7 +61080,7 @@ var platformRoutes_default = router8;
 var import_express9 = __toESM(require_express2(), 1);
 
 // src/backend/indexHtml.ts
-var indexHtml = '<!doctype html>\n<html lang="pt-BR" translate="no">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <meta name="google" content="notranslate">\n    <title>Quero Competir</title>\n    <link rel="preconnect" href="https://fonts.googleapis.com">\n    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto:ital,wght@0,400;0,500;0,700;0,900;1,400;1,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">\n    <script type="module" crossorigin src="/assets/index-BdfgjwBe.js"></script>\n    <link rel="modulepreload" crossorigin href="/assets/vendor-react-DdCDPtko.js">\n    <link rel="modulepreload" crossorigin href="/assets/vendor-ui-CzhfXNEe.js">\n    <link rel="modulepreload" crossorigin href="/assets/vendor-motion-3qZ3xKb7.js">\n    <link rel="modulepreload" crossorigin href="/assets/vendor-supabase-DQh0Fvtg.js">\n    <link rel="modulepreload" crossorigin href="/assets/vendor-pdf-DY7VEzpH.js">\n    <link rel="stylesheet" crossorigin href="/assets/index-RGp_RkCC.css">\n  </head>\n  <body>\n    <div id="root"></div>\n  </body>\n</html>\n\n';
+var indexHtml = '<!doctype html>\n<html lang="pt-BR" translate="no">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <meta name="google" content="notranslate">\n    <title>Quero Competir</title>\n    <link rel="preconnect" href="https://fonts.googleapis.com">\n    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto:ital,wght@0,400;0,500;0,700;0,900;1,400;1,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">\n    <script type="module" crossorigin src="/assets/index-BO4D2Cjm.js"></script>\n    <link rel="modulepreload" crossorigin href="/assets/vendor-react-DdCDPtko.js">\n    <link rel="modulepreload" crossorigin href="/assets/vendor-ui-CzhfXNEe.js">\n    <link rel="modulepreload" crossorigin href="/assets/vendor-motion-3qZ3xKb7.js">\n    <link rel="modulepreload" crossorigin href="/assets/vendor-supabase-DQh0Fvtg.js">\n    <link rel="modulepreload" crossorigin href="/assets/vendor-pdf-DY7VEzpH.js">\n    <link rel="stylesheet" crossorigin href="/assets/index-RGp_RkCC.css">\n  </head>\n  <body>\n    <div id="root"></div>\n  </body>\n</html>\n\n';
 
 // src/backend/routes/publicRoutes.ts
 var isValidUUID3 = (uuid) => {
@@ -61018,16 +61089,29 @@ var isValidUUID3 = (uuid) => {
 };
 var router9 = (0, import_express9.Router)();
 var DEFAULT_LOGO = "https://www.querocompetir.com.br/assets/logo.png";
+var slugify2 = (text) => {
+  if (!text) return "";
+  return text.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/\s+/g, "-").replace(/[^\w\-]+/g, "").replace(/\-\-+/g, "-");
+};
 var handler = async (req, res) => {
   const { id } = req.params;
   const isScoreboard = req.originalUrl.includes("/placar");
   try {
     const supabase = getSupabaseAdmin();
-    let finalTournamentId = id;
-    if (!isValidUUID3(id)) {
-      const { data: slugData } = await supabase.from("tournaments").select("id").eq("slug", id).maybeSingle();
-      if (slugData) {
-        finalTournamentId = slugData.id;
+    const decoded = decodeURIComponent(id).trim();
+    let finalTournamentId = decoded;
+    if (!isValidUUID3(decoded)) {
+      const { data: allTournaments } = await supabase.from("tournaments").select("id, name, owner_id");
+      if (allTournaments) {
+        const targetSlug = slugify2(decoded);
+        const matched = allTournaments.find(
+          (t) => slugify2(t.name) === targetSlug || t.name.toLowerCase() === decoded.toLowerCase()
+        );
+        if (matched) {
+          finalTournamentId = matched.id;
+        } else {
+          return res.send(indexHtml);
+        }
       } else {
         return res.send(indexHtml);
       }

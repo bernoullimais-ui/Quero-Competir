@@ -270,17 +270,14 @@ router.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
     const phone = sub.parent_phone || sub.additional_data?.phone;
 
     let allProvasIds: string[] = [];
-    let totalFee = 0;
-    let totalDiscount = 0;
     for(const s of group) {
       const pIds = Array.isArray(s.category_id) ? s.category_id : (s.category_id ? [s.category_id] : []);
       allProvasIds.push(...pIds);
-      const fee = s.additional_data?.athleteFee || s.additional_data?.totalFee || 0;
-      totalFee += fee;
-      totalDiscount += s.discount_amount || 0;
     }
     allProvasIds = [...new Set(allProvasIds)];
 
+    const totalFee = sub.additional_data?.totalFee || sub.additional_data?.athleteFee || 0;
+    const totalDiscount = sub.discount_amount || 0;
     const categoryNames = allProvasIds.map((id: string) => categoryNamesMap[id] || id);
     const finalFee = Math.max(0, totalFee - totalDiscount);
     const paymentLink = `https://querocompetir.com.br/public/register-athlete/${sub.id}`;
@@ -406,17 +403,14 @@ router.all("/cron-cart-recovery", async (req, res) => {
     if (!tournament) continue;
 
     let allProvasIds: string[] = [];
-    let totalFee = 0;
-    let totalDiscount = 0;
     for(const s of group) {
       const pIds = Array.isArray(s.category_id) ? s.category_id : (s.category_id ? [s.category_id] : []);
       allProvasIds.push(...pIds);
-      const fee = s.additional_data?.athleteFee || s.additional_data?.totalFee || 0;
-      totalFee += fee;
-      totalDiscount += s.discount_amount || 0;
     }
     allProvasIds = [...new Set(allProvasIds)];
 
+    const totalFee = sub.additional_data?.totalFee || sub.additional_data?.athleteFee || 0;
+    const totalDiscount = sub.discount_amount || 0;
     const categoryNames = allProvasIds.map((id: string) => categoryNamesMap[id] || id);
     const finalFee = Math.max(0, totalFee - totalDiscount);
     const paymentLink = `https://querocompetir.com.br/public/register-athlete/${sub.id}`;

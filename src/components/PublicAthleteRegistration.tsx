@@ -621,34 +621,6 @@ export default function PublicAthleteRegistration() {
           </p>
         </div>
 
-        {/* Info Strip (Deadline and Registration Type) */}
-        {currentStep !== "success" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <div className="bg-white px-5 py-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
-              <Clock className="text-slate-400 flex-shrink-0" size={18} />
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Fim das Inscrições</p>
-                <p className="text-sm font-bold text-slate-700">
-                  {settings.deadline ? new Date(settings.deadline).toLocaleDateString("pt-BR") : "Não informado"}
-                </p>
-              </div>
-            </div>
-            <div className="bg-white px-5 py-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
-              <CreditCard className="text-slate-400 flex-shrink-0" size={18} />
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Taxa de Inscrição</p>
-                <p className="text-sm font-semibold text-slate-700">
-                  {settings.feeType === "free" && <span className="text-emerald-600 font-bold">Gratuita</span>}
-                  {settings.feeType === "by_team" && <span className="text-indigo-600 font-semibold">Inclusa (Paga pela Instituição)</span>}
-                  {settings.feeType === "by_team_and_athlete_institution" && <span className="text-indigo-600 font-semibold">Paga pela Instituição</span>}
-                  {settings.feeType === "by_team_and_athlete_parent" && (
-                    <span className="text-amber-600 font-bold">Paga pelo Responsável (R$ {settings.athleteFee.toFixed(2)})</span>
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Steps Indicators */}
         {currentStep !== "success" && (() => {
