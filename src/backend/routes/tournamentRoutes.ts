@@ -577,6 +577,65 @@ router.get("/institution/:institutionId/registrations", async (req, res) => {
   }
 });
 
+router.get("/stats/athletes-count", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    const reqUser = (req as any).user;
+    const accountId: string | undefined = reqUser?.id || (req.headers["x-organizer-id"] as string) || undefined;
+
+    let orgId: string | null = reqUser?.referenceId || null;
+    let role: string | null = reqUser?.role || null;
+    
+    if (accountId && (!role || !orgId)) {
+      if (fs.existsSync(ACCOUNTS_FILE)) {
+        try {
+          const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, "utf-8"));
+          const acct = accounts.find((a: any) => a.id === accountId);
+          if (acct) {
+            if (!role) role = acct.role || null;
+            if (!orgId && acct.referenceId) orgId = acct.referenceId;
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (!orgId) {
+      return res.json({ count: 0 });
+    }
+
+    const { data: tournaments, error: tErr } = await supabase
+      .from("tournaments")
+      .select("id")
+      .eq("owner_id", orgId)
+      .neq("status", "cancelled");
+
+    if (tErr || !tournaments || tournaments.length === 0) {
+      return res.json({ count: 0 });
+    }
+
+    const tIds = tournaments.map(t => t.id);
+
+    const { data: subs, error: sErr } = await supabase
+      .from("athlete_subscriptions")
+      .select("athlete_name, document, user_id")
+      .in("tournament_id", tIds);
+
+    if (sErr || !subs) {
+      return res.json({ count: 0 });
+    }
+
+    const unique = new Set();
+    subs.forEach(s => {
+      const key = (s.document || s.athlete_name || s.user_id || Math.random().toString()).toLowerCase().trim();
+      unique.add(key);
+    });
+
+    res.json({ count: unique.size });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Listar torneios ativos
 router.get("/", async (req, res) => {
   try {

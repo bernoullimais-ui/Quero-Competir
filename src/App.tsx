@@ -255,10 +255,10 @@ const Home = () => {
       })
       .catch(console.error);
 
-    fetch("/api/members", { headers })
+    fetch("/api/tournaments/stats/athletes-count", { headers })
       .then(res => res.json())
       .then(data => {
-        if (data && !data.error) setMembersCount(data.length);
+        if (data && typeof data.count === "number") setMembersCount(data.count);
       })
       .catch(console.error);
 
