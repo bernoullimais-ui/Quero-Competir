@@ -99,6 +99,9 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const { success: toastSuccess, error: toastError } = useToast();
+  
+  const [filterAgeClass, setFilterAgeClass] = useState<string>("");
+  const [filterEvent, setFilterEvent] = useState<string>("");
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
@@ -599,9 +602,37 @@ export default function CategoriesTab({ categories, refreshCategories, tournamen
         </div>
       </div>
 
+      {categories.length > 0 && (
+        <div className="flex gap-4 mb-4">
+          <select 
+            value={filterAgeClass} 
+            onChange={e => setFilterAgeClass(e.target.value)}
+            className="px-4 py-2 rounded-xl border border-slate-200 outline-none text-sm text-slate-700 bg-white shadow-sm"
+          >
+            <option value="">Todas as Classes de Idade</option>
+            {Array.from(new Set(categories.map(c => c.age_group).filter(Boolean))).sort().map(age => (
+              <option key={age} value={age}>{age}</option>
+            ))}
+          </select>
+          <select 
+            value={filterEvent} 
+            onChange={e => setFilterEvent(e.target.value)}
+            className="px-4 py-2 rounded-xl border border-slate-200 outline-none text-sm text-slate-700 bg-white shadow-sm"
+          >
+            <option value="">Todas as Provas / Esportes</option>
+            {Array.from(new Set(categories.map(c => c.rules_config?.swim_event_label || c.name).filter(Boolean))).sort().map(event => (
+              <option key={event} value={event}>{event}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {categories.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {categories.map((cat, i) => {
+          {categories
+            .filter(cat => (!filterAgeClass || cat.age_group === filterAgeClass) && (!filterEvent || (cat.rules_config?.swim_event_label || cat.name) === filterEvent))
+            .map((cat) => {
+            const i = categories.indexOf(cat);
             const isDragging = draggedIndex === i;
             const isDragOver = dragOverIndex === i;
 
