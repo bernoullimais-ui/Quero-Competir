@@ -1281,11 +1281,11 @@ export default function PublicAthleteRegistration() {
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>
                           <span className="block text-[10px] font-bold text-slate-400 uppercase">Atleta / Participante</span>
-                          <span className="font-extrabold text-slate-800">{data?.subscription?.athleteName || athleteName || "Atleta"}</span>
+                          <span className="font-extrabold text-slate-800">{data?.subscription?.athleteName || "Atleta"}</span>
                         </div>
                         <div>
                           <span className="block text-[10px] font-bold text-slate-400 uppercase">Responsável</span>
-                          <span className="font-extrabold text-slate-800">{data?.subscription?.parentName || parentName || "Responsável"}</span>
+                          <span className="font-extrabold text-slate-800">{data?.subscription?.parentName || "Responsável"}</span>
                         </div>
                         <div>
                           <span className="block text-[10px] font-bold text-slate-400 uppercase">Clube / Entidade</span>
