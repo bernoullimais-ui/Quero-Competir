@@ -3976,7 +3976,7 @@ router.post("/:id/self-register", async (req, res) => {
         const categoryNames = cats?.map((c: any) => c.name) || targetCategoryIds;
 
         // PIX ou link de pagamento do primeiro sub
-        const pixLink = totalFee > 0 ? `${process.env.APP_URL || "https://querocompetir.com.br"}/public/register-athlete/${createdSubIds[0]}` : undefined;
+        const pixLink = totalFee > 0 ? `https://www.querocompetir.com.br/public/register-athlete/${createdSubIds[0]}` : undefined;
 
         await sendPreRegistrationMessage({
           phone,

@@ -280,7 +280,7 @@ router.post("/cart-recovery/:tournamentId", requireAuth, async (req, res) => {
     const totalDiscount = sub.discount_amount || 0;
     const categoryNames = allProvasIds.map((id: string) => categoryNamesMap[id] || id);
     const finalFee = Math.max(0, totalFee - totalDiscount);
-    const paymentLink = `https://querocompetir.com.br/public/register-athlete/${sub.id}`;
+    const paymentLink = `https://www.querocompetir.com.br/public/register-athlete/${sub.id}`;
     const pixCopyPaste = sub.additional_data?.pixCopyPaste || undefined;
 
     await sendCartRecoveryMessage({
@@ -413,7 +413,7 @@ router.all("/cron-cart-recovery", async (req, res) => {
     const totalDiscount = sub.discount_amount || 0;
     const categoryNames = allProvasIds.map((id: string) => categoryNamesMap[id] || id);
     const finalFee = Math.max(0, totalFee - totalDiscount);
-    const paymentLink = `https://querocompetir.com.br/public/register-athlete/${sub.id}`;
+    const paymentLink = `https://www.querocompetir.com.br/public/register-athlete/${sub.id}`;
     const pixCopyPaste = sub.additional_data?.pixCopyPaste || undefined;
 
     await sendCartRecoveryMessage({
