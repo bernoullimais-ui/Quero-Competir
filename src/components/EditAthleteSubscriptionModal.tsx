@@ -48,9 +48,25 @@ export default function EditAthleteSubscriptionModal({
     setLoading(true);
     try {
       const referenceSubId = athleteGroup.subIds[0];
+      const savedUser = localStorage.getItem("currentUser");
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json"
+      };
+      
+      if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser);
+          if (user && user.token) {
+            headers["Authorization"] = `Bearer ${user.token}`;
+          }
+        } catch (e) {
+          console.error("Error parsing user from localStorage", e);
+        }
+      }
+
       const res = await fetch(`/api/tournaments/${tournamentId}/athlete-subscriptions/bulk-edit`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           referenceSubId,
           targetCategoryIds: selectedCategoryIds
