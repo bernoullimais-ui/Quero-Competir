@@ -4,6 +4,8 @@ import { Settings, Timer, AlertCircle, Users, Plus, Trash2, Eye, Download, FileT
 import { useToast } from "./ui/Toast.tsx";
 import { useConfirm } from "./ui/ConfirmDialog.tsx";
 import AthleteEnrollmentModal from "./AthleteEnrollmentModal.tsx";
+import EditAthleteSubscriptionModal from "./EditAthleteSubscriptionModal.tsx";
+import { Edit2 } from "lucide-react";
 
 interface SubscriptionsTabProps {
   tournamentId: string;
@@ -55,6 +57,9 @@ export default function SubscriptionsTab({
   
   const [showAthleteModal, setShowAthleteModal] = useState(false);
   const [selectedReg, setSelectedReg] = useState<any>(null);
+
+  const [showEditAthleteModal, setShowEditAthleteModal] = useState(false);
+  const [editingAthleteGroup, setEditingAthleteGroup] = useState<any>(null);
 
   const fetchSubscriptionDbs = async () => {
     if (!tournamentId) return;
@@ -473,6 +478,16 @@ export default function SubscriptionsTab({
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="font-bold text-slate-800 text-md">{group.athleteName}</h4>
+                            <button
+                              onClick={() => {
+                                setEditingAthleteGroup(group);
+                                setShowEditAthleteModal(true);
+                              }}
+                              className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition cursor-pointer"
+                              title="Editar Inscrição"
+                            >
+                              <Edit2 size={14} />
+                            </button>
                             {group.additionalData?.registration_source === "self" && (
                               <span className="px-2 py-0.5 rounded-md text-[9px] uppercase font-black bg-cyan-50 border border-cyan-200 text-cyan-700">Auto-Inscrição</span>
                             )}
@@ -982,6 +997,21 @@ export default function SubscriptionsTab({
         )}
       </AnimatePresence>
 
+      <EditAthleteSubscriptionModal
+        isOpen={showEditAthleteModal}
+        onClose={() => {
+          setShowEditAthleteModal(false);
+          setEditingAthleteGroup(null);
+        }}
+        tournamentId={tournamentId}
+        athleteGroup={editingAthleteGroup}
+        categories={categories}
+        refreshData={() => {
+          fetchSubscriptionDbs();
+          if (refreshAthleteSubs) refreshAthleteSubs();
+          refreshSummary();
+        }}
+      />
     </div>
   );
 }

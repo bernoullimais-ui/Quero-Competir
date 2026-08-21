@@ -4070,7 +4070,84 @@ router.post("/:id/self-register", async (req, res) => {
   }
 });
 
-// Adicionar/Atualizar atletas pré-autorizados (pela instituição)
+// Editar inscrições de um atleta (Adicionar / Remover provas)
+router.put("/:id/athlete-subscriptions/bulk-edit", requireAuth, async (req, res) => {
+  try {
+    const tournamentId = req.params.id;
+    const { referenceSubId, targetCategoryIds } = req.body;
+
+    if (!referenceSubId || !targetCategoryIds || !Array.isArray(targetCategoryIds)) {
+      return res.status(400).json({ error: "Parâmetros inválidos" });
+    }
+
+    const supabase = getSupabaseAdmin();
+
+    const { data: refSub, error: refErr } = await supabase
+      .from('athlete_subscriptions')
+      .select('*')
+      .eq('id', referenceSubId)
+      .eq('tournament_id', tournamentId)
+      .single();
+
+    if (refErr || !refSub) {
+      return res.status(404).json({ error: "Inscrição de referência não encontrada." });
+    }
+
+    let query = supabase.from('athlete_subscriptions').select('id, category_id').eq('tournament_id', tournamentId);
+    
+    if (refSub.document) {
+      query = query.eq('document', refSub.document);
+    } else {
+      query = query.eq('athlete_name', refSub.athlete_name);
+      if (refSub.parent_phone) {
+        query = query.eq('parent_phone', refSub.parent_phone);
+      }
+    }
+
+    const { data: currentSubs, error: subsErr } = await query;
+    if (subsErr) throw subsErr;
+
+    const currentCategoryIds = currentSubs.map(s => s.category_id);
+    const categoriesToRemove = currentCategoryIds.filter(id => !targetCategoryIds.includes(id));
+    const categoriesToAdd = targetCategoryIds.filter(id => !currentCategoryIds.includes(id));
+
+    if (categoriesToRemove.length > 0) {
+      const subsToRemove = currentSubs.filter(s => categoriesToRemove.includes(s.category_id)).map(s => s.id);
+      const { error: delErr } = await supabase
+        .from('athlete_subscriptions')
+        .delete()
+        .in('id', subsToRemove);
+      if (delErr) throw delErr;
+    }
+
+    if (categoriesToAdd.length > 0) {
+      const { data: settings } = await supabase.from('tournament_subscription_settings').select('athlete_fee').eq('tournament_id', tournamentId).maybeSingle();
+      const unitFee = Number(settings?.athlete_fee) || 0;
+
+      const newSubs = categoriesToAdd.map(catId => {
+        const newSub = { ...refSub };
+        delete newSub.id;
+        delete newSub.created_at;
+        newSub.category_id = catId;
+        newSub.payment_status = unitFee > 0 ? "pending" : "paid";
+        newSub.validation_status = "pending";
+        newSub.checked_in_at = null;
+        return newSub;
+      });
+
+      const { error: insErr } = await supabase
+        .from('athlete_subscriptions')
+        .insert(newSubs);
+      if (insErr) throw insErr;
+    }
+
+    res.json({ success: true, message: "Inscrições atualizadas com sucesso." });
+  } catch (error: any) {
+    console.error("[bulk-edit]", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Adicionar/Atualizar atletas pré-autorizados (pela instituição)
 router.post("/:id/athlete-subscriptions", async (req, res) => {
 
